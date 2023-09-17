@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/dev-warrior777/go-electrum-client/node"
+	btcnode "github.com/dev-warrior777/go-electrum-client/chain/btc"
 )
 
 var (
@@ -29,9 +29,9 @@ func realMain() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	node.DebugMode = true
+	btcnode.DebugMode = true
 
-	node := node.NewNode()
+	node := btcnode.NewNode()
 	defer node.Disconnect()
 
 	connectCtx, cancel := context.WithTimeout(ctx, time.Second*3)
