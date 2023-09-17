@@ -2,8 +2,8 @@
 
 Golang Electrum Client.
 
-## Electrum wallet in Go
+## Electrum client wallet in Go
 
 - Electrum wallet library & console API
-- ElectrumX node RPC
+- ElectrumX chain node RPC
 - No GUI

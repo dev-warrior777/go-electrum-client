@@ -1,3 +1,3 @@
-# BTC Node Applications
+# BTC Node - Example Applications
 
-- singlenode - runs simple API tests on one BTC ElectrumX server
+- singlenode - runs simple API tests on one BTC ElectrumX mainnet server

@@ -1,4 +1,4 @@
 
-# Package node
+# Package btc
 
-A node is an electrumX server.
+A btc chain node is a BTC electrumX server.

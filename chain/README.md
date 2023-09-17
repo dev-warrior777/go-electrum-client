@@ -1,4 +1,6 @@
 
-# Package node
+# Package chain
 
-A node is an electrumX server.
+- A chain manager manages electrumX chain nodes
+
+- A chain node is an electrumX server.
