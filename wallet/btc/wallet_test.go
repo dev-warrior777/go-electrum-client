@@ -24,16 +24,15 @@ func TestWalletCreationAndLoad(t *testing.T) {
 	walletFile := filepath.Join(tmpDir, "wallet.db")
 	fmt.Printf("%s\n", walletFile)
 
-	privPass := "abc"
-
 	ec := NewBtcElectrumClient("testnet")
 	fmt.Println("ChainManager: ", ec.chainManager)
 
+	privPass := "abc"
 	err = ec.CreateWallet(privPass)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("made a btcWallet")
+	fmt.Println("made a btcWallet", ec.wallet)
 
 	/*
 

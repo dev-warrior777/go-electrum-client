@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg"
-
 	"github.com/dev-warrior777/go-electrum-client/chain"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
