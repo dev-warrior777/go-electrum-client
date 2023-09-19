@@ -11,20 +11,30 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dev-warrior777/go-electrum-client/chain"
+	"github.com/btcsuite/btcd/chaincfg"
 	chainbtc "github.com/dev-warrior777/go-electrum-client/chain/btc"
+	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
+const tmpDirName = "./testdata"
+
 func TestWalletCreationAndLoad(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "")
+	tmpDir, err := os.MkdirTemp(tmpDirName, "")
 	if err != nil {
-		t.Fatalf("Error creating temporary directory: %v", err)
+		log.Fatalf("Error creating temporary directory: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	walletFile := filepath.Join(tmpDir, "wallet.db")
+
+	cfg := wallet.NewDefaultConfig()
+	cfg.Chain = wallet.Bitcoin
+	cfg.Params = &chaincfg.TestNet3Params
+	defaultDataDir := cfg.DataDir
+	newDataDir := filepath.Join(tmpDir, defaultDataDir)
+	cfg.DataDir = newDataDir
+	walletFile := filepath.Join(newDataDir, "wallet.db")
 	fmt.Printf("%s\n", walletFile)
 
-	ec := NewBtcElectrumClient("testnet")
+	ec := NewBtcElectrumClient(cfg)
 	fmt.Println("ChainManager: ", ec.chainManager)
 
 	privPass := "abc"
@@ -92,16 +102,21 @@ var (
 )
 
 func TestRunNode(t *testing.T) {
-	ec := NewBtcElectrumClient("testnet")
-	// ec := NewBtcElectrumClient("mainnet")
-	cm := ec.chainManager
-	fmt.Println("NodeManager: ", cm)
+	cm := wallet.ChainManager{
+		Chain: wallet.Bitcoin,
+		Net:   "testnet",
+	}
+	// cm := wallet.ChainManager{
+	// 	Chain: wallet.Bitcoin,
+	// 	Net: "mainnet",
+	// }
+	fmt.Println("ChainManager: ", cm)
 
 	var serverAddr string
 	switch cm.Net {
-	case chain.NetTypeMainnet:
+	case "mainnet":
 		serverAddr = mainserverAddr
-	case chain.NetTypeTestnet:
+	case "testnet":
 		serverAddr = testServerAddr
 	default:
 		t.Fatal("invalid chain net type")
@@ -184,10 +199,10 @@ func TestRunNode(t *testing.T) {
 
 	var transaction *chainbtc.GetTransaction
 	switch cm.Net {
-	case chain.NetTypeMainnet:
+	case "mainnet":
 		transaction, err = btcNode.BlockchainTransactionGet( /*mainnet*/
 			ctx, "f53a8b83f85dd1ce2a6ef4593e67169b90aaeb402b3cf806b37afc634ef71fbc", false)
-	case chain.NetTypeTestnet:
+	case "testnet":
 		transaction, err = btcNode.BlockchainTransactionGet( /*testnet3*/
 			ctx, "581d837b8bcca854406dc5259d1fb1e0d314fcd450fb2d4654e78c48120e0135", false)
 	default:

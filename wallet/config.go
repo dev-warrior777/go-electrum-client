@@ -10,7 +10,10 @@ const (
 )
 
 type Config struct {
-	// Network parameters. Set mainnet, testnet, or regtest using this.
+	// The blockchain, Bitcoin, Dash, etc
+	Chain CoinType
+
+	// Network parameters. Set mainnet, testnet using this.
 	Params *chaincfg.Params
 
 	// The user-agent that shall be visible to peers
@@ -25,8 +28,10 @@ type Config struct {
 
 func NewDefaultConfig() *Config {
 	return &Config{
+		Chain:     Bitcoin,
 		Params:    &chaincfg.MainNetParams,
 		UserAgent: appName,
 		DataDir:   btcutil.AppDataDir(appName, false),
+		DB:        nil, // TODO: update for concrete impl
 	}
 }

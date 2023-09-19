@@ -21,6 +21,7 @@ type CoinType uint32
 const (
 	Bitcoin     CoinType = 0
 	Litecoin             = 1
+	Dash                 = 5
 	Zcash                = 133
 	BitcoinCash          = 145
 	Ethereum             = 60
