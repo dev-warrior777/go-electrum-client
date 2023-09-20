@@ -21,7 +21,7 @@ type CoinType uint32
 const (
 	Bitcoin     CoinType = 0
 	Litecoin             = 1
-	Dash                 = 5
+	Dash                 = 5 // TODO: impl
 	Zcash                = 133
 	BitcoinCash          = 145
 	Ethereum             = 60
@@ -122,7 +122,7 @@ type Stxos interface {
 
 type Txns interface {
 	// Put a new transaction to the database
-	Put(raw []byte, txid, value string, height int, timestamp time.Time, watchOnly bool) error
+	Put(raw []byte, txid string, value int64, height int, timestamp time.Time, watchOnly bool) error
 
 	// Fetch a tx and it's metadata given a hash
 	Get(txid chainhash.Hash) (Txn, error)
@@ -133,7 +133,7 @@ type Txns interface {
 	// Update the height of a transaction
 	UpdateHeight(txid chainhash.Hash, height int, timestamp time.Time) error
 
-	// Delete a transactions from the db
+	// Delete a transaction from the db
 	Delete(txid *chainhash.Hash) error
 }
 
@@ -196,7 +196,7 @@ type Utxo struct {
 	AtHeight int32
 
 	// The higher the better
-	Value string
+	Value int64
 
 	// Output script
 	ScriptPubkey []byte
@@ -271,7 +271,7 @@ type Txn struct {
 	Txid string
 
 	// The value relevant to the wallet
-	Value string
+	Value int64
 
 	// The height at which it was mined
 	Height int32

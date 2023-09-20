@@ -16,20 +16,21 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-const tmpDirName = "./testdata"
+// new wallets, etc. Manually clean while developing
+const tmpDirName = "testdata"
+
+var tmpDirPath string
+
+func init() {
+	wd, _ := os.Getwd()
+	tmpDirPath = filepath.Join(wd, tmpDirName)
+}
 
 func TestWalletCreationAndLoad(t *testing.T) {
-	tmpDir, err := os.MkdirTemp(tmpDirName, "")
-	if err != nil {
-		log.Fatalf("Error creating temporary directory: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
 	cfg := wallet.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
 	cfg.Params = &chaincfg.TestNet3Params
-	defaultDataDir := cfg.DataDir
-	newDataDir := filepath.Join(tmpDir, defaultDataDir)
+	newDataDir := filepath.Join(tmpDirPath, tmpDirName)
 	cfg.DataDir = newDataDir
 	walletFile := filepath.Join(newDataDir, "wallet.db")
 	fmt.Printf("%s\n", walletFile)
@@ -38,7 +39,7 @@ func TestWalletCreationAndLoad(t *testing.T) {
 	fmt.Println("ChainManager: ", ec.chainManager)
 
 	privPass := "abc"
-	err = ec.CreateWallet(privPass)
+	err := ec.CreateWallet(privPass)
 	if err != nil {
 		t.Fatal(err)
 	}

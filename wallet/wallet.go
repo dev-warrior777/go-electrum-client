@@ -303,6 +303,12 @@ const (
 	INTERNAL            = 1
 )
 
+/*
+  Be careful below when Value big.Int is returned that it is not greater than IsInt64()
+
+  i.e. not greater than int64 MAX satoshis (~~10 billion bitcoins)
+*/
+
 // This callback is passed to any registered transaction listeners when a transaction is detected
 // for the wallet.
 type TransactionCallback struct {
