@@ -30,10 +30,9 @@ func TestWalletCreationAndLoad(t *testing.T) {
 	cfg := wallet.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
 	cfg.Params = &chaincfg.TestNet3Params
-	newDataDir := filepath.Join(tmpDirPath, tmpDirName)
-	cfg.DataDir = newDataDir
-	walletFile := filepath.Join(newDataDir, "wallet.db")
-	fmt.Printf("%s\n", walletFile)
+	cfg.DataDir = tmpDirPath
+	walletFile := filepath.Join(cfg.DataDir, "wallet.db")
+	fmt.Printf("Wallet: %s\n", walletFile)
 
 	ec := NewBtcElectrumClient(cfg)
 	fmt.Println("ChainManager: ", ec.chainManager)
