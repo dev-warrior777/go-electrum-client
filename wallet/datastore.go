@@ -2,8 +2,6 @@ package wallet
 
 import (
 	"bytes"
-	"encoding/json"
-	"math/big"
 	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
@@ -319,12 +317,12 @@ type KeyPath struct {
 	Index   int
 }
 
-type CurrencyDefinition struct {
-	Code         string
-	Divisibility int64
-}
-type CurrencyValue struct {
-	Currency           CurrencyDefinition
-	Value              big.Int
-	ValueSerialization json.Number
-}
+// type CurrencyDefinition struct {
+// 	Code         string
+// 	Divisibility int64
+// }
+// type CurrencyValue struct {
+// 	Currency           CurrencyDefinition
+// 	Value              big.Int
+// 	ValueSerialization json.Number
+// }

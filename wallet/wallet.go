@@ -136,7 +136,7 @@ type walletMustManager interface {
 	// The reason for this that if the spend never confirms, no coins will be lost to the wallet.
 	//
 	// The returned balances should be in the coin's base unit (for example: satoshis)
-	Balance() (confirmed, unconfirmed CurrencyValue)
+	Balance() (confirmed, unconfirmed int64)
 
 	// Transactions returns a list of transactions for this wallet.
 	Transactions() ([]Txn, error)
@@ -317,14 +317,14 @@ type TransactionCallback struct {
 	Inputs    []TransactionInput
 	Height    int32
 	Timestamp time.Time
-	Value     big.Int
+	Value     int64
 	WatchOnly bool
 	BlockTime time.Time
 }
 
 type TransactionOutput struct {
 	Address btcutil.Address
-	Value   big.Int
+	Value   int64
 	Index   uint32
 	OrderID string
 }
@@ -333,7 +333,7 @@ type TransactionInput struct {
 	OutpointHash  []byte
 	OutpointIndex uint32
 	LinkedAddress btcutil.Address
-	Value         big.Int
+	Value         int64
 	OrderID       string
 }
 
