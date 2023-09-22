@@ -82,7 +82,7 @@ func (u *UtxoDB) GetAll() ([]wallet.Utxo, error) {
 		}
 		ret = append(ret, wallet.Utxo{
 			Op:           *wire.NewOutPoint(shaHash, uint32(index)),
-			AtHeight:     int32(height),
+			AtHeight:     int64(height),
 			Value:        int64(value),
 			ScriptPubkey: scriptBytes,
 			WatchOnly:    watchOnly,

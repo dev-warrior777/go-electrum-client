@@ -234,7 +234,7 @@ func (m *mockTxnStore) Put(raw []byte, txid string, value, height int, timestamp
 	m.txns[txid] = &wallet.Txn{
 		Txid:      txid,
 		Value:     int64(value),
-		Height:    int32(height),
+		Height:    int64(height),
 		Timestamp: timestamp,
 		WatchOnly: watchOnly,
 		Bytes:     raw,
@@ -266,7 +266,7 @@ func (m *mockTxnStore) UpdateHeight(txid chainhash.Hash, height int, timestamp t
 	if !ok {
 		return errors.New("Not found")
 	}
-	txn.Height = int32(height)
+	txn.Height = int64(height)
 	txn.Timestamp = timestamp
 	return nil
 }

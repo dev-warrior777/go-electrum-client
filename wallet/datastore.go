@@ -191,7 +191,7 @@ type Utxo struct {
 	Op wire.OutPoint
 
 	// Block height where this tx was confirmed, 0 for unconfirmed
-	AtHeight int32
+	AtHeight int64
 
 	// The higher the better
 	Value int64
@@ -238,7 +238,7 @@ type Stxo struct {
 	Utxo Utxo
 
 	// The height at which it met its demise
-	SpendHeight int32
+	SpendHeight int64
 
 	// The tx that consumed it
 	SpendTxid chainhash.Hash
@@ -272,7 +272,7 @@ type Txn struct {
 	Value int64
 
 	// The height at which it was mined
-	Height int32
+	Height int64
 
 	// The time the transaction was first seen
 	Timestamp time.Time
@@ -316,13 +316,3 @@ type KeyPath struct {
 	Purpose KeyPurpose
 	Index   int
 }
-
-// type CurrencyDefinition struct {
-// 	Code         string
-// 	Divisibility int64
-// }
-// type CurrencyValue struct {
-// 	Currency           CurrencyDefinition
-// 	Value              big.Int
-// 	ValueSerialization json.Number
-// }

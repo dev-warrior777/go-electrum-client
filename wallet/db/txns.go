@@ -70,7 +70,7 @@ func (t *TxnsDB) Get(txid chainhash.Hash) (wallet.Txn, error) {
 	txn = wallet.Txn{
 		Txid:      msgTx.TxHash().String(),
 		Value:     int64(value),
-		Height:    int32(height),
+		Height:    int64(height),
 		Timestamp: time.Unix(int64(timestamp), 0),
 		WatchOnly: watchOnly,
 		Bytes:     ret,
@@ -111,7 +111,7 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 		txn := wallet.Txn{
 			Txid:      msgTx.TxHash().String(),
 			Value:     int64(value),
-			Height:    int32(height),
+			Height:    int64(height),
 			Timestamp: time.Unix(int64(timestamp), 0),
 			WatchOnly: watchOnly,
 			Bytes:     tx,

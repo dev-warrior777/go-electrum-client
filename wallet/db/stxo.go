@@ -88,14 +88,14 @@ func (s *StxoDB) GetAll() ([]wallet.Stxo, error) {
 		}
 		utxo := wallet.Utxo{
 			Op:           *wire.NewOutPoint(shaHash, uint32(index)),
-			AtHeight:     int32(height),
+			AtHeight:     int64(height),
 			Value:        int64(value),
 			ScriptPubkey: scriptBytes,
 			WatchOnly:    watchOnly,
 		}
 		ret = append(ret, wallet.Stxo{
 			Utxo:        utxo,
-			SpendHeight: int32(spendHeight),
+			SpendHeight: int64(spendHeight),
 			SpendTxid:   *spentHash,
 		})
 	}

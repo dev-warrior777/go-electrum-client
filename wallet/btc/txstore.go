@@ -20,7 +20,7 @@ import (
 type TxStore struct {
 	adrs           []btcutil.Address
 	watchedScripts [][]byte
-	txids          map[string]int32
+	txids          map[string]int64
 	txidsMutex     *sync.RWMutex
 	addrMutex      *sync.Mutex
 	cbMutex        *sync.Mutex
@@ -41,7 +41,7 @@ func NewTxStore(p *chaincfg.Params, db wallet.Datastore, keyManager *KeyManager)
 		addrMutex:  new(sync.Mutex),
 		cbMutex:    new(sync.Mutex),
 		txidsMutex: new(sync.RWMutex),
-		txids:      make(map[string]int32),
+		txids:      make(map[string]int64),
 		Datastore:  db,
 	}
 	err := txs.PopulateAdrs()
@@ -194,7 +194,7 @@ func (ts *TxStore) PopulateAdrs() error {
 
 // Ingest puts a tx into the DB atomically.  This can result in a
 // gain, a loss, or no result.  Gain or loss in satoshis is returned.
-func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32, timestamp time.Time) (uint32, error) {
+func (ts *TxStore) Ingest(tx *wire.MsgTx, height int64, timestamp time.Time) (uint32, error) {
 	var hits uint32
 	var err error
 	// Tx has been OK'd by SPV; check tx sanity
@@ -452,7 +452,7 @@ func (ts *TxStore) processReorg(lastGoodHeight uint32) error {
 		return err
 	}
 	for i := len(txns) - 1; i >= 0; i-- {
-		if txns[i].Height > int32(lastGoodHeight) {
+		if txns[i].Height > int64(lastGoodHeight) {
 			txid, err := chainhash.NewHashFromStr(txns[i].Txid)
 			if err != nil {
 				log.Println(err.Error())

@@ -7,10 +7,104 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
-type ElectrumWallet interface{}
+type ElectrumWallet interface {
+
+	// Start the wallet
+	Start()
+
+	// Return the network parameters
+	Params() *chaincfg.Params
+
+	// Returns the type of crytocurrency this wallet implements
+	CurrencyCode() string
+
+	// Check if this amount is considered dust < 1000 sats/equivalent for now
+	IsDust(amount int64) bool
+
+	// Get the master private key
+	MasterPrivateKey() *hd.ExtendedKey
+
+	// Get the master public key
+	MasterPublicKey() *hd.ExtendedKey
+
+	// Get the current address for the given purpose
+	CurrentAddress(purpose KeyPurpose) btcutil.Address
+
+	// Returns a fresh address that has never been returned by this function
+	NewAddress(purpose KeyPurpose) btcutil.Address
+
+	// Parse the address string and return an address interface
+	DecodeAddress(addr string) (btcutil.Address, error)
+
+	// Turn the given output script into an address
+	ScriptToAddress(script []byte) (btcutil.Address, error)
+
+	// Turn the given address into an output script
+	AddressToScript(addr btcutil.Address) ([]byte, error)
+
+	// Returns if the wallet has the key for the given address
+	HasKey(addr btcutil.Address) bool
+
+	// Get the confirmed and unconfirmed balances
+	Balance() (confirmed, unconfirmed int64)
+
+	// Returns a list of transactions for this wallet
+	Transactions() ([]Txn, error)
+
+	// Get info on a specific transaction
+	GetTransaction(txid chainhash.Hash) (Txn, error)
+
+	// Return the number of confirmations and the height for a transaction
+	GetConfirmations(txid chainhash.Hash) (confirms, atHeight int64, err error)
+
+	// Get the height of the blockchain from chain manager
+	ChainTip() int64
+
+	// Get the current fee per byte
+	GetFeePerByte(feeLevel FeeLevel) uint64
+
+	// Send bitcoins to an external wallet
+	Spend(amount int64, addr btcutil.Address, feeLevel FeeLevel) (*chainhash.Hash, error)
+
+	// Bump the fee for the given transaction
+	BumpFee(txid chainhash.Hash) (*chainhash.Hash, error)
+
+	// Calculates the estimated size of the transaction and returns the total fee for the given feePerByte
+	EstimateFee(ins []TransactionInput, outs []TransactionOutput, feePerByte uint64) uint64
+
+	// Build and broadcast a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
+	SweepAddress(utxos []Utxo, address *btcutil.Address, key *hd.ExtendedKey, redeemScript *[]byte, feeLevel FeeLevel) (*chainhash.Hash, error)
+
+	// Create a signature for a multisig transaction
+	CreateMultisigSignature(ins []TransactionInput, outs []TransactionOutput, key *hd.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]Signature, error)
+
+	// Combine signatures and optionally broadcast
+	Multisign(ins []TransactionInput, outs []TransactionOutput, sigs1 []Signature, sigs2 []Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error)
+
+	// Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked escrow which releases using the timeoutKey.
+	GenerateMultisigScript(keys []hd.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hd.ExtendedKey) (addr btcutil.Address, redeemScript []byte, err error)
+
+	// Add a script to the wallet and get notifications back when coins are received or spent from it
+	AddWatchedScript(script []byte) error
+
+	// Add a callback for incoming transactions
+	AddTransactionListener(func(TransactionCallback))
+
+	// NotifyTransactionListners
+	NotifyTransactionListners(cb TransactionCallback)
+
+	// Use this to re-download merkle blocks in case of missed transactions. Get from chain manager
+	ReSyncBlockchain(fromHeight uint64)
+
+	// Cleanly disconnect from the wallet
+	Close()
+}
+
+var ErrWalletFnNotImplemented = errors.New("wallet function is not implemented")
 
 // Wallet interface is used by openbazaar-go for both normal wallet operation (sending
 // and receiving) as well as for handling multisig escrow payment as part of its order flow.
@@ -315,7 +409,7 @@ type TransactionCallback struct {
 	Txid      string
 	Outputs   []TransactionOutput
 	Inputs    []TransactionInput
-	Height    int32
+	Height    int64
 	Timestamp time.Time
 	Value     int64
 	WatchOnly bool
