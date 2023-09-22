@@ -137,6 +137,10 @@ func NewBtcElectrumWallet(config *wallet.Config, privPass string) (*BtcElectrumW
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("Addresses")
+	for i, adr := range w.txstore.adrs {
+		fmt.Printf("%d %v\n", i, adr)
+	}
 
 	return w, nil
 }

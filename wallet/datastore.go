@@ -305,11 +305,11 @@ type StatusCode string
 
 const (
 	StatusUnconfirmed StatusCode = "UNCONFIRMED"
-	StatusPending                = "PENDING"
-	StatusConfirmed              = "CONFIRMED"
-	StatusStuck                  = "STUCK"
-	StatusDead                   = "DEAD"
-	StatusError                  = "ERROR"
+	StatusPending     StatusCode = "PENDING"
+	StatusConfirmed   StatusCode = "CONFIRMED"
+	StatusStuck       StatusCode = "STUCK"
+	StatusDead        StatusCode = "DEAD"
+	StatusError       StatusCode = "ERROR"
 )
 
 type KeyPath struct {

@@ -44,6 +44,23 @@ func TestWalletCreationAndLoad(t *testing.T) {
 	}
 	fmt.Println("made a btcWallet", ec.wallet)
 
+	adr := ec.wallet.CurrentAddress(wallet.EXTERNAL)
+	fmt.Println("Current External address", adr)
+	newAdr := ec.wallet.NewAddress(wallet.EXTERNAL)
+	fmt.Println("New External address", newAdr)
+	newAdr1 := ec.wallet.NewAddress(wallet.EXTERNAL)
+	fmt.Println("New External address", newAdr1)
+	newAdr2 := ec.wallet.NewAddress(wallet.EXTERNAL)
+	fmt.Println("New External address", newAdr2)
+	adr2 := ec.wallet.CurrentAddress(wallet.EXTERNAL)
+	fmt.Println("Current External address 2", adr2)
+
+	adrI := ec.wallet.CurrentAddress(wallet.INTERNAL)
+	fmt.Println("Current Internal address", adrI)
+	adrNewI := ec.wallet.NewAddress(wallet.INTERNAL)
+	fmt.Println("New Internal address", adrNewI)
+	adrI2 := ec.wallet.CurrentAddress(wallet.INTERNAL)
+	fmt.Println("Current Internal address 2", adrI2)
 	/*
 
 
