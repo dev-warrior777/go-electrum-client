@@ -426,7 +426,6 @@ func (w *BtcElectrumWallet) Spend(amount int64, addr btcutil.Address, feeLevel w
 
 // Bump the fee for the given transaction
 func (w *BtcElectrumWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error) {
-	// not yet implemented
 	return nil, wallet.ErrWalletFnNotImplemented
 }
 
