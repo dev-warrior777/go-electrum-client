@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-var DebugMode bool
-
 type transport struct {
 	conn      net.Conn
 	responses chan []byte
@@ -104,7 +102,7 @@ func (t *transport) listen(ctx context.Context) {
 				// The server closed the connection... This happens if we
 				// send unsupported requests to it.
 				if err == io.EOF {
-					err = errors.New("server closed connection (potentially because we sent an unsupported request)")
+					err = errors.New("server closed connection (potentially because we sent an unsupported request, or Ping failed)")
 				}
 				errs <- err
 				break

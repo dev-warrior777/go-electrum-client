@@ -61,29 +61,15 @@ func RunNode(t *testing.T, net, addr string) {
 
 	// Remember to drain errors! Since communication is async not all errors
 	// will happen as a direct response to requests.
-	// I do not like this but cannot think of a better way at this time...
+	// I do not like this but cannot think of a better way right now ...
 	go func() {
 		err := <-btcNode.Node.Errors()
 		log.Printf("ran into error: %s", err)
 		btcNode.Disconnect()
 	}()
 
-	//Send server.ping request in order to keep alive connection to
-	//electrum server
-	go func() {
-		for {
-			if err := btcNode.Node.Ping(ctx); err != nil {
-				log.Fatal(err)
-			}
-
-			select {
-			case <-time.After(5 * time.Second):
-			case <-ctx.Done():
-				return
-			}
-
-		}
-	}()
+	// Start services: 5s server.ping requests for connection keep alive
+	btcNode.Start()
 
 	version, err := btcNode.Node.ServerVersion(ctx)
 	if err != nil {
@@ -103,6 +89,10 @@ func RunNode(t *testing.T, net, addr string) {
 		t.Fatal(err)
 	}
 	fmt.Printf("Address: %s\n\n", address)
+
+	/*
+		Next: server.features
+	*/
 
 	peers, err := btcNode.Node.ServerPeersSubscribe(ctx)
 	if err != nil {
@@ -138,7 +128,7 @@ func RunNode(t *testing.T, net, addr string) {
 	}
 
 	// If you're connecting to a node that support address queries, change this
-	// to true.
+	// to true. Get a list of supported queries from the server itself.
 	nodeSupportsAddressQueries := false
 	if nodeSupportsAddressQueries {
 		balance, err := btcNode.Node.BlockchainAddressGetBalance(ctx, "bc1qv5wppm0xwarzwea9xxascc5rne7c0c296h7y5p")
@@ -154,7 +144,6 @@ func RunNode(t *testing.T, net, addr string) {
 	select {
 	case <-ctx.Done():
 		t.Fatal(ctx.Err())
-
 	case <-time.After(until):
 	}
 }
