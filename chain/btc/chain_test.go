@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dev-warrior777/go-electrum-client/chain"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -21,49 +22,48 @@ var (
 	testServerAddr = "blockstream.info:993"
 
 	// https://github.com/spesmilo/electrum/blob/cffbe44c07a59a7d6a3d5183181659a57de8d2c0/electrum/servers.json
-	mainserverAddr = "blockstream.info:700"
+	mainServerAddr = "blockstream.info:700"
 )
 
-func TestRunNode(t *testing.T) {
+func TestRunMainnetNode(t *testing.T) {
+	cm := wallet.ChainManager{
+		Chain: wallet.Bitcoin,
+		Net:   "mainnet",
+	}
+	fmt.Println("ChainManager: ", cm)
+	RunNode(t, cm.Net, mainServerAddr)
+}
+
+func TestRunTestnetNode(t *testing.T) {
 	cm := wallet.ChainManager{
 		Chain: wallet.Bitcoin,
 		Net:   "testnet",
 	}
-	// cm := wallet.ChainManager{
-	// 	Chain: wallet.Bitcoin,
-	// 	Net: "mainnet",
-	// }
 	fmt.Println("ChainManager: ", cm)
+	RunNode(t, cm.Net, testServerAddr)
+}
 
-	var serverAddr string
-	switch cm.Net {
-	case "mainnet":
-		serverAddr = mainserverAddr
-	case "testnet":
-		serverAddr = testServerAddr
-	default:
-		t.Fatal("invalid chain net type")
-	}
-
+func RunNode(t *testing.T, net, addr string) {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	DebugMode = true
+	chain.DebugMode = true
 
-	btcNode := NewNode()
+	btcNode := NewBtcNode(net)
 	defer btcNode.Disconnect()
 
 	connectCtx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
-	if err := btcNode.Connect(connectCtx, serverAddr, &tls.Config{}); err != nil {
+	if err := btcNode.Connect(connectCtx, addr, &tls.Config{}); err != nil {
 		e := fmt.Errorf("connect node: %w", err).Error()
 		t.Fatalf("connect node %s", e)
 	}
 
 	// Remember to drain errors! Since communication is async not all errors
 	// will happen as a direct response to requests.
+	// I do not like this but cannot think of a better way at this time...
 	go func() {
-		err := <-btcNode.Errors()
+		err := <-btcNode.Node.Errors()
 		log.Printf("ran into error: %s", err)
 		btcNode.Disconnect()
 	}()
@@ -72,7 +72,7 @@ func TestRunNode(t *testing.T) {
 	//electrum server
 	go func() {
 		for {
-			if err := btcNode.Ping(ctx); err != nil {
+			if err := btcNode.Node.Ping(ctx); err != nil {
 				log.Fatal(err)
 			}
 
@@ -85,32 +85,32 @@ func TestRunNode(t *testing.T) {
 		}
 	}()
 
-	version, err := btcNode.ServerVersion(ctx)
+	version, err := btcNode.Node.ServerVersion(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	fmt.Printf("Version: %v\n\n", version)
 
-	banner, err := btcNode.ServerBanner(ctx)
+	banner, err := btcNode.Node.ServerBanner(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	fmt.Printf("Banner: %s\n\n", banner)
 
-	address, err := btcNode.ServerDonationAddress(ctx)
+	address, err := btcNode.Node.ServerDonationAddress(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	fmt.Printf("Address: %s\n\n", address)
 
-	peers, err := btcNode.ServerPeersSubscribe(ctx)
+	peers, err := btcNode.Node.ServerPeersSubscribe(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	fmt.Printf("Peers: %+v\n\n", peers)
 
-	headerChan, err := btcNode.BlockchainHeadersSubscribe(ctx)
+	headerChan, err := btcNode.Node.BlockchainHeadersSubscribe(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,13 +120,13 @@ func TestRunNode(t *testing.T) {
 		}
 	}()
 
-	var transaction *GetTransaction
-	switch cm.Net {
+	var transaction *chain.GetTransaction
+	switch net {
 	case "mainnet":
-		transaction, err = btcNode.BlockchainTransactionGet( /*mainnet*/
+		transaction, err = btcNode.Node.BlockchainTransactionGet( /*mainnet*/
 			ctx, "f53a8b83f85dd1ce2a6ef4593e67169b90aaeb402b3cf806b37afc634ef71fbc", false)
 	case "testnet":
-		transaction, err = btcNode.BlockchainTransactionGet( /*testnet3*/
+		transaction, err = btcNode.Node.BlockchainTransactionGet( /*testnet3*/
 			ctx, "581d837b8bcca854406dc5259d1fb1e0d314fcd450fb2d4654e78c48120e0135", false)
 	default:
 		t.Fatal("invalid chain net type")
@@ -141,7 +141,7 @@ func TestRunNode(t *testing.T) {
 	// to true.
 	nodeSupportsAddressQueries := false
 	if nodeSupportsAddressQueries {
-		balance, err := btcNode.BlockchainAddressGetBalance(ctx, "bc1qv5wppm0xwarzwea9xxascc5rne7c0c296h7y5p")
+		balance, err := btcNode.Node.BlockchainAddressGetBalance(ctx, "bc1qv5wppm0xwarzwea9xxascc5rne7c0c296h7y5p")
 		if err != nil {
 			t.Fatal(err)
 		}

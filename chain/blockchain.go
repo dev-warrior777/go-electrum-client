@@ -1,4 +1,4 @@
-package btc
+package chain
 
 import (
 	"context"
@@ -19,8 +19,6 @@ type BlockchainHeader struct {
 // TODO implement
 // BlockchainBlockGetChunk returns a chunk of block headers as a hexadecimal string.
 // method: "blockchain.block.get_chunk"
-//
-// document not updated
 func (n *Node) BlockchainBlockGetChunk(index int32) (string, error) {
 	return "", ErrNotImplemented
 }
@@ -28,8 +26,6 @@ func (n *Node) BlockchainBlockGetChunk(index int32) (string, error) {
 // TODO implement
 // BlockchainBlockGetHeader returns the deserialized header at a given height.
 // method "blockchain.block.get_header"
-//
-// document not updated
 func (n *Node) BlockchainBlockGetHeader(height int32) error {
 	return ErrNotImplemented
 }
