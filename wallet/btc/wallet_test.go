@@ -29,7 +29,6 @@ func TestWalletCreationAndLoad(t *testing.T) {
 	fmt.Printf("Wallet: %s\n", walletFile)
 
 	ec := NewBtcElectrumClient(cfg)
-	fmt.Println("ChainManager: ", ec.chainManager)
 
 	privPass := "abc"
 	err := ec.CreateWallet(privPass)

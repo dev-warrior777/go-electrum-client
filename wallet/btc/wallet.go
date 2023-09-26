@@ -24,17 +24,13 @@ import (
 
 // BtcElectrumClient
 type BtcElectrumClient struct {
-	config       *wallet.Config
-	wallet       wallet.ElectrumWallet
-	chainManager *wallet.ChainManager
+	config *wallet.Config
+	wallet wallet.ElectrumWallet
 }
 
 func NewBtcElectrumClient(cfg *wallet.Config) *BtcElectrumClient {
-	manager := wallet.NewChainManager(cfg)
-
 	return &BtcElectrumClient{
-		config:       cfg,
-		chainManager: manager,
+		config: cfg,
 	}
 }
 
@@ -49,6 +45,10 @@ func (ec *BtcElectrumClient) CreateWallet(privPass string) error {
 	cfg.DB = sqliteDatastore
 
 	ec.wallet, err = NewBtcElectrumWallet(cfg, privPass)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
