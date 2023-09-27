@@ -23,7 +23,9 @@ var (
 	testTx      = "581d837b8bcca854406dc5259d1fb1e0d314fcd450fb2d4654e78c48120e0135"
 	testGenesis = "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"
 	// https://github.com/spesmilo/electrum/blob/cffbe44c07a59a7d6a3d5183181659a57de8d2c0/electrum/servers.json
-	mainServerAddr = "bitcoin.aranguren.org:50002"
+	mainServerAddr = "elx.bitske.com:50002"
+	// mainServerAddr = "eai.coincited.net:50002"
+	// mainServerAddr = "bitcoin.aranguren.org:50002" // IPv6
 	// mainServerAddr = "blockstream.info:700"
 	mainTx      = "f53a8b83f85dd1ce2a6ef4593e67169b90aaeb402b3cf806b37afc634ef71fbc"
 	mainGenesis = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"

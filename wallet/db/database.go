@@ -11,7 +11,7 @@ import (
 )
 
 // This database is mostly just an example implementation used for testing.
-// End users are free to user their own database.
+// End users are free to use their own database .. bbolt maybe
 type SQLiteDatastore struct {
 	keys           wallet.Keys
 	utxos          wallet.Utxos
@@ -95,6 +95,9 @@ func (s *SQLiteDatastore) GetMnemonic() (string, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	stmt, err := s.db.Prepare("select value from config where key=?")
+	if err != nil {
+		return "", err
+	}
 	defer stmt.Close()
 	var mnemonic string
 	err = stmt.QueryRow("mnemonic").Scan(&mnemonic)

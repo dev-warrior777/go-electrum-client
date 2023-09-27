@@ -5,13 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path"
 	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
-	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
@@ -36,6 +37,11 @@ func NewBtcElectrumClient(cfg *wallet.Config) *BtcElectrumClient {
 
 func (ec *BtcElectrumClient) CreateWallet(privPass string) error {
 	cfg := ec.config
+	datadir := ec.config.DataDir
+	if _, err := os.Stat(path.Join(datadir, "wallet.db")); err == nil {
+		fmt.Printf("a file wallet.db probably exists in the datadir: %s .. \n"+
+			"test will overwrite\n", cfg.DataDir)
+	}
 
 	// Select wallet datastore
 	sqliteDatastore, err := db.Create(cfg.DataDir)
@@ -43,6 +49,36 @@ func (ec *BtcElectrumClient) CreateWallet(privPass string) error {
 		return err
 	}
 	cfg.DB = sqliteDatastore
+
+	ec.wallet, err = NewBtcElectrumWallet(cfg, privPass)
+	if err != nil {
+		// maybe delete db
+		return err
+	}
+
+	sqliteDatastore.SetMnemonic(cfg.Mnemonic)
+	sqliteDatastore.SetCreationDate(cfg.CreationDate)
+	return nil
+}
+
+func (ec *BtcElectrumClient) LoadWallet(privPass string) error {
+	cfg := ec.config
+
+	// Select wallet datastore
+	sqliteDatastore, err := db.Create(cfg.DataDir)
+	if err != nil {
+		return err
+	}
+	cfg.DB = sqliteDatastore
+
+	cfg.Mnemonic, err = sqliteDatastore.GetMnemonic()
+	if err != nil {
+		return err
+	}
+	cfg.CreationDate, err = sqliteDatastore.GetCreationDate()
+	if err != nil {
+		return err
+	}
 
 	ec.wallet, err = NewBtcElectrumWallet(cfg, privPass)
 	if err != nil {
@@ -82,8 +118,8 @@ type BtcElectrumWallet struct {
 	running bool
 }
 
-// TODO: adjust interface simpler
-// var _ = wallet.Wallet(&BtcElectrumWallet{})
+// TODO: adjust interface while developing because .. simpler
+var _ = wallet.ElectrumWallet(&BtcElectrumWallet{})
 
 const WalletVersion = "0.1.0"
 
@@ -137,6 +173,8 @@ func NewBtcElectrumWallet(config *wallet.Config, privPass string) (*BtcElectrumW
 	if err != nil {
 		return nil, err
 	}
+
+	// Debug: remove
 	fmt.Println("Addresses")
 	for i, adr := range w.txstore.adrs {
 		fmt.Printf("%d %v\n", i, adr)
@@ -436,13 +474,13 @@ func (w *BtcElectrumWallet) EstimateFee(ins []wallet.TransactionInput, outs []wa
 }
 
 // Build and broadcast a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
-func (w *BtcElectrumWallet) SweepAddress(utxos []wallet.Utxo, address *btcutil.Address, key *hd.ExtendedKey, redeemScript *[]byte, feeLevel wallet.FeeLevel) (*chainhash.Hash, error) {
+func (w *BtcElectrumWallet) SweepAddress(utxos []wallet.Utxo, address *btcutil.Address, key *hdkeychain.ExtendedKey, redeemScript *[]byte, feeLevel wallet.FeeLevel) (*chainhash.Hash, error) {
 	// not yet implemented
 	return nil, wallet.ErrWalletFnNotImplemented
 }
 
 // Create a signature for a multisig transaction
-func (w *BtcElectrumWallet) CreateMultisigSignature(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, key *hd.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]wallet.Signature, error) {
+func (w *BtcElectrumWallet) CreateMultisigSignature(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, key *hdkeychain.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]wallet.Signature, error) {
 	// not yet implemented
 	return nil, wallet.ErrWalletFnNotImplemented
 }
@@ -454,7 +492,7 @@ func (w *BtcElectrumWallet) Multisign(ins []wallet.TransactionInput, outs []wall
 }
 
 // Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked escrow which releases using the timeoutKey.
-func (w *BtcElectrumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hd.ExtendedKey) (addr btcutil.Address, redeemScript []byte, err error) {
+func (w *BtcElectrumWallet) GenerateMultisigScript(keys []hdkeychain.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hdkeychain.ExtendedKey) (addr btcutil.Address, redeemScript []byte, err error) {
 	// not yet implemented
 	return nil, nil, wallet.ErrWalletFnNotImplemented
 
