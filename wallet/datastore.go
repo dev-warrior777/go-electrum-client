@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"bytes"
+	"errors"
 	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
@@ -135,14 +136,30 @@ type Txns interface {
 	Delete(txid *chainhash.Hash) error
 }
 
-// Keys provides a database interface for the wallet to save key material, track
-// used keys, and manage the look ahead window.
-type Keys interface {
-	// Put a bip32 key to the database
-	Put(hash160 []byte, keyPath KeyPath) error
+var ErrKeyImportNotImplemented = errors.New("key import not yet implemented")
 
+// Split off these imported key funcs from interface below. They need to be in
+// database encrypted blob storage.
+type ImportedKeys interface {
 	// Import a loose private key not part of the keychain
+	// ErKeyImportNotImplemented
 	ImportKey(scriptAddress []byte, key *btcec.PrivateKey) error
+
+	// Returns an imported private key given a script address
+	// ErKeyImportNotImplemented
+	GetKey(scriptAddress []byte) (*btcec.PrivateKey, error)
+
+	// Returns all imported keys - ErKeyImportNotImplemented
+	GetImported() ([]*btcec.PrivateKey, error)
+}
+
+// Keys provides a database interface for the wallet to:
+// - Track used keys by key path
+// - Manage the look ahead window.
+// - No HD keys are stored in the database. All HD keys are derived 'on the fly'
+type Keys interface {
+	// Put a bip32 key path to the database
+	Put(hash160 []byte, keyPath KeyPath) error
 
 	// Mark the script as used
 	MarkKeyAsUsed(scriptAddress []byte) error
@@ -153,12 +170,6 @@ type Keys interface {
 
 	// Returns the first unused path for the given purpose
 	GetPathForKey(scriptAddress []byte) (KeyPath, error)
-
-	// Returns an imported private key given a script address
-	GetKey(scriptAddress []byte) (*btcec.PrivateKey, error)
-
-	// Returns all imported keys
-	GetImported() ([]*btcec.PrivateKey, error)
 
 	// Get a list of unused key indexes for the given purpose
 	GetUnused(purpose KeyPurpose) ([]int, error)

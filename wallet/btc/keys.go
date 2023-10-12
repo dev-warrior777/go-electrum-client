@@ -126,23 +126,25 @@ func (km *KeyManager) GetKeys() []*hd.ExtendedKey {
 }
 
 func (km *KeyManager) GetKeyForScript(scriptAddress []byte) (*hd.ExtendedKey, error) {
-	keyPath, err := km.datastore.GetPathForKey(scriptAddress)
-	if err != nil {
-		key, err := km.datastore.GetKey(scriptAddress)
-		if err != nil {
-			return nil, err
-		}
-		hdKey := hd.NewExtendedKey(
-			km.params.HDPrivateKeyID[:],
-			key.Serialize(),
-			make([]byte, 32),
-			[]byte{0x00, 0x00, 0x00, 0x00},
-			0,
-			0,
-			true)
-		return hdKey, nil
-	}
-	return km.generateChildKey(keyPath.Purpose, uint32(keyPath.Index))
+	// keyPath, err := km.datastore.GetPathForKey(scriptAddress)
+	// if err != nil {
+	// 	key, err := km.datastore.GetKey(scriptAddress)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 		hdKey := hd.NewExtendedKey(
+	// 			km.params.HDPrivateKeyID[:],
+	// 			key.Serialize(),
+	// 			make([]byte, 32),
+	// 			[]byte{0x00, 0x00, 0x00, 0x00},
+	// 			0,
+	// 			0,
+	// 			true)
+	// 		return hdKey, nil
+	// 	}
+	// return km.generateChildKey(keyPath.Purpose, uint32(keyPath.Index))
+
+	return nil, wallet.ErrKeyImportNotImplemented
 }
 
 // Mark the given key as used and extend the lookahead window
