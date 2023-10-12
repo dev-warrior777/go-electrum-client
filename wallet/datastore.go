@@ -87,11 +87,17 @@ func (c *CoinType) CurrencyCode() string {
 }
 
 type Datastore interface {
+	Enc() Enc
 	Utxos() Utxos
 	Stxos() Stxos
 	Txns() Txns
 	Keys() Keys
 	WatchedScripts() WatchedScripts
+}
+
+type Enc interface {
+	Encrypt(b []byte, pw string) error
+	Decrypt(pw string) ([]byte, error)
 }
 
 type Utxos interface {

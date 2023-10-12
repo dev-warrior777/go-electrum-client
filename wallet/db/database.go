@@ -13,6 +13,7 @@ import (
 // This database is mostly just an example implementation used for testing.
 // End users are free to use their own database .. bbolt maybe
 type SQLiteDatastore struct {
+	enc            wallet.Enc
 	keys           wallet.Keys
 	utxos          wallet.Utxos
 	stxos          wallet.Stxos
@@ -31,6 +32,10 @@ func Create(repoPath string) (*SQLiteDatastore, error) {
 
 	l := new(sync.RWMutex)
 	sqliteDB := &SQLiteDatastore{
+		enc: &EncDB{
+			db:   conn,
+			lock: l,
+		},
 		keys: &KeysDB{
 			db:   conn,
 			lock: l,
@@ -58,6 +63,9 @@ func Create(repoPath string) (*SQLiteDatastore, error) {
 	return sqliteDB, nil
 }
 
+func (db *SQLiteDatastore) Enc() wallet.Enc {
+	return db.enc
+}
 func (db *SQLiteDatastore) Keys() wallet.Keys {
 	return db.keys
 }
@@ -83,6 +91,7 @@ func initDatabaseTables(db *sql.DB) error {
 	create table if not exists txns (txid text primary key not null, value integer, height integer, timestamp integer, watchOnly integer, tx blob);
 	create table if not exists watchedScripts (scriptPubKey text primary key not null);
 	create table if not exists config(key text primary key not null, value blob);
+	create table if not exists enc(key text primary key not null, value blob);
 	`
 	_, err := db.Exec(sqlStmt)
 	if err != nil {
