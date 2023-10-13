@@ -42,10 +42,9 @@ func TestEncryptBytes(t *testing.T) {
 	}
 }
 
-func TestDecryptBytes(t *testing.T) {
-	b, err := enc.Decrypt(pw)
+func TestWif(t *testing.T) {
+	err := PrivKeyToWif()
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(b)
 }

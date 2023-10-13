@@ -16,11 +16,16 @@ import (
 )
 
 type MockDatastore struct {
+	enc            wallet.Enc
 	keys           wallet.Keys
 	utxos          wallet.Utxos
 	stxos          wallet.Stxos
 	txns           wallet.Txns
 	watchedScripts wallet.WatchedScripts
+}
+
+func (m *MockDatastore) Enc() wallet.Enc {
+	return m.enc
 }
 
 func (m *MockDatastore) Keys() wallet.Keys {
@@ -41,6 +46,35 @@ func (m *MockDatastore) Txns() wallet.Txns {
 
 func (m *MockDatastore) WatchedScripts() wallet.WatchedScripts {
 	return m.watchedScripts
+}
+
+// encrypted blob
+type mockStorage struct {
+	blob []byte
+}
+
+// reverse mimics encryption/decryption between bytes and a database blob
+func reverse(s []byte) []byte {
+	var d = make([]byte, len(s))
+	for i, j := 0, len(s)-1; i < len(s); i, j = i+1, j-1 {
+		d[j] = s[i]
+	}
+	return d
+}
+
+func (ms *mockStorage) Encrypt(b []byte, pw string) error {
+	if pw != "abc" {
+		return errors.New("invalid password")
+	}
+	ms.blob = reverse(b)
+	return nil
+}
+
+func (ms *mockStorage) Decrypt(pw string) ([]byte, error) {
+	if pw != "abc" {
+		return nil, errors.New("invalid password")
+	}
+	return reverse(ms.blob), nil
 }
 
 type keyStoreEntry struct {

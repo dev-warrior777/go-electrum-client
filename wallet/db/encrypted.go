@@ -4,10 +4,14 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"runtime"
 	"sync"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/nacl/secretbox"
 )
@@ -107,4 +111,30 @@ func getEncryptionKey32(password string) [32]byte {
 	}
 	b := argon2.IDKey([]byte(password), SALT, TIME, MEM, threads, KEYLEN)
 	return ([32]byte)(b)
+}
+
+/////////////////////////////////
+// Testing
+
+func PrivKeyToWif() error {
+	var key *btcec.PrivateKey
+	key, err := btcec.NewPrivateKey()
+	if err != nil {
+		return err
+	}
+	fmt.Println(key.Serialize())
+	wif, err := btcutil.NewWIF(key, &chaincfg.MainNetParams, false)
+	if err != nil {
+		return err
+	}
+	wifStr := wif.String()
+	fmt.Println(wifStr)
+
+	dec, _ := btcutil.DecodeWIF(wifStr)
+	fmt.Println(dec.PrivKey.Serialize())
+
+	// Can also do this
+	ecKey := key.ToECDSA()
+	fmt.Println(ecKey)
+	return nil
 }
