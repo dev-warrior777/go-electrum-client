@@ -2,6 +2,7 @@ package btc
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -35,7 +36,7 @@ func NewBtcElectrumClient(cfg *wallet.Config) *BtcElectrumClient {
 	}
 }
 
-func (ec *BtcElectrumClient) CreateWallet(privPass string) error {
+func (ec *BtcElectrumClient) CreateWallet(pw string) error {
 	cfg := ec.config
 	datadir := ec.config.DataDir
 	if _, err := os.Stat(path.Join(datadir, "wallet.db")); err == nil {
@@ -50,18 +51,38 @@ func (ec *BtcElectrumClient) CreateWallet(privPass string) error {
 	}
 	cfg.DB = sqliteDatastore
 
-	ec.wallet, err = NewBtcElectrumWallet(cfg, privPass)
+	ec.wallet, err = NewBtcElectrumWallet(cfg, pw)
 	if err != nil {
-		// maybe delete db
 		return err
 	}
 
-	sqliteDatastore.SetMnemonic(cfg.Mnemonic)
-	sqliteDatastore.SetCreationDate(cfg.CreationDate)
 	return nil
 }
 
-func (ec *BtcElectrumClient) LoadWallet(privPass string) error {
+func (ec *BtcElectrumClient) RecreateElectrumWallet(pw, mnenomic string) error {
+	cfg := ec.config
+	datadir := ec.config.DataDir
+	if _, err := os.Stat(path.Join(datadir, "wallet.db")); err == nil {
+		fmt.Printf("a file wallet.db probably exists in the datadir: %s .. \n"+
+			"test will overwrite\n", cfg.DataDir)
+	}
+
+	// Select wallet datastore
+	sqliteDatastore, err := db.Create(cfg.DataDir)
+	if err != nil {
+		return err
+	}
+	cfg.DB = sqliteDatastore
+
+	ec.wallet, err = RecreateElectrumWallet(cfg, pw, mnenomic)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (ec *BtcElectrumClient) LoadWallet(pw string) error {
 	cfg := ec.config
 
 	// Select wallet datastore
@@ -71,16 +92,7 @@ func (ec *BtcElectrumClient) LoadWallet(privPass string) error {
 	}
 	cfg.DB = sqliteDatastore
 
-	cfg.Mnemonic, err = sqliteDatastore.GetMnemonic()
-	if err != nil {
-		return err
-	}
-	cfg.CreationDate, err = sqliteDatastore.GetCreationDate()
-	if err != nil {
-		return err
-	}
-
-	ec.wallet, err = NewBtcElectrumWallet(cfg, privPass)
+	ec.wallet, err = LoadBtcElectrumWallet(cfg, pw)
 	if err != nil {
 		return err
 	}
@@ -88,6 +100,7 @@ func (ec *BtcElectrumClient) LoadWallet(privPass string) error {
 	return nil
 }
 
+//////////////////////////////////////////////////////////////////////////////
 //	ElectrumWallet
 
 // var _ = (*wallet.ElectrumWallet)(nil)
@@ -100,16 +113,15 @@ type BtcElectrumWallet struct {
 	masterPrivateKey *hdkeychain.ExtendedKey
 	masterPublicKey  *hdkeychain.ExtendedKey
 
-	mnemonic string
-
 	feeProvider *wallet.FeeProvider
 
 	repoPath string
 
 	// TODO: maybe a scaled down blockchain with headers of interest to wallet?
 	// blockchain  *Blockchain
-	txstore    *TxStore
-	keyManager *KeyManager
+	storageManager *StorageManager
+	txstore        *TxStore
+	keyManager     *KeyManager
 
 	mutex *sync.RWMutex
 
@@ -123,20 +135,55 @@ var _ = wallet.ElectrumWallet(&BtcElectrumWallet{})
 
 const WalletVersion = "0.1.0"
 
-func NewBtcElectrumWallet(config *wallet.Config, privPass string) (*BtcElectrumWallet, error) {
-	if config.Mnemonic == "" {
-		ent, err := bip39.NewEntropy(128)
-		if err != nil {
-			return nil, err
-		}
-		mnemonic, err := bip39.NewMnemonic(ent)
-		if err != nil {
-			return nil, err
-		}
-		config.Mnemonic = mnemonic
-		config.CreationDate = time.Now()
+// NewBtcElectrumWallet mskes new wallet with a new seed. The Mnemonic should
+// be saved offline by the user.
+func NewBtcElectrumWallet(config *wallet.Config, pw string) (*BtcElectrumWallet, error) {
+	if pw == "" {
+		return nil, errors.New("empty password")
 	}
-	seed := bip39.NewSeed(config.Mnemonic, "")
+
+	ent, err := bip39.NewEntropy(128)
+	if err != nil {
+		return nil, err
+	}
+	mnemonic, err := bip39.NewMnemonic(ent)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: dbg remove
+	fmt.Println("Save: ", mnemonic)
+
+	seed := bip39.NewSeed(mnemonic, "")
+
+	return makeBtcElectrumWallet(config, pw, seed)
+}
+
+// RecreateElectrumWallet mskes new wallet with a mnenomic seed from an existing wallet.
+// pw does not need to be the same as the old wallet
+func RecreateElectrumWallet(config *wallet.Config, pw, mnemonic string) (*BtcElectrumWallet, error) {
+	if pw == "" {
+		return nil, errors.New("empty password")
+	}
+	seed, err := bip39.NewSeedWithErrorChecking(mnemonic, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return makeBtcElectrumWallet(config, pw, seed)
+}
+
+func LoadBtcElectrumWallet(config *wallet.Config, pw string) (*BtcElectrumWallet, error) {
+	if pw == "" {
+		return nil, errors.New("empty password")
+	}
+
+	return loadBtcElectrumWallet(config, pw)
+}
+
+func makeBtcElectrumWallet(config *wallet.Config, pw string, seed []byte) (*BtcElectrumWallet, error) {
+
+	// dbg
+	fmt.Println("seed: ", hex.EncodeToString(seed))
 
 	mPrivKey, err := hdkeychain.NewMaster(seed, config.Params)
 	if err != nil {
@@ -150,9 +197,87 @@ func NewBtcElectrumWallet(config *wallet.Config, privPass string) (*BtcElectrumW
 		repoPath:         config.DataDir,
 		masterPrivateKey: mPrivKey,
 		masterPublicKey:  mPubKey,
-		mnemonic:         config.Mnemonic,
 		params:           config.Params,
-		creationDate:     config.CreationDate,
+		creationDate:     time.Now(),
+		feeProvider: wallet.NewFeeProvider(
+			config.MaxFee,
+			config.HighFee,
+			config.MediumFee,
+			config.LowFee,
+			config.FeeAPI.String(),
+			config.Proxy,
+		),
+		mutex: new(sync.RWMutex),
+	}
+
+	sm := NewStorageManager(config.DB.Enc(), config.Params)
+	sm.store.Version = "0,1"
+	sm.store.Xprv = mPrivKey.String()
+	sm.store.Xpub = mPubKey.String()
+	if config.StoreEncSeed {
+		sm.store.Seed = make([]byte, len(seed))
+		copy(sm.store.Seed, seed)
+	}
+	err = sm.Put(pw)
+	if err != nil {
+		return nil, err
+	}
+	w.storageManager = sm
+
+	w.keyManager, err = NewKeyManager(config.DB.Keys(), w.params, w.masterPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	w.txstore, err = NewTxStore(w.params, config.DB, w.keyManager)
+	if err != nil {
+		return nil, err
+	}
+
+	err = config.DB.Cfg().PutCreationDate(w.creationDate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Debug: remove
+	if config.Params != &chaincfg.MainNetParams {
+		fmt.Println("Created: ", w.creationDate)
+		fmt.Println(hex.EncodeToString(sm.store.Seed))
+		fmt.Println("Addresses")
+		for i, adr := range w.txstore.adrs {
+			fmt.Printf("%d %v\n", i, adr)
+			if i > 3 {
+				break
+			}
+		}
+	}
+	return w, nil
+}
+
+func loadBtcElectrumWallet(config *wallet.Config, pw string) (*BtcElectrumWallet, error) {
+
+	sm := NewStorageManager(config.DB.Enc(), config.Params)
+
+	err := sm.Get(pw)
+	if err != nil {
+		return nil, err
+	}
+
+	mPrivKey, err := hdkeychain.NewKeyFromString(sm.store.Xprv)
+	if err != nil {
+		return nil, err
+	}
+	mPubKey, err := hdkeychain.NewKeyFromString(sm.store.Xpub)
+	if err != nil {
+		return nil, err
+	}
+
+	w := &BtcElectrumWallet{
+		repoPath:         config.DataDir,
+		masterPrivateKey: mPrivKey,
+		masterPublicKey:  mPubKey,
+		storageManager:   sm,
+		params:           config.Params,
 		feeProvider: wallet.NewFeeProvider(
 			config.MaxFee,
 			config.HighFee,
@@ -174,10 +299,22 @@ func NewBtcElectrumWallet(config *wallet.Config, privPass string) (*BtcElectrumW
 		return nil, err
 	}
 
+	w.creationDate, err = config.DB.Cfg().GetCreationDate()
+	if err != nil {
+		return nil, err
+	}
+
 	// Debug: remove
-	fmt.Println("Addresses")
-	for i, adr := range w.txstore.adrs {
-		fmt.Printf("%d %v\n", i, adr)
+	if config.Params != &chaincfg.MainNetParams {
+		fmt.Println("Stored Creation Date: ", w.creationDate)
+		fmt.Println(hex.EncodeToString(sm.store.Seed))
+		fmt.Println("Addresses")
+		for i, adr := range w.txstore.adrs {
+			fmt.Printf("%d %v\n", i, adr)
+			if i > 3 {
+				break
+			}
+		}
 	}
 
 	return w, nil
@@ -194,6 +331,10 @@ func (w *BtcElectrumWallet) Start() {
 // API
 //
 //////////////
+
+func (w *BtcElectrumWallet) CreationDate() time.Time {
+	return w.creationDate
+}
 
 func (w *BtcElectrumWallet) CurrencyCode() string {
 	if w.params.Name == chaincfg.MainNetParams.Name {
@@ -233,10 +374,6 @@ func (w *BtcElectrumWallet) ChildKey(keyBytes []byte, chaincode []byte, isPrivat
 		0,
 		isPrivateKey)
 	return hdKey.Derive(0)
-}
-
-func (w *BtcElectrumWallet) Mnemonic() string {
-	return w.mnemonic
 }
 
 func (w *BtcElectrumWallet) CurrentAddress(purpose wallet.KeyPurpose) btcutil.Address {

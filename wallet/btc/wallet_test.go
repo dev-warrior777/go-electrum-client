@@ -23,16 +23,18 @@ func makeBitcoinTestnetConfig() *wallet.Config {
 	cfg := wallet.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
 	cfg.Params = &chaincfg.TestNet3Params
+	cfg.StoreEncSeed = true
 	cfg.DataDir = tmpDirPath
 	return cfg
 }
+
+// Create a new standard wallet
 func TestWalletCreation(t *testing.T) {
 	cfg := makeBitcoinTestnetConfig()
-
 	ec := NewBtcElectrumClient(cfg)
 
-	privPass := "abc"
-	err := ec.CreateWallet(privPass)
+	pw := "abc"
+	err := ec.CreateWallet(pw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,27 +42,31 @@ func TestWalletCreation(t *testing.T) {
 
 	adr := ec.wallet.CurrentAddress(wallet.EXTERNAL)
 	fmt.Println("Current External address", adr)
-	// newAdr := ec.wallet.NewAddress(wallet.EXTERNAL)
-	// fmt.Println("New External address", newAdr)
-	// newAdr1 := ec.wallet.NewAddress(wallet.EXTERNAL)
-	// fmt.Println("New External address", newAdr1)
-	// newAdr2 := ec.wallet.NewAddress(wallet.EXTERNAL)
-	// fmt.Println("New External address", newAdr2)
-	// adr2 := ec.wallet.CurrentAddress(wallet.EXTERNAL)
-	// fmt.Println("Current External address 2", adr2)
-
 	adrI := ec.wallet.CurrentAddress(wallet.INTERNAL)
 	fmt.Println("Current Internal address", adrI)
-	// adrNewI := ec.wallet.NewAddress(wallet.INTERNAL)
-	// fmt.Println("New Internal address", adrNewI)
-	// adrI2 := ec.wallet.CurrentAddress(wallet.INTERNAL)
-	// fmt.Println("Current Internal address 2", adrI2)
 }
+
+var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
+
+// var seedForMnenomic = "148e047034a3f0a88905f9c2fa08bce280681db23d1f38783d3980a6cfbe327439159a51068343c274dc8819bd150fa018faffbe76133989f936a21e6b7bd0ed"
+
+// Recreate a known wallet. Overwrites 'wallet.db' of the previous test
+func TestWalletRecreate(t *testing.T) {
+	cfg := makeBitcoinTestnetConfig()
+	ec := NewBtcElectrumClient(cfg)
+	pw := "abc"
+	err := ec.RecreateElectrumWallet(pw, mnemonic)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Load the recreated wallet
 func TestWalletLoad(t *testing.T) {
 	cfg := makeBitcoinTestnetConfig()
-	privPass := "abc"
+	pw := "abc"
 	ec := NewBtcElectrumClient(cfg)
-	err := ec.LoadWallet(privPass)
+	err := ec.LoadWallet(pw)
 	if err != nil {
 		t.Fatal(err)
 	}

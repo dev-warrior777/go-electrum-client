@@ -16,7 +16,7 @@ type Storage struct {
 	Version  string   `json:"version"`
 	Xprv     string   `json:"xprv"`
 	Xpub     string   `json:"xpub"`
-	Seed     []string `json:"seed,omitempty"`
+	Seed     []byte   `json:"seed,omitempty"`
 	Imported []string `json:"imported,omitempty"`
 }
 

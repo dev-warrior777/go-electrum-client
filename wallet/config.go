@@ -3,7 +3,6 @@ package wallet
 import (
 	"net"
 	"net/url"
-	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -21,11 +20,8 @@ type Config struct {
 	// Network parameters. Set mainnet, testnet using this.
 	Params *chaincfg.Params
 
-	// Bip39 mnemonic string. If empty a new mnemonic will be created.
-	Mnemonic string
-
-	// The date the wallet was created.
-	CreationDate time.Time
+	// Store the seed in encrypted storage
+	StoreEncSeed bool
 
 	// The user-agent that shall be visible to the network
 	UserAgent string
@@ -64,7 +60,6 @@ func NewDefaultConfig() *Config {
 	return &Config{
 		Chain:                Bitcoin,
 		Params:               &chaincfg.MainNetParams,
-		Mnemonic:             "", // Make new seed
 		UserAgent:            appName,
 		DataDir:              btcutil.AppDataDir(appName, false),
 		DB:                   nil, // TODO: update for concrete impl

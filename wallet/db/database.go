@@ -4,15 +4,15 @@ import (
 	"database/sql"
 	"path"
 	"sync"
-	"time"
 
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// This database is mostly just an example implementation used for testing.
-// End users are free to use their own database .. bbolt maybe
+// This database is an SqLite3 implementation of Datastore.
+// A different database could be plugged in .. bbolt maybe
 type SQLiteDatastore struct {
+	cfg            wallet.Cfg
 	enc            wallet.Enc
 	keys           wallet.Keys
 	utxos          wallet.Utxos
@@ -32,6 +32,10 @@ func Create(repoPath string) (*SQLiteDatastore, error) {
 
 	l := new(sync.RWMutex)
 	sqliteDB := &SQLiteDatastore{
+		cfg: &CfgDB{
+			db:   conn,
+			lock: l,
+		},
 		enc: &EncDB{
 			db:   conn,
 			lock: l,
@@ -63,6 +67,9 @@ func Create(repoPath string) (*SQLiteDatastore, error) {
 	return sqliteDB, nil
 }
 
+func (db *SQLiteDatastore) Cfg() wallet.Cfg {
+	return db.cfg
+}
 func (db *SQLiteDatastore) Enc() wallet.Enc {
 	return db.enc
 }
@@ -97,80 +104,5 @@ func initDatabaseTables(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (s *SQLiteDatastore) GetMnemonic() (string, error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	stmt, err := s.db.Prepare("select value from config where key=?")
-	if err != nil {
-		return "", err
-	}
-	defer stmt.Close()
-	var mnemonic string
-	err = stmt.QueryRow("mnemonic").Scan(&mnemonic)
-	if err != nil {
-		return "", err
-	}
-	return mnemonic, nil
-}
-
-func (s *SQLiteDatastore) SetMnemonic(mnemonic string) error {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	stmt, err := tx.Prepare("insert or replace into config(key, value) values(?,?)")
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-	_, err = stmt.Exec("mnemonic", mnemonic)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-	tx.Commit()
-	return nil
-}
-
-func (s *SQLiteDatastore) GetCreationDate() (time.Time, error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	var t time.Time
-	stmt, err := s.db.Prepare("select value from config where key=?")
-	if err != nil {
-		return t, err
-	}
-	defer stmt.Close()
-	var creationDate []byte
-	err = stmt.QueryRow("creationDate").Scan(&creationDate)
-	if err != nil {
-		return t, err
-	}
-	return time.Parse(time.RFC3339, string(creationDate))
-}
-
-func (s *SQLiteDatastore) SetCreationDate(creationDate time.Time) error {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	stmt, err := tx.Prepare("insert or replace into config(key, value) values(?,?)")
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-	_, err = stmt.Exec("creationDate", creationDate.Format(time.RFC3339))
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-	tx.Commit()
 	return nil
 }

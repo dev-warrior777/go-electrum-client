@@ -118,7 +118,7 @@ func (m *mockKeyStore) GetLastKeyIndex(purpose wallet.KeyPurpose) (int, bool, er
 		}
 	}
 	if i == -1 {
-		return i, used, errors.New("No saved keys")
+		return i, used, errors.New("no saved keys")
 	}
 	return i, used, nil
 }
@@ -137,7 +137,7 @@ func (m *mockKeyStore) GetKey(scriptAddress []byte) (*btcec.PrivateKey, error) {
 			return k.key, nil
 		}
 	}
-	return nil, errors.New("Not found")
+	return nil, errors.New("not found")
 }
 
 func (m *mockKeyStore) GetImported() ([]*btcec.PrivateKey, error) {
@@ -218,7 +218,7 @@ func (m *mockUtxoStore) SetWatchOnly(utxo wallet.Utxo) error {
 	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
 	u, ok := m.utxos[key]
 	if !ok {
-		return errors.New("Not found")
+		return errors.New("not found")
 	}
 	u.WatchOnly = true
 	return nil
@@ -228,7 +228,7 @@ func (m *mockUtxoStore) Delete(utxo wallet.Utxo) error {
 	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
 	_, ok := m.utxos[key]
 	if !ok {
-		return errors.New("Not found")
+		return errors.New("not found")
 	}
 	delete(m.utxos, key)
 	return nil
@@ -254,7 +254,7 @@ func (m *mockStxoStore) GetAll() ([]wallet.Stxo, error) {
 func (m *mockStxoStore) Delete(stxo wallet.Stxo) error {
 	_, ok := m.stxos[stxo.SpendTxid.String()]
 	if !ok {
-		return errors.New("Not found")
+		return errors.New("not found")
 	}
 	delete(m.stxos, stxo.SpendTxid.String())
 	return nil
@@ -279,7 +279,7 @@ func (m *mockTxnStore) Put(raw []byte, txid string, value, height int, timestamp
 func (m *mockTxnStore) Get(txid chainhash.Hash) (wallet.Txn, error) {
 	t, ok := m.txns[txid.String()]
 	if !ok {
-		return wallet.Txn{}, errors.New("Not found")
+		return wallet.Txn{}, errors.New("not found")
 	}
 	return *t, nil
 }
@@ -298,7 +298,7 @@ func (m *mockTxnStore) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 func (m *mockTxnStore) UpdateHeight(txid chainhash.Hash, height int, timestamp time.Time) error {
 	txn, ok := m.txns[txid.String()]
 	if !ok {
-		return errors.New("Not found")
+		return errors.New("not found")
 	}
 	txn.Height = int64(height)
 	txn.Timestamp = timestamp
@@ -308,7 +308,7 @@ func (m *mockTxnStore) UpdateHeight(txid chainhash.Hash, height int, timestamp t
 func (m *mockTxnStore) Delete(txid *chainhash.Hash) error {
 	_, ok := m.txns[txid.String()]
 	if !ok {
-		return errors.New("Not found")
+		return errors.New("not found")
 	}
 	delete(m.txns, txid.String())
 	return nil
@@ -342,7 +342,7 @@ func (m *mockWatchedScriptsStore) Delete(scriptPubKey []byte) error {
 	enc := hex.EncodeToString(scriptPubKey)
 	_, ok := m.scripts[enc]
 	if !ok {
-		return errors.New("Not found")
+		return errors.New("not found")
 	}
 	delete(m.scripts, enc)
 	return nil

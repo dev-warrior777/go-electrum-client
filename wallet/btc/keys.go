@@ -71,7 +71,7 @@ func (km *KeyManager) GetCurrentKey(purpose wallet.KeyPurpose) (*hd.ExtendedKey,
 		return nil, err
 	}
 	if len(i) == 0 {
-		return nil, errors.New("No unused keys in database")
+		return nil, errors.New("no unused keys in database")
 	}
 	return km.generateChildKey(purpose, uint32(i[0]))
 }
@@ -161,7 +161,7 @@ func (km *KeyManager) generateChildKey(purpose wallet.KeyPurpose, index uint32) 
 	} else if purpose == wallet.INTERNAL {
 		return km.internalKey.Derive(index)
 	}
-	return nil, errors.New("Unknown key purpose")
+	return nil, errors.New("unknown key purpose")
 }
 
 func (km *KeyManager) lookahead() error {

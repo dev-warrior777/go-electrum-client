@@ -87,12 +87,18 @@ func (c *CoinType) CurrencyCode() string {
 }
 
 type Datastore interface {
+	Cfg() Cfg
 	Enc() Enc
 	Utxos() Utxos
 	Stxos() Stxos
 	Txns() Txns
 	Keys() Keys
 	WatchedScripts() WatchedScripts
+}
+
+type Cfg interface {
+	PutCreationDate(date time.Time) error
+	GetCreationDate() (time.Time, error)
 }
 
 type Enc interface {
