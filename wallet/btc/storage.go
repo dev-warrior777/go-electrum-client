@@ -2,6 +2,8 @@ package btc
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -41,12 +43,32 @@ func NewStorageManager(db wallet.Enc, params *chaincfg.Params) *StorageManager {
 	return sm
 }
 
-func (sm *StorageManager) Encrypt(b []byte, pw string) error {
+func (sm *StorageManager) Put(pw string) error {
+	if len(pw) == 0 {
+		return errors.New("no password")
+	}
 
-	return nil
+	if sm.store == nil {
+		return errors.New("nothing to store")
+	}
+
+	b, err := json.Marshal(sm.store)
+	if err != nil {
+		return err
+	}
+
+	return sm.datastore.PutEncrypted(b, pw)
 }
 
-func (sm *StorageManager) Decrypt(pw string) ([]byte, error) {
+func (sm *StorageManager) Get(pw string) error {
+	if len(pw) == 0 {
+		return errors.New("no password")
+	}
 
-	return nil, nil
+	b, err := sm.datastore.GetDecrypted(pw)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(b, sm.store)
 }

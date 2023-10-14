@@ -34,7 +34,7 @@ type EncDB struct {
 	lock *sync.RWMutex
 }
 
-func (e *EncDB) Encrypt(b []byte, pw string) error {
+func (e *EncDB) PutEncrypted(b []byte, pw string) error {
 	// encrypt
 	eb, err := encryptBytes(b, pw)
 	if err != nil {
@@ -61,7 +61,7 @@ func (e *EncDB) Encrypt(b []byte, pw string) error {
 	return nil
 }
 
-func (e *EncDB) Decrypt(pw string) ([]byte, error) {
+func (e *EncDB) GetDecrypted(pw string) ([]byte, error) {
 	// retreive from db , if exist
 	e.lock.RLock()
 	defer e.lock.RUnlock()

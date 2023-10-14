@@ -22,16 +22,16 @@ func init() {
 	}
 }
 
-func TestEncryptBytes(t *testing.T) {
+func TestEncryptDecryptBytes(t *testing.T) {
 	b := make([]byte, 32)
 	rand.Read(b)
 	sb := hex.EncodeToString(b)
 	fmt.Println(sb)
-	err := enc.Encrypt(b, pw)
+	err := enc.PutEncrypted(b, pw)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ret, err := enc.Decrypt(pw)
+	ret, err := enc.GetDecrypted(pw)
 	if err != nil {
 		t.Fatal(err)
 	}

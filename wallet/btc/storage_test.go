@@ -1,7 +1,6 @@
 package btc
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -9,20 +8,18 @@ import (
 )
 
 func createStorageManager() *StorageManager {
-
 	return NewStorageManager(&mockStorage{}, &chaincfg.MainNetParams)
 }
 
 func TestStoreRetreiveBlob(t *testing.T) {
 	sm := createStorageManager()
-	fmt.Println(sm)
 	var req = "ABC"
-	err := sm.datastore.Encrypt([]byte(req), "abc")
+	err := sm.datastore.PutEncrypted([]byte(req), "abc")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ret, err := sm.datastore.Decrypt("abc")
+	ret, err := sm.datastore.GetDecrypted("abc")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,12 +27,12 @@ func TestStoreRetreiveBlob(t *testing.T) {
 	fmt.Println(string(ret))
 }
 
+var pw = "abc" // tested
 var xprv = "tprv8ZgxMBicQKsPfJU6JyiVdmFAtAzmWmTeEv85nTAHjLQyL35tdP2fAPWDSBBnFqGhhfTHVQMcnZhZDFkzFmCjm1bgf5UDwMAeFUWhJ9Dr8c4"
 var xpub = "tpubD6NzVbkrYhZ4YmVtCdP63AuHTCWhg6eYpDis4yCb9cDNAXLfFmrFLt85cLFTwHiDJ9855NiE7cgQdiTGt5mb2RS9RfaxgVDkwBybJWm54Gh"
 
 func TestStoreRetrieveEncryptedStore(t *testing.T) {
 	sm := createStorageManager()
-	fmt.Println(sm)
 
 	sm.store = &Storage{
 		Version: "0.1",
@@ -46,28 +43,17 @@ func TestStoreRetrieveEncryptedStore(t *testing.T) {
 	before := sm.store.String()
 	fmt.Print("req: ", before)
 
-	req, err := json.Marshal(sm.store)
+	err := sm.Put(pw)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = sm.datastore.Encrypt(req, "abc")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ret, err := sm.datastore.Decrypt("abc")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = json.Unmarshal(ret, sm.store)
+	err = sm.Get(pw)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	after := sm.store.String()
-
 	fmt.Println("ret: ", after)
 
 	if before != after {

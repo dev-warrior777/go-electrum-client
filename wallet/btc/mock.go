@@ -53,7 +53,7 @@ type mockStorage struct {
 	blob []byte
 }
 
-// reverse mimics encryption/decryption between bytes and a database blob
+// reverse simulates encryption/decryption between bytes and a database blob
 func reverse(s []byte) []byte {
 	var d = make([]byte, len(s))
 	for i, j := 0, len(s)-1; i < len(s); i, j = i+1, j-1 {
@@ -62,7 +62,7 @@ func reverse(s []byte) []byte {
 	return d
 }
 
-func (ms *mockStorage) Encrypt(b []byte, pw string) error {
+func (ms *mockStorage) PutEncrypted(b []byte, pw string) error {
 	if pw != "abc" {
 		return errors.New("invalid password")
 	}
@@ -70,7 +70,7 @@ func (ms *mockStorage) Encrypt(b []byte, pw string) error {
 	return nil
 }
 
-func (ms *mockStorage) Decrypt(pw string) ([]byte, error) {
+func (ms *mockStorage) GetDecrypted(pw string) ([]byte, error) {
 	if pw != "abc" {
 		return nil, errors.New("invalid password")
 	}

@@ -96,8 +96,8 @@ type Datastore interface {
 }
 
 type Enc interface {
-	Encrypt(b []byte, pw string) error
-	Decrypt(pw string) ([]byte, error)
+	PutEncrypted(b []byte, pw string) error
+	GetDecrypted(pw string) ([]byte, error)
 }
 
 type Utxos interface {
