@@ -30,14 +30,18 @@ func TestStoreRetreiveBlob(t *testing.T) {
 var pw = "abc" // tested
 var xprv = "tprv8ZgxMBicQKsPfJU6JyiVdmFAtAzmWmTeEv85nTAHjLQyL35tdP2fAPWDSBBnFqGhhfTHVQMcnZhZDFkzFmCjm1bgf5UDwMAeFUWhJ9Dr8c4"
 var xpub = "tpubD6NzVbkrYhZ4YmVtCdP63AuHTCWhg6eYpDis4yCb9cDNAXLfFmrFLt85cLFTwHiDJ9855NiE7cgQdiTGt5mb2RS9RfaxgVDkwBybJWm54Gh"
+var seed = []string{"dummy", "seed", "words"}
+var imported = []string{"wif_0", "wif_1", "wif_2"}
 
 func TestStoreRetrieveEncryptedStore(t *testing.T) {
 	sm := createStorageManager()
 
 	sm.store = &Storage{
-		Version: "0.1",
-		Xprv:    xprv,
-		Xpub:    xpub,
+		Version:  "0.1",
+		Xprv:     xprv,
+		Xpub:     xpub,
+		Seed:     seed,
+		Imported: imported,
 	}
 
 	before := sm.store.String()

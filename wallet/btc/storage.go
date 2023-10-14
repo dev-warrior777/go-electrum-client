@@ -13,13 +13,15 @@ import (
 // Encrypted storage for btc. Stored as an encrypted blob in database.
 
 type Storage struct {
-	Version string `json:"version"`
-	Xprv    string `json:"xprv"`
-	Xpub    string `json:"xpub"`
-	// seed     []string `json:"seed,omitempty"`
-	// imported []string `json:"imported,omitempty"`
+	Version  string   `json:"version"`
+	Xprv     string   `json:"xprv"`
+	Xpub     string   `json:"xpub"`
+	Seed     []string `json:"seed,omitempty"`
+	Imported []string `json:"imported,omitempty"`
 }
 
+// String returns the string representation of the Storage but only of the
+// fields that are always present
 func (s *Storage) String() string {
 	b := new(bytes.Buffer)
 	fmt.Fprintf(b, "{\n%s\n%s\n%s\n}\n", s.Version, s.Xprv, s.Xpub)
