@@ -1,3 +1,5 @@
+///go:build harness
+
 package btc
 
 import (

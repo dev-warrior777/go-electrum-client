@@ -112,7 +112,7 @@ func (sc *ServerConn) listen(ctx context.Context) {
 			}
 			continue
 		}
-		// sc.debug(string(msg))
+		// sc.debug("[Debug] ", string(msg), "\n[<-Debug]\n\n")
 
 		c := sc.responseChan(jsonResp.ID)
 		if c == nil {
@@ -141,6 +141,7 @@ func (sc *ServerConn) pinger(ctx context.Context) {
 			sc.cancel()
 			return
 		}
+		// sc.debug("\nSuccessful PING\n")
 
 		select {
 		case <-ctx.Done():
