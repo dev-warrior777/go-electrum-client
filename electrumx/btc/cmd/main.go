@@ -11,15 +11,52 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	ex "github.com/dev-warrior777/go-electrum-client/electrumx"
+	"github.com/dev-warrior777/go-electrum-client/wallet"
+)
+
+const (
+	coinDir = "btc"
+	// raw bitcoin headers from last checkpoint. For regtest that means from
+	// genesis - so no need to check checkpoint merkle proofs
+	headerFilename = "blockchain_headers"
 )
 
 var (
-	simnetServerAddr = "127.0.0.1:54002"
-	simnetTx         = "9298133b60ac679b01e4d407c552d9ac0866ea40c52501dc1d39fdd57b9e9b5f"
+	simnetServerAddr = "127.0.0.1:53002"
+	simnetTx         = ""
 	simnetGenesis    = "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"
 )
+
+func makeBitcoinRegtestConfig() (*wallet.Config, error) {
+	cfg := wallet.NewDefaultConfig()
+	cfg.Chain = wallet.Bitcoin
+	cfg.Params = &chaincfg.RegressionNetParams
+	cfg.StoreEncSeed = true
+	appDir, err := wallet.GetConfigPath()
+	if err != nil {
+		return nil, err
+	}
+	regtestDir := filepath.Join(appDir, coinDir, "regtest")
+	err = os.MkdirAll(regtestDir, os.ModeDir|0777)
+	if err != nil {
+		return nil, err
+	}
+	cfg.DataDir = regtestDir
+	return cfg, nil
+}
+
+func openBlockchainHeaders(config *wallet.Config) (*os.File, error) {
+	headerFilePath := filepath.Join(config.DataDir, headerFilename)
+	headerFile, err := os.OpenFile(headerFilePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0664)
+	if err != nil {
+		return nil, err
+	}
+	return headerFile, nil
+}
 
 func main() {
 	RunNode(ex.Regtest, simnetServerAddr, simnetTx, simnetGenesis, true)
@@ -32,9 +69,27 @@ func RunNode(network ex.Network, addr, tx, genesis string, useTls bool) {
 
 	ex.DebugMode = true
 
+	config, err := makeBitcoinRegtestConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(config.DataDir)
+	headerFile, err := openBlockchainHeaders(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer headerFile.Close()
+
+	headerFile.Write([]byte{0x41})
+	headerFile.Write([]byte{0x42})
+	headerFile.Write([]byte{0x43})
+
+	if true {
+		os.Exit(0xff)
+	}
+
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
-
 		log.Fatal(err)
 	}
 

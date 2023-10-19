@@ -3,6 +3,8 @@ package wallet
 import (
 	"net"
 	"net/url"
+	"os"
+	"path/filepath"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -54,6 +56,9 @@ type Config struct {
 
 	// Disable the exchange rate provider
 	DisableExchangeRates bool
+
+	// If not testing do not overwrite existing wallet files
+	Testing bool
 }
 
 func NewDefaultConfig() *Config {
@@ -65,4 +70,17 @@ func NewDefaultConfig() *Config {
 		DB:                   nil, // TODO: update for concrete impl
 		DisableExchangeRates: true,
 	}
+}
+
+func GetConfigPath() (string, error) {
+	userCfgDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	appPath := filepath.Join(userCfgDir, appName)
+	err = os.MkdirAll(appPath, os.ModeDir|0777)
+	if err != nil {
+		return "", err
+	}
+	return appPath, nil
 }

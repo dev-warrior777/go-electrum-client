@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path"
 	"sync"
 	"time"
 
@@ -20,85 +18,84 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcwallet/wallet/txrules"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
-	"github.com/dev-warrior777/go-electrum-client/wallet/db"
 	"github.com/tyler-smith/go-bip39"
 )
 
-// BtcElectrumClient
-type BtcElectrumClient struct {
-	config *wallet.Config
-	wallet wallet.ElectrumWallet
-}
+// // BtcElectrumClient
+// type BtcElectrumClient struct {
+// 	config *wallet.Config
+// 	wallet wallet.ElectrumWallet
+// }
 
-func NewBtcElectrumClient(cfg *wallet.Config) *BtcElectrumClient {
-	return &BtcElectrumClient{
-		config: cfg,
-	}
-}
+// func NewBtcElectrumClient(cfg *wallet.Config) *BtcElectrumClient {
+// 	return &BtcElectrumClient{
+// 		config: cfg,
+// 	}
+// }
 
-func (ec *BtcElectrumClient) CreateWallet(pw string) error {
-	cfg := ec.config
-	datadir := ec.config.DataDir
-	if _, err := os.Stat(path.Join(datadir, "wallet.db")); err == nil {
-		fmt.Printf("a file wallet.db probably exists in the datadir: %s .. \n"+
-			"test will overwrite\n", cfg.DataDir)
-	}
+// func (ec *BtcElectrumClient) CreateWallet(pw string) error {
+// 	cfg := ec.config
+// 	datadir := ec.config.DataDir
+// 	if _, err := os.Stat(path.Join(datadir, "wallet.db")); err == nil {
+// 		fmt.Printf("a file wallet.db probably exists in the datadir: %s .. \n"+
+// 			"test will overwrite\n", cfg.DataDir)
+// 	}
 
-	// Select wallet datastore
-	sqliteDatastore, err := db.Create(cfg.DataDir)
-	if err != nil {
-		return err
-	}
-	cfg.DB = sqliteDatastore
+// 	// Select wallet datastore
+// 	sqliteDatastore, err := db.Create(cfg.DataDir)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	cfg.DB = sqliteDatastore
 
-	ec.wallet, err = NewBtcElectrumWallet(cfg, pw)
-	if err != nil {
-		return err
-	}
+// 	ec.wallet, err = NewBtcElectrumWallet(cfg, pw)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-func (ec *BtcElectrumClient) RecreateElectrumWallet(pw, mnenomic string) error {
-	cfg := ec.config
-	datadir := ec.config.DataDir
-	if _, err := os.Stat(path.Join(datadir, "wallet.db")); err == nil {
-		fmt.Printf("a file wallet.db probably exists in the datadir: %s .. \n"+
-			"test will overwrite\n", cfg.DataDir)
-	}
+// func (ec *BtcElectrumClient) RecreateElectrumWallet(pw, mnenomic string) error {
+// 	cfg := ec.config
+// 	datadir := ec.config.DataDir
+// 	if _, err := os.Stat(path.Join(datadir, "wallet.db")); err == nil {
+// 		fmt.Printf("a file wallet.db probably exists in the datadir: %s .. \n"+
+// 			"test will overwrite\n", cfg.DataDir)
+// 	}
 
-	// Select wallet datastore
-	sqliteDatastore, err := db.Create(cfg.DataDir)
-	if err != nil {
-		return err
-	}
-	cfg.DB = sqliteDatastore
+// 	// Select wallet datastore
+// 	sqliteDatastore, err := db.Create(cfg.DataDir)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	cfg.DB = sqliteDatastore
 
-	ec.wallet, err = RecreateElectrumWallet(cfg, pw, mnenomic)
-	if err != nil {
-		return err
-	}
+// 	ec.wallet, err = RecreateElectrumWallet(cfg, pw, mnenomic)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-func (ec *BtcElectrumClient) LoadWallet(pw string) error {
-	cfg := ec.config
+// func (ec *BtcElectrumClient) LoadWallet(pw string) error {
+// 	cfg := ec.config
 
-	// Select wallet datastore
-	sqliteDatastore, err := db.Create(cfg.DataDir)
-	if err != nil {
-		return err
-	}
-	cfg.DB = sqliteDatastore
+// 	// Select wallet datastore
+// 	sqliteDatastore, err := db.Create(cfg.DataDir)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	cfg.DB = sqliteDatastore
 
-	ec.wallet, err = LoadBtcElectrumWallet(cfg, pw)
-	if err != nil {
-		return err
-	}
+// 	ec.wallet, err = LoadBtcElectrumWallet(cfg, pw)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 //////////////////////////////////////////////////////////////////////////////
 //	ElectrumWallet

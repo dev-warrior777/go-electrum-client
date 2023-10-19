@@ -10,31 +10,56 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-// new wallets, etc. Manually clean while developing
-const tmpDirName = "testdata"
+// new wallets, header files, etc. Manually clean while developing
+const coinDir = "btc"
 
-var tmpDirPath string
-
-func init() {
-	wd, _ := os.Getwd()
-	tmpDirPath = filepath.Join(wd, tmpDirName)
-}
-func makeBitcoinTestnetConfig() *wallet.Config {
+func makeBitcoinTestnetConfig() (*wallet.Config, error) {
 	cfg := wallet.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
 	cfg.Params = &chaincfg.TestNet3Params
 	cfg.StoreEncSeed = true
-	cfg.DataDir = tmpDirPath
-	return cfg
+	appDir, err := wallet.GetConfigPath()
+	if err != nil {
+		return nil, err
+	}
+	testnetDir := filepath.Join(appDir, coinDir, "testnet")
+	err = os.MkdirAll(testnetDir, os.ModeDir|0777)
+	if err != nil {
+		return nil, err
+	}
+	cfg.DataDir = testnetDir
+	return cfg, nil
+}
+
+func makeBitcoinRegtestConfig() (*wallet.Config, error) {
+	cfg := wallet.NewDefaultConfig()
+	cfg.Chain = wallet.Bitcoin
+	cfg.Params = &chaincfg.RegressionNetParams
+	cfg.StoreEncSeed = true
+	appDir, err := wallet.GetConfigPath()
+	if err != nil {
+		return nil, err
+	}
+	regtestDir := filepath.Join(appDir, coinDir, "regtest")
+	err = os.MkdirAll(regtestDir, os.ModeDir|0777)
+	if err != nil {
+		return nil, err
+	}
+	cfg.DataDir = regtestDir
+	return cfg, nil
 }
 
 // Create a new standard wallet
 func TestWalletCreation(t *testing.T) {
-	cfg := makeBitcoinTestnetConfig()
+	cfg, err := makeBitcoinRegtestConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Testing = true
 	ec := NewBtcElectrumClient(cfg)
 
 	pw := "abc"
-	err := ec.CreateWallet(pw)
+	err = ec.CreateWallet(pw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,21 +77,29 @@ var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel 
 
 // Recreate a known wallet. Overwrites 'wallet.db' of the previous test
 func TestWalletRecreate(t *testing.T) {
-	cfg := makeBitcoinTestnetConfig()
+	cfg, err := makeBitcoinRegtestConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Testing = true
 	ec := NewBtcElectrumClient(cfg)
 	pw := "abc"
-	err := ec.RecreateElectrumWallet(pw, mnemonic)
+	err = ec.RecreateElectrumWallet(pw, mnemonic)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-// Load the recreated wallet
+// Load the recreated wallet with known seed
 func TestWalletLoad(t *testing.T) {
-	cfg := makeBitcoinTestnetConfig()
+	cfg, err := makeBitcoinRegtestConfig()
+	cfg.Testing = true
+	if err != nil {
+		t.Fatal(err)
+	}
 	pw := "abc"
 	ec := NewBtcElectrumClient(cfg)
-	err := ec.LoadWallet(pw)
+	err = ec.LoadWallet(pw)
 	if err != nil {
 		t.Fatal(err)
 	}
