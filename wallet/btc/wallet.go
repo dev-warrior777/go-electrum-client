@@ -17,85 +17,10 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcwallet/wallet/txrules"
+	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	"github.com/tyler-smith/go-bip39"
 )
-
-// // BtcElectrumClient
-// type BtcElectrumClient struct {
-// 	config *wallet.Config
-// 	wallet wallet.ElectrumWallet
-// }
-
-// func NewBtcElectrumClient(cfg *wallet.Config) *BtcElectrumClient {
-// 	return &BtcElectrumClient{
-// 		config: cfg,
-// 	}
-// }
-
-// func (ec *BtcElectrumClient) CreateWallet(pw string) error {
-// 	cfg := ec.config
-// 	datadir := ec.config.DataDir
-// 	if _, err := os.Stat(path.Join(datadir, "wallet.db")); err == nil {
-// 		fmt.Printf("a file wallet.db probably exists in the datadir: %s .. \n"+
-// 			"test will overwrite\n", cfg.DataDir)
-// 	}
-
-// 	// Select wallet datastore
-// 	sqliteDatastore, err := db.Create(cfg.DataDir)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	cfg.DB = sqliteDatastore
-
-// 	ec.wallet, err = NewBtcElectrumWallet(cfg, pw)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	return nil
-// }
-
-// func (ec *BtcElectrumClient) RecreateElectrumWallet(pw, mnenomic string) error {
-// 	cfg := ec.config
-// 	datadir := ec.config.DataDir
-// 	if _, err := os.Stat(path.Join(datadir, "wallet.db")); err == nil {
-// 		fmt.Printf("a file wallet.db probably exists in the datadir: %s .. \n"+
-// 			"test will overwrite\n", cfg.DataDir)
-// 	}
-
-// 	// Select wallet datastore
-// 	sqliteDatastore, err := db.Create(cfg.DataDir)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	cfg.DB = sqliteDatastore
-
-// 	ec.wallet, err = RecreateElectrumWallet(cfg, pw, mnenomic)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	return nil
-// }
-
-// func (ec *BtcElectrumClient) LoadWallet(pw string) error {
-// 	cfg := ec.config
-
-// 	// Select wallet datastore
-// 	sqliteDatastore, err := db.Create(cfg.DataDir)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	cfg.DB = sqliteDatastore
-
-// 	ec.wallet, err = LoadBtcElectrumWallet(cfg, pw)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	return nil
-// }
 
 //////////////////////////////////////////////////////////////////////////////
 //	ElectrumWallet
@@ -134,7 +59,7 @@ const WalletVersion = "0.1.0"
 
 // NewBtcElectrumWallet mskes new wallet with a new seed. The Mnemonic should
 // be saved offline by the user.
-func NewBtcElectrumWallet(config *wallet.Config, pw string) (*BtcElectrumWallet, error) {
+func NewBtcElectrumWallet(config *client.Config, pw string) (*BtcElectrumWallet, error) {
 	if pw == "" {
 		return nil, errors.New("empty password")
 	}
@@ -157,7 +82,7 @@ func NewBtcElectrumWallet(config *wallet.Config, pw string) (*BtcElectrumWallet,
 
 // RecreateElectrumWallet mskes new wallet with a mnenomic seed from an existing wallet.
 // pw does not need to be the same as the old wallet
-func RecreateElectrumWallet(config *wallet.Config, pw, mnemonic string) (*BtcElectrumWallet, error) {
+func RecreateElectrumWallet(config *client.Config, pw, mnemonic string) (*BtcElectrumWallet, error) {
 	if pw == "" {
 		return nil, errors.New("empty password")
 	}
@@ -169,7 +94,7 @@ func RecreateElectrumWallet(config *wallet.Config, pw, mnemonic string) (*BtcEle
 	return makeBtcElectrumWallet(config, pw, seed)
 }
 
-func LoadBtcElectrumWallet(config *wallet.Config, pw string) (*BtcElectrumWallet, error) {
+func LoadBtcElectrumWallet(config *client.Config, pw string) (*BtcElectrumWallet, error) {
 	if pw == "" {
 		return nil, errors.New("empty password")
 	}
@@ -177,7 +102,7 @@ func LoadBtcElectrumWallet(config *wallet.Config, pw string) (*BtcElectrumWallet
 	return loadBtcElectrumWallet(config, pw)
 }
 
-func makeBtcElectrumWallet(config *wallet.Config, pw string, seed []byte) (*BtcElectrumWallet, error) {
+func makeBtcElectrumWallet(config *client.Config, pw string, seed []byte) (*BtcElectrumWallet, error) {
 
 	// dbg
 	fmt.Println("seed: ", hex.EncodeToString(seed))
@@ -251,7 +176,7 @@ func makeBtcElectrumWallet(config *wallet.Config, pw string, seed []byte) (*BtcE
 	return w, nil
 }
 
-func loadBtcElectrumWallet(config *wallet.Config, pw string) (*BtcElectrumWallet, error) {
+func loadBtcElectrumWallet(config *client.Config, pw string) (*BtcElectrumWallet, error) {
 
 	sm := NewStorageManager(config.DB.Enc(), config.Params)
 

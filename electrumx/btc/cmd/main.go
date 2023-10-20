@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/dev-warrior777/go-electrum-client/client"
 	ex "github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
@@ -31,12 +32,12 @@ var (
 	simnetGenesis    = "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"
 )
 
-func makeBitcoinRegtestConfig() (*wallet.Config, error) {
-	cfg := wallet.NewDefaultConfig()
+func makeBitcoinRegtestConfig() (*client.Config, error) {
+	cfg := client.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
 	cfg.Params = &chaincfg.RegressionNetParams
 	cfg.StoreEncSeed = true
-	appDir, err := wallet.GetConfigPath()
+	appDir, err := client.GetConfigPath()
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +50,7 @@ func makeBitcoinRegtestConfig() (*wallet.Config, error) {
 	return cfg, nil
 }
 
-func openBlockchainHeaders(config *wallet.Config) (*os.File, error) {
+func openBlockchainHeaders(config *client.Config) (*os.File, error) {
 	headerFilePath := filepath.Join(config.DataDir, headerFilename)
 	headerFile, err := os.OpenFile(headerFilePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0664)
 	if err != nil {

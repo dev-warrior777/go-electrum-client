@@ -7,18 +7,19 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
 // new wallets, header files, etc. Manually clean while developing
 const coinDir = "btc"
 
-func makeBitcoinTestnetConfig() (*wallet.Config, error) {
-	cfg := wallet.NewDefaultConfig()
+func makeBitcoinTestnetConfig() (*client.Config, error) {
+	cfg := client.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
 	cfg.Params = &chaincfg.TestNet3Params
 	cfg.StoreEncSeed = true
-	appDir, err := wallet.GetConfigPath()
+	appDir, err := client.GetConfigPath()
 	if err != nil {
 		return nil, err
 	}
@@ -31,12 +32,12 @@ func makeBitcoinTestnetConfig() (*wallet.Config, error) {
 	return cfg, nil
 }
 
-func makeBitcoinRegtestConfig() (*wallet.Config, error) {
-	cfg := wallet.NewDefaultConfig()
+func makeBitcoinRegtestConfig() (*client.Config, error) {
+	cfg := client.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
 	cfg.Params = &chaincfg.RegressionNetParams
 	cfg.StoreEncSeed = true
-	appDir, err := wallet.GetConfigPath()
+	appDir, err := client.GetConfigPath()
 	if err != nil {
 		return nil, err
 	}

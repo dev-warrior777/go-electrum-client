@@ -6,17 +6,18 @@ import (
 	"os"
 	"path"
 
+	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	"github.com/dev-warrior777/go-electrum-client/wallet/db"
 )
 
 // BtcElectrumClient
 type BtcElectrumClient struct {
-	config *wallet.Config
+	config *client.Config
 	wallet wallet.ElectrumWallet
 }
 
-func NewBtcElectrumClient(cfg *wallet.Config) *BtcElectrumClient {
+func NewBtcElectrumClient(cfg *client.Config) *BtcElectrumClient {
 	return &BtcElectrumClient{
 		config: cfg,
 	}
