@@ -1,4 +1,4 @@
-package btc
+package client
 
 import (
 	"errors"
@@ -6,21 +6,39 @@ import (
 	"os"
 	"path"
 
-	"github.com/dev-warrior777/go-electrum-client/client"
+	"github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
+	"github.com/dev-warrior777/go-electrum-client/wallet/btc"
 	"github.com/dev-warrior777/go-electrum-client/wallet/db"
 )
 
 // BtcElectrumClient
 type BtcElectrumClient struct {
-	config *client.Config
+	config *Config
 	wallet wallet.ElectrumWallet
 }
 
-func NewBtcElectrumClient(cfg *client.Config) *BtcElectrumClient {
+func NewBtcElectrumClient(cfg *Config) ElectrumClient {
 	return &BtcElectrumClient{
 		config: cfg,
+		wallet: nil,
 	}
+}
+
+func (ec *BtcElectrumClient) MakeWalletConfig() *wallet.WalletConfig {
+	wc := wallet.WalletConfig{
+		Chain:        ec.config.Chain,
+		Params:       ec.config.Params,
+		StoreEncSeed: ec.config.StoreEncSeed,
+		DataDir:      ec.config.DataDir,
+		DB:           ec.config.DB,
+		LowFee:       ec.config.LowFee,
+		MediumFee:    ec.config.MediumFee,
+		HighFee:      ec.config.HighFee,
+		MaxFee:       ec.config.MaxFee,
+		Testing:      ec.config.Testing,
+	}
+	return &wc
 }
 
 // CreateWallet makes a new wallet with a new seed. The password is to encrypt
@@ -43,12 +61,17 @@ func (ec *BtcElectrumClient) CreateWallet(pw string) error {
 	}
 	cfg.DB = sqliteDatastore
 
-	ec.wallet, err = NewBtcElectrumWallet(cfg, pw)
+	walletCfg := ec.MakeWalletConfig()
+	ec.wallet, err = btc.NewBtcElectrumWallet(walletCfg, pw)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func NewBtcElectrumWallet(cfg *Config, pw string) {
+	panic("unimplemented")
 }
 
 // RecreateElectrumWallet recreates a wallet from an existing mnemonic seed.
@@ -72,7 +95,8 @@ func (ec *BtcElectrumClient) RecreateElectrumWallet(pw, mnenomic string) error {
 	}
 	cfg.DB = sqliteDatastore
 
-	ec.wallet, err = RecreateElectrumWallet(cfg, pw, mnenomic)
+	walletCfg := ec.MakeWalletConfig()
+	ec.wallet, err = btc.RecreateElectrumWallet(walletCfg, pw, mnenomic)
 	if err != nil {
 		return err
 	}
@@ -92,10 +116,23 @@ func (ec *BtcElectrumClient) LoadWallet(pw string) error {
 	}
 	cfg.DB = sqliteDatastore
 
-	ec.wallet, err = LoadBtcElectrumWallet(cfg, pw)
+	walletCfg := ec.MakeWalletConfig()
+	ec.wallet, err = btc.LoadBtcElectrumWallet(walletCfg, pw)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (ec *BtcElectrumClient) Config() *Config {
+	return ec.config
+}
+
+func (ec *BtcElectrumClient) Wallet() wallet.ElectrumWallet {
+	return ec.wallet
+}
+
+func (ec *BtcElectrumClient) Node() electrumx.ElectrumXNode {
+	return ec.Node
 }

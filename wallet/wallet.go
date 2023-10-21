@@ -11,6 +11,34 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
+type WalletConfig struct {
+	// The blockchain, Bitcoin, Dash, etc
+	Chain CoinType
+
+	// Network parameters. Set mainnet, testnet using this.
+	Params *chaincfg.Params
+
+	// Store the seed in encrypted storage
+	StoreEncSeed bool
+
+	// Location of the data directory
+	DataDir string
+
+	// An implementation of the Datastore interface
+	DB Datastore
+
+	// The default fee-per-byte for each level
+	LowFee    uint64
+	MediumFee uint64
+	HighFee   uint64
+
+	// The highest allowable fee-per-byte
+	MaxFee uint64
+
+	// If not testing do not overwrite existing wallet files
+	Testing bool
+}
+
 type ElectrumWallet interface {
 
 	// Start the wallet

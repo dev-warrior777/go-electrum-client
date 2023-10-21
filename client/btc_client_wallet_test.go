@@ -1,4 +1,4 @@
-package btc
+package client
 
 import (
 	"fmt"
@@ -7,37 +7,18 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
 // new wallets, header files, etc. Manually clean while developing
 const coinDir = "btc"
 
-func makeBitcoinTestnetConfig() (*client.Config, error) {
-	cfg := client.NewDefaultConfig()
-	cfg.Chain = wallet.Bitcoin
-	cfg.Params = &chaincfg.TestNet3Params
-	cfg.StoreEncSeed = true
-	appDir, err := client.GetConfigPath()
-	if err != nil {
-		return nil, err
-	}
-	testnetDir := filepath.Join(appDir, coinDir, "testnet")
-	err = os.MkdirAll(testnetDir, os.ModeDir|0777)
-	if err != nil {
-		return nil, err
-	}
-	cfg.DataDir = testnetDir
-	return cfg, nil
-}
-
-func makeBitcoinRegtestConfig() (*client.Config, error) {
-	cfg := client.NewDefaultConfig()
+func makeBitcoinRegtestConfig() (*Config, error) {
+	cfg := NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
 	cfg.Params = &chaincfg.RegressionNetParams
 	cfg.StoreEncSeed = true
-	appDir, err := client.GetConfigPath()
+	appDir, err := GetConfigPath()
 	if err != nil {
 		return nil, err
 	}
@@ -64,11 +45,11 @@ func TestWalletCreation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("made a btcWallet", ec.wallet)
+	fmt.Println("made a btcWallet", ec.Wallet())
 
-	adr := ec.wallet.CurrentAddress(wallet.EXTERNAL)
+	adr := ec.Wallet().CurrentAddress(wallet.EXTERNAL)
 	fmt.Println("Current External address", adr)
-	adrI := ec.wallet.CurrentAddress(wallet.INTERNAL)
+	adrI := ec.Wallet().CurrentAddress(wallet.INTERNAL)
 	fmt.Println("Current Internal address", adrI)
 }
 

@@ -17,7 +17,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcwallet/wallet/txrules"
-	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	"github.com/tyler-smith/go-bip39"
 )
@@ -25,9 +24,12 @@ import (
 //////////////////////////////////////////////////////////////////////////////
 //	ElectrumWallet
 
-// var _ = (*wallet.ElectrumWallet)(nil)
-
 // BtcElectrumWallet implements ElectrumWallet
+
+// TODO: adjust interface while developing because .. simpler
+var _ = wallet.ElectrumWallet(&BtcElectrumWallet{})
+
+const WalletVersion = "0.1.0"
 
 type BtcElectrumWallet struct {
 	params *chaincfg.Params
@@ -52,14 +54,9 @@ type BtcElectrumWallet struct {
 	running bool
 }
 
-// TODO: adjust interface while developing because .. simpler
-var _ = wallet.ElectrumWallet(&BtcElectrumWallet{})
-
-const WalletVersion = "0.1.0"
-
 // NewBtcElectrumWallet mskes new wallet with a new seed. The Mnemonic should
 // be saved offline by the user.
-func NewBtcElectrumWallet(config *client.Config, pw string) (*BtcElectrumWallet, error) {
+func NewBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrumWallet, error) {
 	if pw == "" {
 		return nil, errors.New("empty password")
 	}
@@ -82,7 +79,7 @@ func NewBtcElectrumWallet(config *client.Config, pw string) (*BtcElectrumWallet,
 
 // RecreateElectrumWallet mskes new wallet with a mnenomic seed from an existing wallet.
 // pw does not need to be the same as the old wallet
-func RecreateElectrumWallet(config *client.Config, pw, mnemonic string) (*BtcElectrumWallet, error) {
+func RecreateElectrumWallet(config *wallet.WalletConfig, pw, mnemonic string) (*BtcElectrumWallet, error) {
 	if pw == "" {
 		return nil, errors.New("empty password")
 	}
@@ -94,7 +91,7 @@ func RecreateElectrumWallet(config *client.Config, pw, mnemonic string) (*BtcEle
 	return makeBtcElectrumWallet(config, pw, seed)
 }
 
-func LoadBtcElectrumWallet(config *client.Config, pw string) (*BtcElectrumWallet, error) {
+func LoadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrumWallet, error) {
 	if pw == "" {
 		return nil, errors.New("empty password")
 	}
@@ -102,7 +99,7 @@ func LoadBtcElectrumWallet(config *client.Config, pw string) (*BtcElectrumWallet
 	return loadBtcElectrumWallet(config, pw)
 }
 
-func makeBtcElectrumWallet(config *client.Config, pw string, seed []byte) (*BtcElectrumWallet, error) {
+func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) (*BtcElectrumWallet, error) {
 
 	// dbg
 	fmt.Println("seed: ", hex.EncodeToString(seed))
@@ -126,8 +123,11 @@ func makeBtcElectrumWallet(config *client.Config, pw string, seed []byte) (*BtcE
 			config.HighFee,
 			config.MediumFee,
 			config.LowFee,
-			config.FeeAPI.String(),
-			config.Proxy,
+			// move to client
+			"",
+			nil,
+			// config.FeeAPI.String(),
+			// config.Proxy,
 		),
 		mutex: new(sync.RWMutex),
 	}
@@ -176,7 +176,7 @@ func makeBtcElectrumWallet(config *client.Config, pw string, seed []byte) (*BtcE
 	return w, nil
 }
 
-func loadBtcElectrumWallet(config *client.Config, pw string) (*BtcElectrumWallet, error) {
+func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrumWallet, error) {
 
 	sm := NewStorageManager(config.DB.Enc(), config.Params)
 
@@ -205,8 +205,11 @@ func loadBtcElectrumWallet(config *client.Config, pw string) (*BtcElectrumWallet
 			config.HighFee,
 			config.MediumFee,
 			config.LowFee,
-			config.FeeAPI.String(),
-			config.Proxy,
+			// move to client
+			"",
+			nil,
+			// config.FeeAPI.String(),
+			// config.Proxy,
 		),
 		mutex: new(sync.RWMutex),
 	}
