@@ -26,8 +26,12 @@ import (
 const (
 	coinDir = "btc"
 	// raw bitcoin headers from last checkpoint. For regtest that means from
-	// genesis - so no need to check checkpoint merkle proofs
+	// genesis - so no need to check checkpoint merkle proofs. For testnet or
+	// mainnet use the version of "blockchain.block.headers" that sends a cp
+	// as an additional parameter to the server. Not yet implemented but down-
+	// loading mainnet/testnet from genesis is not an option due to size.
 	headerFilename = "blockchain_headers"
+	HEADER_SIZE    = 80
 )
 
 var (
@@ -74,7 +78,7 @@ func openBlockchainHeadersForReadWrite(config *client.Config) (*os.File, error) 
 	return headerFile, nil
 }
 
-// // reverse - reverses bytes received in network byte order
+// // reverse - reverses bytes received in network byte order as a copy.
 // func reverse(s []byte) []byte {
 // 	var d = make([]byte, len(s))
 // 	for i, j := 0, len(s)-1; i < len(s); i, j = i+1, j-1 {
@@ -89,7 +93,6 @@ func main() {
 
 func RunNode(network ex.Network, addr, tx, genesis string, useTls bool) {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	// ctx, cancel := contexlog.WithTimeout(contexlog.Background(), 45*time.Second)
 	defer cancel()
 
 	ex.DebugMode = true
@@ -144,7 +147,7 @@ func RunNode(network ex.Network, addr, tx, genesis string, useTls bool) {
 	fmt.Println("\n\n================= Running =================")
 
 	////////////////////////////////////////////////////////////////////////
-	// Get stored blocks
+	// Get stored headers
 	////////////////
 
 	// create if noexist
@@ -160,11 +163,10 @@ func RunNode(network ex.Network, addr, tx, genesis string, useTls bool) {
 		log.Fatal(err)
 	}
 
-	var numHeaders = 0
 	fsize := fi.Size()
 
-	numHeaders = int(fsize / 80)
-	er := fsize % 80
+	var numHeaders = int(fsize / HEADER_SIZE)
+	er := fsize % HEADER_SIZE
 	if er != 0 {
 		log.Fatal("corrupted file")
 	}
@@ -194,10 +196,10 @@ func RunNode(network ex.Network, addr, tx, genesis string, useTls bool) {
 
 	// Do not make block count too big or electrumX may throttle response
 	// as an anti ddos measure. Magic number 2016 from electrum code
-	const blockDelta = 2016
+	const blockDelta = 20
 	var done_gathering = false
-	var startHeight = uint32(numHeaders) // or wallet birthday
-	var blockCount = uint32(2016)
+	var startHeight = uint32(numHeaders)
+	var blockCount = uint32(20)
 	hdrsRes, err := sc.BlockHeaders(ctx, startHeight, blockCount)
 	if err != nil {
 		log.Fatal(err)
@@ -225,13 +227,14 @@ func RunNode(network ex.Network, addr, tx, genesis string, useTls bool) {
 	startHeight += blockDelta
 
 	if !done_gathering {
-		var nxtHdr = time.Millisecond * 30
-	outCtxDone:
 		for {
 			select {
 			case <-ctx.Done():
-				break outCtxDone
-			case <-time.After(nxtHdr):
+				fmt.Println("Server shutdown - gathering")
+				sc.Shutdown()
+				<-sc.Done()
+				return
+			case <-time.After(time.Millisecond * 33):
 				hdrsRes, err := sc.BlockHeaders(ctx, startHeight, blockCount)
 				if err != nil {
 					fmt.Println(err)
@@ -256,18 +259,18 @@ func RunNode(network ex.Network, addr, tx, genesis string, useTls bool) {
 
 				if count < blockDelta {
 					fmt.Println("Done gathering")
+					done_gathering = true
 					goto out1
 				}
 
 				startHeight += blockDelta
-				nxtHdr = time.Second
 			}
 		}
 	}
 out1:
 	headerFile.Close()
 
-	// debug: read back stored raw headers, deserialize & print ->
+	// read back stored raw headers, deserialize (debug: & print)
 	headerFile, err = openBlockchainHeadersForReadWrite(config)
 	if err != nil {
 		log.Fatal(err)
@@ -289,12 +292,16 @@ out1:
 	hdr := wire.BlockHeader{}
 
 	var i int
-	for i = 0; i < numBytes; i += 80 {
+	var maybeTip = int32(0)
+	for i = 0; i < numBytes; i += HEADER_SIZE {
+		maybeTip = int32(i / HEADER_SIZE)
+		// debug->
 		err = hdr.Deserialize(hdrBuf)
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println("Hash: ", hdr.BlockHash(), "Height: ", i/80)
+		fmt.Println("============================")
+		fmt.Println("Hash: ", hdr.BlockHash(), "Height: ", i/HEADER_SIZE, "i/HEADER_SIZE")
 		fmt.Println("--------------------------")
 		fmt.Printf("Version: 0x%08x\n", hdr.Version)
 		fmt.Println("Previous Hash: ", hdr.PrevBlock)
@@ -302,33 +309,109 @@ out1:
 		fmt.Println("Time Stamp: ", hdr.Timestamp)
 		fmt.Printf("Bits: 0x%08x\n", hdr.Bits)
 		fmt.Println("Nonce: ", hdr.Nonce)
-		fmt.Println()
 		fmt.Println("============================")
+		fmt.Println()
+		//<-debug
 	}
 	headerFile.Close()
-	// debug: End debug <-
+
+	fi, _ = os.Stat(headerFilePath)
+	fsize = fi.Size()
+
+	fmt.Println("blockchain_headers - Size: ", fsize, "maybeTip: ", maybeTip)
+	fmt.Println("***********************************************************")
 
 	////////////////////////////////////////////////////
-	// 	// read whatever is in the queue
-	// 	_, hdrResNotify, err := sc.SubscribeHeaders(ctx)
-	// 	if err != nil {
-	// 		log.Fatal(err)
-	// 	}
+	// Subscribe headers & serve
+	////////////////////////////
 
-	// out:
-	// 	for {
-	// 		select {
-	// 		case <-ctx.Done():
-	// 			break out
-	// 		case <-hdrResNotify:
-	// 			// read whatever is in the queue
-	// 			for x := range hdrResNotify {
-	// 				fmt.Println("New Block: ", x.Height, x.Hex)
-	// 			}
-	// 		}
-	// 	}
+	headerFile, err = openBlockchainHeadersForAppend(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer headerFile.Close()
 
-	// server shutdown
-	sc.Shutdown()
-	<-sc.Done()
+	_, hdrResNotify, err := sc.SubscribeHeaders(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("============================================================")
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("Server shutdown - Subscribe headers (tip)")
+			sc.Shutdown()
+			<-sc.Done()
+			return
+		case <-hdrResNotify:
+			// read whatever is in the queue, usually one header at tip
+			for x := range hdrResNotify {
+				fmt.Println("New Block: ", x.Height, x.Hex)
+				if x.Height > maybeTip {
+					n := x.Height - maybeTip
+					if n == 1 {
+						// simple case: just store it
+						fmt.Println("Storing header for height: ", x.Height)
+						b, _ := hex.DecodeString(x.Hex)
+						_, err := headerFile.Write(b)
+						if err != nil {
+							// for now ;-)2
+							panic(err)
+						}
+						hdr := wire.BlockHeader{}
+						hdrBuf := bytes.NewBuffer(b)
+						err = hdr.Deserialize(hdrBuf)
+						if err != nil {
+							log.Fatal(err)
+						}
+						fmt.Println("Hash: ", hdr.BlockHash(), "Height: ", x.Height)
+						fmt.Println("--------------------------")
+						fmt.Printf("Version: 0x%08x\n", hdr.Version)
+						fmt.Println("Previous Hash: ", hdr.PrevBlock)
+						fmt.Println("Merkle Root: ", hdr.MerkleRoot)
+						fmt.Println("Time Stamp: ", hdr.Timestamp)
+						fmt.Printf("Bits: 0x%08x\n", hdr.Bits)
+						fmt.Println("Nonce: ", hdr.Nonce)
+						fmt.Println()
+						fmt.Println("============================")
+					} else {
+						fmt.Println("Missing header(s)")
+						numMissing := x.Height - maybeTip
+						from := uint32(maybeTip + 1)
+						numToGet := uint32(numMissing)
+						fmt.Printf("Filling from height %d to height %d inclusive\n", from, x.Height)
+						fmt.Println(" -> go get them with 'block.headers'")
+						fmt.Println("Getting ", numToGet, " headers ", from, " ... ", x.Height)
+						hdrsRes, err := sc.BlockHeaders(ctx, from, numToGet)
+						if err != nil {
+							log.Fatal(err)
+						}
+						count := hdrsRes.Count
+
+						fmt.Println("Count: ", count, " more read from server at Height: ", from)
+						fmt.Println("Storing: ", count, " headers ", from, "..", from+count-1)
+						fmt.Println()
+
+						if count > 0 {
+							b, err := hex.DecodeString(hdrsRes.HexConcat)
+							if err != nil {
+								log.Fatal(err)
+							}
+							_, err = headerFile.Write(b)
+							if err != nil {
+								log.Fatal(err)
+							}
+						}
+						fmt.Println()
+						fmt.Println("============================")
+					}
+					maybeTip = x.Height
+				} else {
+					fmt.Printf("Already got a header for height %d - possible reorg (unhandled)\n", x.Height)
+				}
+			}
+		}
+	}
+	// serve until ^C
 }
