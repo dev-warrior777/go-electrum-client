@@ -8,8 +8,8 @@ import (
 
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
-	"github.com/dev-warrior777/go-electrum-client/wallet/btc"
 	"github.com/dev-warrior777/go-electrum-client/wallet/db"
+	"github.com/dev-warrior777/go-electrum-client/wallet/wltbtc"
 )
 
 // BtcElectrumClient
@@ -62,7 +62,7 @@ func (ec *BtcElectrumClient) CreateWallet(pw string) error {
 	cfg.DB = sqliteDatastore
 
 	walletCfg := ec.MakeWalletConfig()
-	ec.wallet, err = btc.NewBtcElectrumWallet(walletCfg, pw)
+	ec.wallet, err = wltbtc.NewBtcElectrumWallet(walletCfg, pw)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (ec *BtcElectrumClient) RecreateElectrumWallet(pw, mnenomic string) error {
 	cfg.DB = sqliteDatastore
 
 	walletCfg := ec.MakeWalletConfig()
-	ec.wallet, err = btc.RecreateElectrumWallet(walletCfg, pw, mnenomic)
+	ec.wallet, err = wltbtc.RecreateElectrumWallet(walletCfg, pw, mnenomic)
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func (ec *BtcElectrumClient) LoadWallet(pw string) error {
 	cfg.DB = sqliteDatastore
 
 	walletCfg := ec.MakeWalletConfig()
-	ec.wallet, err = btc.LoadBtcElectrumWallet(walletCfg, pw)
+	ec.wallet, err = wltbtc.LoadBtcElectrumWallet(walletCfg, pw)
 	if err != nil {
 		return err
 	}
