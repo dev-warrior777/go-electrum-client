@@ -14,7 +14,7 @@ import (
 // new wallets, header files, etc. Manually clean while developing
 const coinDir = "btc"
 
-func makeBitcoinRegtestConfig() (*client.Config, error) {
+func makeBitcoinRegtestConfig() (*client.ClientConfig, error) {
 	cfg := client.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
 	cfg.Params = &chaincfg.RegressionNetParams
@@ -46,11 +46,11 @@ func TestWalletCreation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("made a btcWallet", ec.Wallet())
+	fmt.Println("made a btcWallet", ec.GetWallet())
 
-	adr := ec.Wallet().CurrentAddress(wallet.EXTERNAL)
+	adr := ec.GetWallet().CurrentAddress(wallet.EXTERNAL)
 	fmt.Println("Current External address", adr)
-	adrI := ec.Wallet().CurrentAddress(wallet.INTERNAL)
+	adrI := ec.GetWallet().CurrentAddress(wallet.INTERNAL)
 	fmt.Println("Current Internal address", adrI)
 }
 

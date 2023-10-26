@@ -6,11 +6,13 @@ import (
 )
 
 type ElectrumClient interface {
+	GetConfig() *ClientConfig
+	GetWallet() wallet.ElectrumWallet
+	GetNode() electrumx.ElectrumXNode
+	//
 	CreateWallet(pw string) error
 	RecreateElectrumWallet(pw, mnenomic string) error
 	LoadWallet(pw string) error
 	//
-	Config() *Config
-	Wallet() wallet.ElectrumWallet
-	Node() electrumx.ElectrumXNode
+	CreateNode() error
 }

@@ -17,7 +17,7 @@ const (
 	appName = "goele"
 )
 
-type Config struct {
+type ClientConfig struct {
 	// The blockchain, Bitcoin, Dash, etc
 	Chain wallet.CoinType
 
@@ -63,8 +63,8 @@ type Config struct {
 	Testing bool
 }
 
-func NewDefaultConfig() *Config {
-	return &Config{
+func NewDefaultConfig() *ClientConfig {
+	return &ClientConfig{
 		Chain:                wallet.Bitcoin,
 		Params:               &chaincfg.MainNetParams,
 		UserAgent:            appName,
