@@ -1,4 +1,4 @@
-package client
+package btc
 
 import (
 	"fmt"
@@ -7,18 +7,19 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
 // new wallets, header files, etc. Manually clean while developing
 const coinDir = "btc"
 
-func makeBitcoinRegtestConfig() (*Config, error) {
-	cfg := NewDefaultConfig()
+func makeBitcoinRegtestConfig() (*client.Config, error) {
+	cfg := client.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
 	cfg.Params = &chaincfg.RegressionNetParams
 	cfg.StoreEncSeed = true
-	appDir, err := GetConfigPath()
+	appDir, err := client.GetConfigPath()
 	if err != nil {
 		return nil, err
 	}

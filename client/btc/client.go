@@ -1,4 +1,4 @@
-package client
+package btc
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	"github.com/dev-warrior777/go-electrum-client/wallet/db"
@@ -14,11 +15,11 @@ import (
 
 // BtcElectrumClient
 type BtcElectrumClient struct {
-	config *Config
+	config *client.Config
 	wallet wallet.ElectrumWallet
 }
 
-func NewBtcElectrumClient(cfg *Config) ElectrumClient {
+func NewBtcElectrumClient(cfg *client.Config) client.ElectrumClient {
 	return &BtcElectrumClient{
 		config: cfg,
 		wallet: nil,
@@ -70,7 +71,7 @@ func (ec *BtcElectrumClient) CreateWallet(pw string) error {
 	return nil
 }
 
-func NewBtcElectrumWallet(cfg *Config, pw string) {
+func NewBtcElectrumWallet(cfg *client.Config, pw string) {
 	panic("unimplemented")
 }
 
@@ -125,7 +126,7 @@ func (ec *BtcElectrumClient) LoadWallet(pw string) error {
 	return nil
 }
 
-func (ec *BtcElectrumClient) Config() *Config {
+func (ec *BtcElectrumClient) Config() *client.Config {
 	return ec.config
 }
 
