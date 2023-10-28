@@ -40,7 +40,7 @@ var (
 	simnetGenesis    = "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"
 )
 
-func makeBitcoinRegtestConfig() (*client.Config, error) {
+func makeBitcoinRegtestConfig() (*client.ClientConfig, error) {
 	cfg := client.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
 	cfg.Params = &chaincfg.RegressionNetParams
@@ -60,7 +60,7 @@ func makeBitcoinRegtestConfig() (*client.Config, error) {
 
 var headerFilePath string
 
-func openBlockchainHeadersForAppend(config *client.Config) (*os.File, error) {
+func openBlockchainHeadersForAppend(config *client.ClientConfig) (*os.File, error) {
 	headerFilePath = filepath.Join(config.DataDir, headerFilename)
 	headerFile, err := os.OpenFile(headerFilePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0664)
 	if err != nil {
@@ -69,7 +69,7 @@ func openBlockchainHeadersForAppend(config *client.Config) (*os.File, error) {
 	return headerFile, nil
 }
 
-func openBlockchainHeadersForReadWrite(config *client.Config) (*os.File, error) {
+func openBlockchainHeadersForReadWrite(config *client.ClientConfig) (*os.File, error) {
 	headerFilePath = filepath.Join(config.DataDir, headerFilename)
 	headerFile, err := os.OpenFile(headerFilePath, os.O_CREATE|os.O_RDWR, 0664)
 	if err != nil {

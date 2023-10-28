@@ -11,9 +11,6 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-// new wallets, header files, etc. Manually clean while developing
-const coinDir = "btc"
-
 func makeBitcoinRegtestConfig() (*client.ClientConfig, error) {
 	cfg := client.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
@@ -23,7 +20,7 @@ func makeBitcoinRegtestConfig() (*client.ClientConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	regtestDir := filepath.Join(appDir, coinDir, "regtest")
+	regtestDir := filepath.Join(appDir, "btc", "regtest")
 	err = os.MkdirAll(regtestDir, os.ModeDir|0777)
 	if err != nil {
 		return nil, err
