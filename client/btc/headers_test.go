@@ -297,3 +297,20 @@ func TestStore(t *testing.T) {
 		log.Fatal("error expected")
 	}
 }
+
+func TestMapIter(t *testing.T) {
+	m := make(map[int]string)
+	m[0] = "zero"
+	m[2] = "two"
+	m[1] = "one"
+	m[3] = "three"
+	delete(m, 3)
+	keys := make([]int, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	for key := range keys {
+		fmt.Println(key, m[key])
+	}
+	fmt.Println()
+}

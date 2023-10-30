@@ -25,3 +25,8 @@ testdata/
 
 #test bin
 electrumx/btc/cmd/main
+goele
+
+#vscode
+.vscode/
+__debug_bin*
