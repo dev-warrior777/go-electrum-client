@@ -8,6 +8,20 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+type ServerAddr struct {
+	Net, Addr string
+}
+
+func (a ServerAddr) Network() string {
+	return a.Net
+}
+func (a ServerAddr) String() string {
+	return a.Addr
+}
+
+// Ensure simpleAddr implements the net.Addr interface.
+var _ net.Addr = ServerAddr{}
+
 type NodeConfig struct {
 	// The blockchain, Bitcoin, Dash, etc
 	Chain wallet.CoinType
@@ -21,7 +35,7 @@ type NodeConfig struct {
 	// Location of the data directory
 	DataDir string
 
-	// If you wish to connect to a single trusted electrumX peer set this. TODO:
+	// If you wish to connect to a single trusted electrumX peer set this.
 	TrustedPeer net.Addr
 
 	// A Tor proxy can be set here causing the wallet will use Tor. TODO:
@@ -40,15 +54,5 @@ var Mainnet Network = "mainnet"
 var DebugMode bool
 
 type ElectrumXNode interface {
-	// Start()
-	// Stop()
-}
-
-type SingleNode struct {
-	NodeConfig *NodeConfig
-	Server     *ServerConn
-}
-
-type MultiNode struct {
-	ServerMap map[string]*ServerConn
+	Start() error
 }

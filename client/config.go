@@ -10,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"golang.org/x/net/proxy"
 
+	"github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -36,7 +37,8 @@ type ClientConfig struct {
 	// An implementation of the Datastore interface
 	DB wallet.Datastore
 
-	// If you wish to connect to a single trusted electrumX peer set this. TODO:
+	// If you wish to connect to a single trusted electrumX peer server set this.
+	// SingleNode servers will error if not provided
 	TrustedPeer net.Addr
 
 	// A Tor proxy can be set here causing the wallet will use Tor. TODO:
@@ -69,9 +71,37 @@ func NewDefaultConfig() *ClientConfig {
 		Params:               &chaincfg.MainNetParams,
 		UserAgent:            appName,
 		DataDir:              btcutil.AppDataDir(appName, false),
-		DB:                   nil, // TODO: update for concrete impl
+		DB:                   nil, // concrete impl
 		DisableExchangeRates: true,
 	}
+}
+func (cc *ClientConfig) MakeWalletConfig() *wallet.WalletConfig {
+	wc := wallet.WalletConfig{
+		Chain:        cc.Chain,
+		Params:       cc.Params,
+		StoreEncSeed: cc.StoreEncSeed,
+		DataDir:      cc.DataDir,
+		DB:           cc.DB,
+		LowFee:       cc.LowFee,
+		MediumFee:    cc.MediumFee,
+		HighFee:      cc.HighFee,
+		MaxFee:       cc.MaxFee,
+		Testing:      cc.Testing,
+	}
+	return &wc
+}
+
+func (cc *ClientConfig) MakeNodeConfig() *electrumx.NodeConfig {
+	nc := electrumx.NodeConfig{
+		Chain:       cc.Chain,
+		Params:      cc.Params,
+		UserAgent:   cc.UserAgent,
+		DataDir:     cc.DataDir,
+		TrustedPeer: cc.TrustedPeer,
+		Proxy:       cc.Proxy,
+		Testing:     cc.Testing,
+	}
+	return &nc
 }
 
 func GetConfigPath() (string, error) {

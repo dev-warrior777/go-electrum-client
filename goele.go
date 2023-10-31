@@ -9,13 +9,16 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/dev-warrior777/go-electrum-client/client"
+	"github.com/dev-warrior777/go-electrum-client/client/btc"
+	"github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
 var (
 	coins = []string{"btc"} // add as implemented
-	nets  = []string{"mainnet", "testnet", "regtest"}
+	nets  = []string{"mainnet", "testnet", "regtest", "simnet"}
 )
 
 func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
@@ -37,7 +40,6 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 	case "btc":
 	default:
 		return nil, errors.New("invalid coin")
-
 	}
 	cfg := client.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
@@ -52,6 +54,29 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		return nil, err
 	}
 	cfg.DataDir = coinNetDir
+	switch net {
+	case "regtest", "simnet":
+		cfg.Params = &chaincfg.RegressionNetParams
+		cfg.TrustedPeer = electrumx.ServerAddr{
+			Net: "ssl", Addr: "127.0.0.1:53002",
+		}
+		cfg.StoreEncSeed = true
+		cfg.Testing = true
+	case "testnet":
+		cfg.Params = &chaincfg.TestNet3Params
+		cfg.TrustedPeer = electrumx.ServerAddr{
+			Net: "tcp", Addr: "testnet.aranguren.org:51001",
+		}
+		cfg.StoreEncSeed = true
+		cfg.Testing = true
+	case "mainnet":
+		cfg.Params = &chaincfg.MainNetParams
+		cfg.TrustedPeer = electrumx.ServerAddr{
+			Net: "ssl", Addr: "elx.bitske.com:50002",
+		}
+		cfg.StoreEncSeed = false
+		cfg.Testing = false
+	}
 	return cfg, nil
 }
 
@@ -70,6 +95,8 @@ func main() {
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
+	fmt.Println(cfg.Chain, cfg.Params.Name)
 
-	fmt.Println(cfg.Chain, "to be continued")
+	ec := btc.NewBtcElectrumClient(cfg)
+	ec.CreateNode()
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
+	"github.com/dev-warrior777/go-electrum-client/electrumx/elxbtc"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	"github.com/dev-warrior777/go-electrum-client/wallet/db"
 	"github.com/dev-warrior777/go-electrum-client/wallet/wltbtc"
@@ -23,47 +24,26 @@ type BtcElectrumClient struct {
 func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 	ec := BtcElectrumClient{
 		ClientConfig: cfg,
-		// Wallet: nil,
-		// Node:   nil,
+		Wallet:       nil,
+		Node:         nil,
 	}
 	return &ec
-}
-
-func (ec *BtcElectrumClient) MakeWalletConfig() *wallet.WalletConfig {
-	wc := wallet.WalletConfig{
-		Chain:        ec.ClientConfig.Chain,
-		Params:       ec.ClientConfig.Params,
-		StoreEncSeed: ec.ClientConfig.StoreEncSeed,
-		DataDir:      ec.ClientConfig.DataDir,
-		DB:           ec.ClientConfig.DB,
-		LowFee:       ec.ClientConfig.LowFee,
-		MediumFee:    ec.ClientConfig.MediumFee,
-		HighFee:      ec.ClientConfig.HighFee,
-		MaxFee:       ec.ClientConfig.MaxFee,
-		Testing:      ec.ClientConfig.Testing,
-	}
-	return &wc
-}
-
-func (ec *BtcElectrumClient) MakeNodeConfig() *electrumx.NodeConfig {
-	nc := electrumx.NodeConfig{
-		Chain:       ec.ClientConfig.Chain,
-		Params:      ec.ClientConfig.Params,
-		UserAgent:   ec.ClientConfig.UserAgent,
-		DataDir:     ec.ClientConfig.DataDir,
-		TrustedPeer: ec.ClientConfig.TrustedPeer,
-		Proxy:       ec.ClientConfig.Proxy,
-		Testing:     ec.ClientConfig.Testing,
-	}
-	return &nc
 }
 
 func (ec *BtcElectrumClient) GetConfig() *client.ClientConfig {
 	return ec.ClientConfig
 }
 
+func (ec *BtcElectrumClient) SetWallet(wallet wallet.ElectrumWallet) {
+	ec.Wallet = wallet
+}
+
 func (ec *BtcElectrumClient) GetWallet() wallet.ElectrumWallet {
 	return ec.Wallet
+}
+
+func (ec *BtcElectrumClient) SetNode(node electrumx.ElectrumXNode) {
+	ec.Node = node
 }
 
 func (ec *BtcElectrumClient) GetNode() electrumx.ElectrumXNode {
@@ -90,12 +70,11 @@ func (ec *BtcElectrumClient) CreateWallet(pw string) error {
 	}
 	cfg.DB = sqliteDatastore
 
-	walletCfg := ec.MakeWalletConfig()
+	walletCfg := cfg.MakeWalletConfig()
 	ec.Wallet, err = wltbtc.NewBtcElectrumWallet(walletCfg, pw)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -124,12 +103,11 @@ func (ec *BtcElectrumClient) RecreateElectrumWallet(pw, mnenomic string) error {
 	}
 	cfg.DB = sqliteDatastore
 
-	walletCfg := ec.MakeWalletConfig()
+	walletCfg := cfg.MakeWalletConfig()
 	ec.Wallet, err = wltbtc.RecreateElectrumWallet(walletCfg, pw, mnenomic)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -145,22 +123,18 @@ func (ec *BtcElectrumClient) LoadWallet(pw string) error {
 	}
 	cfg.DB = sqliteDatastore
 
-	walletCfg := ec.MakeWalletConfig()
+	walletCfg := cfg.MakeWalletConfig()
 	ec.Wallet, err = wltbtc.LoadBtcElectrumWallet(walletCfg, pw)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
-// CreateNode creates an ElectrumX node - single or multi
+// CreateNode creates a single ElectrumX node
 func (ec *BtcElectrumClient) CreateNode() error {
-	nodeCfg := ec.MakeNodeConfig()
-	ec.Node = electrumx.SingleNode{
-		NodeConfig: nodeCfg,
-		Server:     &electrumx.ServerConn{},
-	}
-
+	nodeCfg := ec.GetConfig().MakeNodeConfig()
+	n := elxbtc.NewSingleNode(nodeCfg)
+	ec.SetNode(n)
 	return nil
 }
