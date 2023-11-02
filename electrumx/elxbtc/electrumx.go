@@ -49,16 +49,15 @@ func (s *SingleNode) Start() error {
 		log.Fatal(err)
 	}
 
-	rootCAs, _ := x509.SystemCertPool()
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true,
-		RootCAs:            rootCAs,
-		MinVersion:         tls.VersionTLS12, // works ok
-		ServerName:         host,
-	}
-
-	if netProto != "ssl" {
-		tlsConfig = nil
+	var tlsConfig *tls.Config = nil
+	if netProto == "ssl" {
+		rootCAs, _ := x509.SystemCertPool()
+		tlsConfig = &tls.Config{
+			InsecureSkipVerify: true,
+			RootCAs:            rootCAs,
+			MinVersion:         tls.VersionTLS12, // works ok
+			ServerName:         host,
+		}
 	}
 
 	opts := &electrumx.ConnectOpts{
@@ -66,10 +65,12 @@ func (s *SingleNode) Start() error {
 		DebugLogger: electrumx.StdoutPrinter,
 	}
 
-	sc, err := electrumx.ConnectServer(ctx, addr, opts)
+	s.Server, err = electrumx.ConnectServer(ctx, addr, opts)
 	if err != nil {
 		return err
 	}
+	sc := s.Server
+
 	fmt.Println(sc.Proto())
 
 	fmt.Printf("\n\n ** Connected to %s **\n\n", network)
