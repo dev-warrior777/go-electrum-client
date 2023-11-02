@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/dev-warrior777/go-electrum-client/client"
@@ -99,4 +100,15 @@ func main() {
 
 	ec := btc.NewBtcElectrumClient(cfg)
 	ec.CreateNode()
+	err = ec.GetNode().Start()
+	if err != nil {
+		fmt.Println(err, " - exiting")
+		os.Exit(1)
+	}
+
+	// dev
+	<-time.After(time.Second * 2)
+
+	// Stop the running node
+	ec.GetNode().Stop()
 }

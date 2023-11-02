@@ -55,4 +55,5 @@ var DebugMode bool
 
 type ElectrumXNode interface {
 	Start() error
+	Stop()
 }

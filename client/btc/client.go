@@ -131,10 +131,9 @@ func (ec *BtcElectrumClient) LoadWallet(pw string) error {
 	return nil
 }
 
-// CreateNode creates a single ElectrumX node
-func (ec *BtcElectrumClient) CreateNode() error {
+// CreateNode creates a single unconnected ElectrumX node
+func (ec *BtcElectrumClient) CreateNode() {
 	nodeCfg := ec.GetConfig().MakeNodeConfig()
 	n := elxbtc.NewSingleNode(nodeCfg)
-	ec.SetNode(n)
-	return nil
+	ec.Node = n
 }
