@@ -105,6 +105,7 @@ func main() {
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
+	err = ec.SyncHeaders()
 
 	// dev
 	<-time.After(time.Second * 2)

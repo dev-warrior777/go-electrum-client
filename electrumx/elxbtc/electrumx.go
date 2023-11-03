@@ -8,37 +8,25 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
-	"os/signal"
 
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
 type SingleNode struct {
-	NodeCtx       context.Context
-	NodeCtxCancel context.CancelFunc
-	NodeConfig    *electrumx.NodeConfig
-	Server        *electrumx.ServerConn
+	Config *electrumx.NodeConfig
+	Server *electrumx.ElectrumXSvrConn
 }
 
 func NewSingleNode(cfg *electrumx.NodeConfig) *SingleNode {
 	n := SingleNode{
-		NodeConfig: cfg,
-		Server:     nil,
+		Config: cfg,
+		Server: nil,
 	}
 	return &n
 }
 
 func (s *SingleNode) Start() error {
-	network := s.NodeConfig.Params.Name
-	genesis := s.NodeConfig.Params.GenesisHash.String()
-	fmt.Println("starting single node on", network, "genesis", genesis)
-	// dev only
-	s.NodeCtx, s.NodeCtxCancel = signal.NotifyContext(context.Background(), os.Interrupt)
-	// s.NodeCtx, s.NodeCtxCancel = context.WithCancel(context.Background())
-	ctx := s.NodeCtx
-	cancel := s.NodeCtxCancel
-	trustedServer := s.NodeConfig.TrustedPeer
+	trustedServer := s.Config.TrustedPeer
 	if trustedServer == nil {
 		return errors.New("SingleNode requires a trusted ElectrumX server")
 	}
@@ -65,15 +53,28 @@ func (s *SingleNode) Start() error {
 		DebugLogger: electrumx.StdoutPrinter,
 	}
 
-	s.Server, err = electrumx.ConnectServer(ctx, addr, opts)
+	network := s.Config.Params.Name
+	genesis := s.Config.Params.GenesisHash.String()
+	fmt.Println("starting single node on", network, "genesis", genesis)
+
+	// Our context shared with client for cancellation
+	ctx, cancel := context.WithCancel(context.Background())
+
+	sc, err := electrumx.ConnectServer(ctx, addr, opts)
 	if err != nil {
+		cancel()
 		return err
 	}
-	sc := s.Server
+	s.Server = &electrumx.ElectrumXSvrConn{
+		SvrConn:   sc,
+		SvrCtx:    ctx,
+		SvrCancel: cancel,
+		Running:   true,
+	}
 
 	fmt.Println(sc.Proto())
 
-	fmt.Printf("\n\n ** Connected to %s **\n\n", network)
+	fmt.Printf("\n ** Connected to %s **\n", network)
 
 	feats, err := sc.Features(ctx)
 	if err != nil {
@@ -82,7 +83,6 @@ func (s *SingleNode) Start() error {
 	}
 
 	if feats.Genesis != genesis {
-		cancel()
 		return errors.New("wrong genesis hash for Bitcoin")
 	}
 	fmt.Println("Genesis correct: ", "0x"+feats.Genesis)
@@ -92,14 +92,41 @@ func (s *SingleNode) Start() error {
 
 func (s *SingleNode) Stop() {
 	fmt.Println("stopping single node")
-	s.NodeCtxCancel()
+	// s.Server.SvrCancel()
+	s.Server.Running = false
+	s.Server.SvrConn.Shutdown()
+	<-s.Server.SvrConn.Done()
 	fmt.Println("stopped single node")
 }
 
+func (s *SingleNode) GetServerConn() (*electrumx.ElectrumXSvrConn, error) {
+	return s.Server, nil
+}
+
+var ErrServerNotRunning error = errors.New("server not running")
+
+func (s *SingleNode) BlockHeaders(startHeight, blockCount uint32) (*electrumx.GetBlockHeadersResult, error) {
+	server := s.Server
+	if !server.Running {
+		return nil, ErrServerNotRunning
+	}
+	return server.SvrConn.BlockHeaders(server.SvrCtx, startHeight, blockCount)
+}
+
+func (s *SingleNode) SubscribeHeaders() (*electrumx.SubscribeHeadersResult, <-chan *electrumx.SubscribeHeadersResult, error) {
+	server := s.Server
+	if !server.Running {
+		return nil, nil, ErrServerNotRunning
+	}
+	return server.SvrConn.SubscribeHeaders(server.SvrCtx)
+}
+
+// /////////////////////////////////////////////////////////////////////////////
+// MultiNode
+// //////////
 type MultiNode struct {
-	NodeCtx    context.Context
 	NodeConfig *electrumx.NodeConfig
-	ServerMap  map[string]*electrumx.ServerConn
+	ServerMap  map[string]*electrumx.ElectrumXSvrConn
 }
 
 func (m *MultiNode) Start() error {
@@ -107,8 +134,7 @@ func (m *MultiNode) Start() error {
 	// TODO:
 	return nil
 }
-
 func (m *MultiNode) Stop() {
-	fmt.Println("stopping single node")
+	fmt.Println("stopping multi node")
 	// TODO:
 }

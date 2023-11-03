@@ -1,6 +1,7 @@
 package electrumx
 
 import (
+	"context"
 	"net"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -56,4 +57,14 @@ var DebugMode bool
 type ElectrumXNode interface {
 	Start() error
 	Stop()
+	GetServerConn() (*ElectrumXSvrConn, error)
+	BlockHeaders(startHeight, blockCount uint32) (*GetBlockHeadersResult, error)
+	SubscribeHeaders() (*SubscribeHeadersResult, <-chan *SubscribeHeadersResult, error)
+}
+
+type ElectrumXSvrConn struct {
+	SvrCtx    context.Context
+	SvrCancel context.CancelFunc
+	SvrConn   *ServerConn
+	Running   bool
 }

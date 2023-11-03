@@ -1,10 +1,13 @@
 package btc
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path"
+	"time"
 
 	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
@@ -30,20 +33,16 @@ func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 	return &ec
 }
 
+//////////////////////////////////////////////////////////////////////////////
+// Interface
+////////////
+
 func (ec *BtcElectrumClient) GetConfig() *client.ClientConfig {
 	return ec.ClientConfig
 }
 
-func (ec *BtcElectrumClient) SetWallet(wallet wallet.ElectrumWallet) {
-	ec.Wallet = wallet
-}
-
 func (ec *BtcElectrumClient) GetWallet() wallet.ElectrumWallet {
 	return ec.Wallet
-}
-
-func (ec *BtcElectrumClient) SetNode(node electrumx.ElectrumXNode) {
-	ec.Node = node
 }
 
 func (ec *BtcElectrumClient) GetNode() electrumx.ElectrumXNode {
@@ -77,10 +76,6 @@ func (ec *BtcElectrumClient) CreateWallet(pw string) error {
 	}
 	return nil
 }
-
-// func NewBtcElectrumWallet(cfg *client.Config, pw string) {
-// 	panic("unimplemented")
-// }
 
 // RecreateElectrumWallet recreates a wallet from an existing mnemonic seed.
 // The password is to encrypt the stored xpub, xprv and other sensitive data
@@ -137,3 +132,104 @@ func (ec *BtcElectrumClient) CreateNode() {
 	n := elxbtc.NewSingleNode(nodeCfg)
 	ec.Node = n
 }
+
+func (ec *BtcElectrumClient) SyncHeaders() error {
+	headers, err := NewHeaders(ec.ClientConfig)
+	if err != nil {
+		return err
+	}
+
+	b, err := headers.ReadAllBytesFromFile()
+	if err != nil {
+		return err
+	}
+	lb := len(b)
+	fmt.Println("read header bytes", lb)
+	numHeaders, err := headers.BytesToNumHdrs(lb)
+	if err != nil {
+		return err
+	}
+
+	// Do not make block count too big or electrumX may throttle response
+	// as an anti ddos measure. Magic number 2016 from electrum code
+	const blockDelta = 20 // 20 dev 2016 pro
+	doneGathering := false
+	var startHeight = uint32(numHeaders)
+	var blockCount = uint32(20)
+
+	n := ec.GetNode()
+
+	hdrsRes, err := n.BlockHeaders(startHeight, blockCount)
+	if err != nil {
+		return err
+	}
+	count := hdrsRes.Count
+
+	fmt.Println("Count: ", count, " read from server at Height: ", startHeight)
+
+	if count > 0 {
+		b, err := hex.DecodeString(hdrsRes.HexConcat)
+		if err != nil {
+			log.Fatal(err)
+		}
+		nh, err := headers.AppendHeaders(b)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("Appended: ", nh, " headers at ", startHeight)
+	}
+
+	if count < blockDelta {
+		fmt.Println("Done gathering")
+		doneGathering = true
+	}
+
+	sc, err := n.GetServerConn()
+	if err != nil {
+		return err
+	}
+	svrCtx := sc.SvrCtx
+
+	for !doneGathering {
+
+		startHeight += blockDelta
+
+		select {
+		case <-svrCtx.Done():
+			fmt.Println("Server shutdown - gathering")
+			n.Stop()
+			return nil
+		case <-time.After(time.Millisecond * 33):
+			hdrsRes, err := n.BlockHeaders(startHeight, blockCount)
+			if err != nil {
+				return err
+			}
+			count = hdrsRes.Count
+
+			fmt.Println("Count: ", count, " read from Height: ", startHeight)
+
+			if count > 0 {
+				b, err := hex.DecodeString(hdrsRes.HexConcat)
+				if err != nil {
+					return err
+				}
+				_, err = headers.AppendHeaders(b)
+				if err != nil {
+					return err
+				}
+			}
+
+			if count < blockDelta {
+				fmt.Println("Done gathering")
+				doneGathering = true
+			}
+		}
+	}
+
+	return nil
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Btc
+//////
+// func (ec *BtcElectrumClient) Foo() error {

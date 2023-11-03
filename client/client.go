@@ -15,4 +15,5 @@ type ElectrumClient interface {
 	LoadWallet(pw string) error
 	//
 	CreateNode()
+	SyncHeaders() error
 }

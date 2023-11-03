@@ -177,3 +177,7 @@ func bytesToNumHdrs(numBytes int) (int32, error) {
 	}
 	return int32(numBytes / HEADER_SIZE), nil
 }
+
+func (h *Headers) BytesToNumHdrs(numBytes int) (int32, error) {
+	return bytesToNumHdrs(numBytes)
+}
