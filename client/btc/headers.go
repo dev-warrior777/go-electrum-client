@@ -58,7 +58,7 @@ func NewHeaders(cfg *client.ClientConfig) (*Headers, error) {
 	return &hdrs, nil
 }
 
-func (h *Headers) clearMap() {
+func (h *Headers) ClearMap() {
 	h.hdrs = nil // gc
 	h.hdrs = make(map[int32]wire.BlockHeader)
 }
@@ -96,7 +96,7 @@ func (h *Headers) ReadHeaders(num, height int32) (int32, error) {
 			return 0, errors.New("corrupt file")
 		}
 		headersRead := int32(bytesRead / HEADER_SIZE)
-		err = h.store(b, height)
+		err = h.Store(b, height)
 		return headersRead, err
 	}
 	return 0, nil
@@ -150,7 +150,7 @@ func (h *Headers) ReadAllBytesFromFile() ([]byte, error) {
 // store 'numHdrs' headers starting at height 'height' in 'hdrs' map
 // 'b' should have exactly 'numHdrs' x 'HEADER_SIZE' bytes. A few more
 // bytes will be ignored here though. A few less will error EOF. Caveat emptor!
-func (h *Headers) store(b []byte, height int32) error {
+func (h *Headers) Store(b []byte, startHeight int32) error {
 	numHdrs, err := bytesToNumHdrs(len(b))
 	if err != nil {
 		return err
@@ -165,10 +165,34 @@ func (h *Headers) store(b []byte, height int32) error {
 		if err != nil {
 			return err
 		}
-		at := height + i
+		at := startHeight + i
 		h.hdrs[at] = blkHdr
 	}
 	return nil
+}
+
+// Verify headers prev hash back from tip. If all is true depth is ignored
+// and the whole chain is verified
+func (h *Headers) VerifyFromTip(depth int32, all bool) error {
+	downTo := h.hdrsTip - depth
+	if downTo < 0 || all {
+		downTo = 0
+	}
+	var height int32
+	for height = h.hdrsTip; height > downTo; height-- {
+		thisHdr := h.hdrs[height]
+		prevHdr := h.hdrs[height-1]
+		prevHdrBlkHash := prevHdr.BlockHash()
+		if prevHdr.BlockHash() != thisHdr.PrevBlock {
+			errors.New("verify failed")
+		}
+		fmt.Printf("verified header at height %d has blockhash %s\n", height-1, prevHdrBlkHash.String())
+	}
+	return nil
+}
+
+func (h *Headers) VerifyAll() error {
+	return h.VerifyFromTip(0, true)
 }
 
 func bytesToNumHdrs(numBytes int) (int32, error) {

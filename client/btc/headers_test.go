@@ -149,23 +149,19 @@ func TestAppendHeaders(t *testing.T) {
 	}
 
 	// store all bytes into the map
-	err = h.store(b, 0)
+	err = h.Store(b, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 	h.hdrsTip = maybeTip
 
 	// verify chain
-	var height int32
-	for height = h.hdrsTip; height > 0; height-- {
-		thisHdr := h.hdrs[height]
-		prevHdr := h.hdrs[height-1]
-		prevHdrBlkHash := prevHdr.BlockHash()
-		if prevHdr.BlockHash() != thisHdr.PrevBlock {
-			log.Fatal("header chain verify failed")
-		}
-		fmt.Printf("verified header at height %d has blockhash %s\n", height-1, prevHdrBlkHash.String())
+	fmt.Println("verifying back from tip at height", h.hdrsTip)
+	err = h.VerifyAll()
+	if err != nil {
+		log.Fatal(err)
 	}
+	h.synced = true
 }
 
 func TestReadStoreHeaderFile(t *testing.T) {
@@ -194,7 +190,7 @@ func TestReadStoreHeaderFile(t *testing.T) {
 	// store headers
 	cfg, _ := makeRegtestConfig()
 	h, _ := NewHeaders(cfg)
-	err = h.store(b, 0)
+	err = h.Store(b, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -260,39 +256,39 @@ var hdr3 = []byte{
 func TestStore(t *testing.T) {
 	cfg, _ := makeRegtestConfig()
 	h, _ := NewHeaders(cfg)
-	err := h.store(hdr, 0)
+	err := h.Store(hdr, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
-	h.clearMap()
-	err = h.store(hdr3, 0)
+	h.ClearMap()
+	err = h.Store(hdr3, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
-	h.clearMap()
-	err = h.store(hdr3, 100)
+	h.ClearMap()
+	err = h.Store(hdr3, 100)
 	if err != nil {
 		log.Fatal(err)
 	}
-	h.clearMap()
-	err = h.store(hdr, 0)
+	h.ClearMap()
+	err = h.Store(hdr, 0)
 	if err != nil {
 		log.Fatal("error expected")
 	}
-	h.clearMap()
-	err = h.store(hdr3, 0)
+	h.ClearMap()
+	err = h.Store(hdr3, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 	// extra bytes are ignored
-	h.clearMap()
-	err = h.store(hdrBadLenMore, 0)
+	h.ClearMap()
+	err = h.Store(hdrBadLenMore, 0)
 	if err == nil {
 		log.Fatal("error expected")
 	}
 	// less than expected size is not ignored
-	h.clearMap()
-	err = h.store(hdrBadLenLess, 0)
+	h.ClearMap()
+	err = h.Store(hdrBadLenLess, 0)
 	if err == nil {
 		log.Fatal("error expected")
 	}

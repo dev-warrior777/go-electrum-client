@@ -105,9 +105,16 @@ func main() {
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
-	err = ec.SyncHeaders()
 
-	// dev
+	// go ec.SyncHeaders()
+	fmt.Println("syncing headers")
+	err = ec.SyncHeaders()
+	if err != nil {
+		ec.GetNode().Stop()
+		fmt.Println(err, " - exiting")
+		os.Exit(1)
+	}
+
 	<-time.After(time.Second * 2)
 
 	// Stop the running node
