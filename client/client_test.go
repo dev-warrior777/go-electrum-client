@@ -14,6 +14,11 @@ type GenElectrumClient struct {
 	n electrumx.ElectrumXNode
 }
 
+type GenElectrumNode struct {
+	_ *electrumx.NodeConfig
+	_ *electrumx.ElectrumXSvrConn
+}
+
 func NewGenElectrumClient() ElectrumClient {
 	ec := GenElectrumClient{
 		c: NewDefaultConfig(),
@@ -43,11 +48,15 @@ func (gec *GenElectrumClient) LoadWallet(pw string) error {
 	return nil
 }
 
-func (gec *GenElectrumClient) CreateNode() error {
-	gec.n = electrumx.SingleNode{
-		NodeConfig: &electrumx.NodeConfig{},
-		Server:     &electrumx.ServerConn{},
-	}
+func (gec *GenElectrumClient) CreateNode() {
+	gec.n = nil
+}
+
+func (gec *GenElectrumClient) SyncClientHeaders() error {
+	return nil
+}
+
+func (gec *GenElectrumClient) SubscribeClientHeaders() error {
 	return nil
 }
 

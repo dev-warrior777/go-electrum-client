@@ -26,11 +26,6 @@ const (
 	ELECTRUM_MAGIC_NUMHDR = 2016
 )
 
-var (
-	pver     = wire.ProtocolVersion
-	maybeTip = int32(0)
-)
-
 type Headers struct {
 	// blockchain headers file to persist headers we know
 	hdrFilePath string
@@ -107,7 +102,7 @@ func (h *Headers) ReadHeaders(num, height int32) (int32, error) {
 // 'blockchain.headers.subscribe' events. Returns the number of headers written.
 func (h *Headers) AppendHeaders(rawHdrs []byte) (int32, error) {
 	numBytes := len(rawHdrs)
-	numHdrs, err := bytesToNumHdrs(numBytes)
+	numHdrs, err := h.BytesToNumHdrs(numBytes)
 	if err != nil {
 		return 0, err
 	}
@@ -151,7 +146,7 @@ func (h *Headers) ReadAllBytesFromFile() ([]byte, error) {
 // 'b' should have exactly 'numHdrs' x 'HEADER_SIZE' bytes. A few more
 // bytes will be ignored here though. A few less will error EOF. Caveat emptor!
 func (h *Headers) Store(b []byte, startHeight int32) error {
-	numHdrs, err := bytesToNumHdrs(len(b))
+	numHdrs, err := h.BytesToNumHdrs(len(b))
 	if err != nil {
 		return err
 	}
@@ -184,7 +179,7 @@ func (h *Headers) VerifyFromTip(depth int32, all bool) error {
 		prevHdr := h.hdrs[height-1]
 		prevHdrBlkHash := prevHdr.BlockHash()
 		if prevHdr.BlockHash() != thisHdr.PrevBlock {
-			errors.New("verify failed")
+			return errors.New("verify failed")
 		}
 		fmt.Printf("verified header at height %d has blockhash %s\n", height-1, prevHdrBlkHash.String())
 	}
@@ -195,13 +190,9 @@ func (h *Headers) VerifyAll() error {
 	return h.VerifyFromTip(0, true)
 }
 
-func bytesToNumHdrs(numBytes int) (int32, error) {
+func (h *Headers) BytesToNumHdrs(numBytes int) (int32, error) {
 	if numBytes%HEADER_SIZE != 0 {
 		return 0, errors.New("invalid bytes length - not a multiple of header size")
 	}
 	return int32(numBytes / HEADER_SIZE), nil
-}
-
-func (h *Headers) BytesToNumHdrs(numBytes int) (int32, error) {
-	return bytesToNumHdrs(numBytes)
 }

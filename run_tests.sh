@@ -1,4 +1,5 @@
 #!/bin/bash
-
+echo "add '-v' on command line for a detailed output"
+echo
 go mod tidy
-go test -v -count=1 ./...
+go test $@ -count=1 ./...

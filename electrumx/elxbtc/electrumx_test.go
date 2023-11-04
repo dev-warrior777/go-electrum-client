@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	ex "github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
@@ -78,17 +77,15 @@ func RunNode(t *testing.T, network ex.Network, addr, tx, genesis string, useTls 
 
 	fmt.Printf("\n\n ** Connected to %s **\n\n", network)
 
-	banner, err := sc.Banner(ctx)
+	_, err = sc.Banner(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	spew.Dump(banner)
 
 	feats, err := sc.Features(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	spew.Dump(feats)
 
 	if feats.Genesis != genesis {
 		t.Fatalf("wrong genesis hash for Bitcoin on %s: %s",
@@ -96,11 +93,10 @@ func RunNode(t *testing.T, network ex.Network, addr, tx, genesis string, useTls 
 	}
 	t.Log("Genesis correct")
 
-	txres, err := sc.GetTransaction(ctx, tx)
+	_, err = sc.GetTransaction(ctx, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	spew.Dump(txres)
 
 	const until = time.Second * 7
 	fmt.Printf("leaving connection open for %s\n", until)

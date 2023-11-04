@@ -129,3 +129,9 @@ func (ec *BtcElectrumClient) CreateNode() {
 	n := elxbtc.NewSingleNode(nodeCfg)
 	ec.Node = n
 }
+
+// Interface methods in cleint_headers.go
+// SyncHeaders() error
+// SubscribeHeaders() error
+
+//////////////////////////////////////////////////////////////////////////////

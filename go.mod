@@ -7,7 +7,6 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
-	github.com/davecgh/go-spew v1.1.1
 	github.com/decred/go-socks v1.1.0
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/tyler-smith/go-bip39 v1.1.0

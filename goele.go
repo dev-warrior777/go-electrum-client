@@ -107,14 +107,27 @@ func main() {
 	}
 
 	// go ec.SyncHeaders()
+	// if you do this make an error channel back to here. If this fails
+	// the client initialization is a fail
+
 	fmt.Println("syncing headers")
-	err = ec.SyncHeaders()
+	err = ec.SyncClientHeaders()
 	if err != nil {
 		ec.GetNode().Stop()
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
 
+	// start goroutine to listen for blockchain headers arriving
+	fmt.Println("subscribe headers")
+	err = ec.SubscribeClientHeaders()
+	if err != nil {
+		ec.GetNode().Stop()
+		fmt.Println(err, " - exiting")
+		os.Exit(1)
+	}
+
+	// dev
 	<-time.After(time.Second * 2)
 
 	// Stop the running node
