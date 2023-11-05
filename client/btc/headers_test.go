@@ -189,7 +189,7 @@ func TestReadStoreHeaderFile(t *testing.T) {
 
 	// store headers
 	cfg, _ := makeRegtestConfig()
-	h, _ := NewHeaders(cfg)
+	h := NewHeaders(cfg)
 	err = h.Store(b, 0)
 	if err != nil {
 		log.Fatal(err)
@@ -255,7 +255,7 @@ var hdr3 = []byte{
 
 func TestStore(t *testing.T) {
 	cfg, _ := makeRegtestConfig()
-	h, _ := NewHeaders(cfg)
+	h := NewHeaders(cfg)
 	err := h.Store(hdr, 0)
 	if err != nil {
 		log.Fatal(err)
@@ -295,18 +295,16 @@ func TestStore(t *testing.T) {
 }
 
 func TestMapIter(t *testing.T) {
-	m := make(map[int]string)
-	m[0] = "zero"
-	m[2] = "two"
-	m[1] = "one"
-	m[3] = "three"
-	delete(m, 3)
-	keys := make([]int, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
+	cfg, _ := makeRegtestConfig()
+	h := NewHeaders(cfg)
+	err := h.Store(hdrFileReg, 0)
+	if err != nil {
+		log.Fatal(err)
 	}
-	for key := range keys {
-		fmt.Println(key, m[key])
+	numHeaders, err := h.BytesToNumHdrs(len(hdrFileReg))
+	if err != nil {
+		log.Fatal(err)
 	}
-	fmt.Println()
+	h.hdrsTip = numHeaders - 1
+	h.DumpAll()
 }

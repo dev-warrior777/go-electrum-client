@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/dev-warrior777/go-electrum-client/client"
@@ -128,7 +127,9 @@ func main() {
 	}
 
 	// dev
-	<-time.After(time.Second * 2)
+	// <-time.After(time.Second * 200)
+	sc, _ := ec.GetNode().GetServerConn()
+	<-sc.SvrConn.Done()
 
 	// Stop the running node
 	ec.GetNode().Stop()

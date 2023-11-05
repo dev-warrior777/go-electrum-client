@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/signal"
 
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
@@ -58,7 +60,10 @@ func (s *SingleNode) Start() error {
 	fmt.Println("starting single node on", network, "genesis", genesis)
 
 	// Our context shared with client for cancellation
-	ctx, cancel := context.WithCancel(context.Background())
+	// pro TODO:
+	// ctx, cancel := context.WithCancel(context.Background())
+	// dev
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 
 	sc, err := electrumx.ConnectServer(ctx, addr, opts)
 	if err != nil {
@@ -91,12 +96,15 @@ func (s *SingleNode) Start() error {
 }
 
 func (s *SingleNode) Stop() {
-	fmt.Println("stopping single node")
-	// s.Server.SvrCancel()
+	fmt.Println("stopping single node...")
+	if !s.Server.Running {
+		fmt.Println("..not running")
+		return
+	}
 	s.Server.Running = false
 	s.Server.SvrConn.Shutdown()
 	<-s.Server.SvrConn.Done()
-	fmt.Println("stopped single node")
+	fmt.Println("..stopped single node")
 }
 
 func (s *SingleNode) GetServerConn() (*electrumx.ElectrumXSvrConn, error) {

@@ -1,4 +1,5 @@
 #!/bin/bash
+echo
 echo "add '-v' on command line for a detailed output"
 echo
 go mod tidy

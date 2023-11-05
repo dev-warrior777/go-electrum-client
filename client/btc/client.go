@@ -19,6 +19,8 @@ type BtcElectrumClient struct {
 	ClientConfig *client.ClientConfig
 	Wallet       wallet.ElectrumWallet
 	Node         electrumx.ElectrumXNode
+	// client copy of blockchain headers
+	clientHeaders *Headers
 }
 
 func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
@@ -27,6 +29,7 @@ func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 		Wallet:       nil,
 		Node:         nil,
 	}
+	ec.clientHeaders = NewHeaders(cfg)
 	return &ec
 }
 

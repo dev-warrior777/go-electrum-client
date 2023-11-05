@@ -39,7 +39,7 @@ type Headers struct {
 	synced  bool
 }
 
-func NewHeaders(cfg *client.ClientConfig) (*Headers, error) {
+func NewHeaders(cfg *client.ClientConfig) *Headers {
 	filePath := filepath.Join(cfg.DataDir, HEADER_FILE_NAME)
 	hdrsMapInitSize := 2 * ELECTRUM_MAGIC_NUMHDR //4032
 	hdrsMap := make(map[int32]wire.BlockHeader, hdrsMapInitSize)
@@ -50,7 +50,7 @@ func NewHeaders(cfg *client.ClientConfig) (*Headers, error) {
 		hdrsTip:     0,
 		synced:      false,
 	}
-	return &hdrs, nil
+	return &hdrs
 }
 
 func (h *Headers) ClearMap() {
@@ -188,6 +188,29 @@ func (h *Headers) VerifyFromTip(depth int32, all bool) error {
 
 func (h *Headers) VerifyAll() error {
 	return h.VerifyFromTip(0, true)
+}
+
+func (h *Headers) DumpAt(height int32) {
+	h.hdrsMtx.Lock()
+	defer h.hdrsMtx.Unlock()
+	hdr := h.hdrs[height]
+	fmt.Println("Hash: ", hdr.BlockHash(), "Height: ", height)
+	fmt.Println("--------------------------")
+	fmt.Printf("Version: 0x%08x\n", hdr.Version)
+	fmt.Println("Previous Hash: ", hdr.PrevBlock)
+	fmt.Println("Merkle Root: ", hdr.MerkleRoot)
+	fmt.Println("Time Stamp: ", hdr.Timestamp)
+	fmt.Printf("Bits: 0x%08x\n", hdr.Bits)
+	fmt.Println("Nonce: ", hdr.Nonce)
+	fmt.Println()
+	fmt.Println("============================")
+}
+
+func (h *Headers) DumpAll() {
+	var k int32
+	for k = 0; k <= h.hdrsTip; k++ {
+		h.DumpAt(k)
+	}
 }
 
 func (h *Headers) BytesToNumHdrs(numBytes int) (int32, error) {

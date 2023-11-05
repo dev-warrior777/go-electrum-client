@@ -13,20 +13,17 @@ import (
 // hashes backwards from Tip.
 // SyncClientHeaders is part of the ElectrumClient interface inmplementation
 func (ec *BtcElectrumClient) SyncClientHeaders() error {
-	headers, err := NewHeaders(ec.ClientConfig)
-	if err != nil {
-		return err
-	}
+	h := ec.clientHeaders
 
 	// 1. Read last stored blockchain_headers file for this network
 
-	b, err := headers.ReadAllBytesFromFile()
+	b, err := h.ReadAllBytesFromFile()
 	if err != nil {
 		return err
 	}
 	lb := len(b)
 	fmt.Println("read header bytes", lb)
-	numHeaders, err := headers.BytesToNumHdrs(lb)
+	numHeaders, err := h.BytesToNumHdrs(lb)
 	if err != nil {
 		return err
 	}
@@ -43,9 +40,9 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	var startHeight = uint32(numHeaders)
 	var blockCount = uint32(20)
 
-	n := ec.GetNode()
+	node := ec.GetNode()
 
-	hdrsRes, err := n.BlockHeaders(startHeight, blockCount)
+	hdrsRes, err := node.BlockHeaders(startHeight, blockCount)
 	if err != nil {
 		return err
 	}
@@ -58,7 +55,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		nh, err := headers.AppendHeaders(b)
+		nh, err := h.AppendHeaders(b)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -72,7 +69,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 		doneGathering = true
 	}
 
-	sc, err := n.GetServerConn()
+	sc, err := node.GetServerConn()
 	if err != nil {
 		return err
 	}
@@ -85,10 +82,10 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 		select {
 		case <-svrCtx.Done():
 			fmt.Println("Server shutdown - gathering")
-			n.Stop()
+			node.Stop()
 			return nil
 		case <-time.After(time.Millisecond * 33):
-			hdrsRes, err := n.BlockHeaders(startHeight, blockCount)
+			hdrsRes, err := node.BlockHeaders(startHeight, blockCount)
 			if err != nil {
 				return err
 			}
@@ -101,7 +98,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 				if err != nil {
 					return err
 				}
-				nh, err := headers.AppendHeaders(b)
+				nh, err := h.AppendHeaders(b)
 				if err != nil {
 					return err
 				}
@@ -119,46 +116,49 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 
 	// 3. Read up to date blockchain_headers file - this can be improved since
 	//    we already read most of it but for now; simplicity
-	b2, err := headers.ReadAllBytesFromFile()
+	b2, err := h.ReadAllBytesFromFile()
 	if err != nil {
 		return err
 	}
 
 	// 4. Store all headers in a map
-	err = headers.Store(b2, 0)
+	err = h.Store(b2, 0)
 	if err != nil {
 		return err
 	}
-	headers.hdrsTip = maybeTip
+	h.hdrsTip = maybeTip
 
 	// 5. Verify headers in headers map
-	fmt.Printf("starting verify at height %d\n", headers.hdrsTip)
-	err = headers.VerifyAll()
+	fmt.Printf("starting verify at height %d\n", h.hdrsTip)
+	err = h.VerifyAll()
 	if err != nil {
 		return err
 	}
 	fmt.Println("header chain verified")
 
-	headers.synced = true
-	fmt.Println("headers synced up to tip ", headers.hdrsTip)
+	h.synced = true
+	fmt.Println("headers synced up to tip ", h.hdrsTip)
 	return nil
 }
 
-// SyncHeaders is part of the ElectrumClient interface inmplementation
+// SubscribeClientHeaders is part of the ElectrumClient interface inmplementation
 func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
-	// headers, err := NewHeaders(ec.ClientConfig)
-	// if err != nil {
-	// 	return err
-	// }
+	h := ec.clientHeaders
 
-	n := ec.GetNode()
+	// local tip for calculation before storage
+	maybeTip := h.hdrsTip
 
-	_, hdrResNotifyCh, err := n.SubscribeHeaders()
+	node := ec.GetNode()
+
+	// possible ddos
+	<-time.After(time.Second)
+
+	_, hdrResNotifyCh, err := node.SubscribeHeaders()
 	if err != nil {
 		return err
 	}
 
-	sc, err := n.GetServerConn()
+	sc, err := node.GetServerConn()
 	if err != nil {
 		return err
 	}
@@ -168,76 +168,89 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 		fmt.Println("=== Waiting for headers ===")
 		for {
 			select {
+
 			case <-svrCtx.Done():
 				fmt.Println("Server shutdown - subscribe headers")
-				n.Stop()
+				node.Stop()
 				return
+
 			case <-hdrResNotifyCh:
 				// read whatever is in the queue, usually one header at tip
 				for x := range hdrResNotifyCh {
 					fmt.Println("New Block: ", x.Height, x.Hex)
-					// if x.Height > maybeTip {
-					// 	n := x.Height - maybeTip
-					// 	if n == 1 {
-					// 		// simple case: just store it
-					// 		fmt.Println("Storing header for height: ", x.Height)
-					// 		b, _ := hex.DecodeString(x.Hex)
-					// 		_, err := headerFile.Write(b)
-					// 		if err != nil {
-					// 			// for now ;-)2
-					// 			panic(err)
-					// 		}
-					// 		hdr := wire.BlockHeader{}
-					// 		hdrBuf := bytes.NewBuffer(b)
-					// 		err = hdr.Deserialize(hdrBuf)
-					// 		if err != nil {
-					// 			log.Fatal(err)
-					// 		}
-					// 		fmt.Println("Hash: ", hdr.BlockHash(), "Height: ", x.Height)
-					// 		fmt.Println("--------------------------")
-					// 		fmt.Printf("Version: 0x%08x\n", hdr.Version)
-					// 		fmt.Println("Previous Hash: ", hdr.PrevBlock)
-					// 		fmt.Println("Merkle Root: ", hdr.MerkleRoot)
-					// 		fmt.Println("Time Stamp: ", hdr.Timestamp)
-					// 		fmt.Printf("Bits: 0x%08x\n", hdr.Bits)
-					// 		fmt.Println("Nonce: ", hdr.Nonce)
-					// 		fmt.Println()
-					// 		fmt.Println("============================")
-					// 	} else {
-					// 		fmt.Println("Missing header(s)")
-					// 		numMissing := x.Height - maybeTip
-					// 		from := uint32(maybeTip + 1)
-					// 		numToGet := uint32(numMissing)
-					// 		fmt.Printf("Filling from height %d to height %d inclusive\n", from, x.Height)
-					// 		fmt.Println(" -> go get them with 'block.headers'")
-					// 		fmt.Println("Getting ", numToGet, " headers ", from, " ... ", x.Height)
-					// 		hdrsRes, err := n.BlockHeaders(from, numToGet)
-					// 		if err != nil {
-					// 			log.Fatal(err)
-					// 		}
-					// 		count := hdrsRes.Count
+					if x.Height > maybeTip {
+						n := x.Height - maybeTip
+						if n == 1 {
+							// simple case: just store it
+							fmt.Println("Storing header for height: ", x.Height)
+							b, err := hex.DecodeString(x.Hex)
+							if err != nil {
+								panic(err)
+							}
+							hdrsAppended, err := h.AppendHeaders(b)
+							if err != nil {
+								panic(err)
+							}
+							if hdrsAppended != 1 {
+								panic("appended less headers than read")
+							}
+							err = h.Store(b, x.Height)
+							if err != nil {
+								panic("could not store header in map")
+							}
 
-					// 		fmt.Println("Count: ", count, " more read from server at Height: ", from)
-					// 		fmt.Println("Storing: ", count, " headers ", from, "..", from+count-1)
-					// 		fmt.Println()
+							// update tip / local tip
+							h.hdrsTip = x.Height
+							maybeTip = x.Height
 
-					// 		if count > 0 {
-					// 			b, err := hex.DecodeString(hdrsRes.HexConcat)
-					// 			if err != nil {
-					// 				log.Fatal(err)
-					// 			}
-					// 			_, err = headerFile.Write(b)
-					// 			if err != nil {
-					// 				log.Fatal(err)
-					// 			}
-					// 		}
-					// 		fmt.Println()
-					// 		fmt.Println("============================")
-					// 	}
-					// 	maybeTip = x.Height
-					// } else {
-					// 	fmt.Printf("Already got a header for height %d - possible reorg (unhandled)\n", x.Height)
-					// }
+							// verify added header back from new tip
+							h.VerifyFromTip(2, false)
+
+						} else {
+							// Server can skip any amount of headers but we should
+							// trust that this SingleNode's tip is the tip.
+							fmt.Println("More tha one header(s)")
+							numMissing := uint32(x.Height - maybeTip)
+							from := uint32(maybeTip + 1)
+							numToGet := numMissing
+							fmt.Printf("Filling from height %d to height %d inclusive\n", from, x.Height)
+							// go get them with 'block.headers'
+							hdrsRes, err := node.BlockHeaders(from, numToGet)
+							if err != nil {
+								panic(err)
+							}
+							count := hdrsRes.Count
+
+							fmt.Println("Storing: ", count, " headers ", from, "..", from+count-1)
+
+							if count > 0 {
+								b, err := hex.DecodeString(hdrsRes.HexConcat)
+								if err != nil {
+									panic(err)
+								}
+								hdrsAppended, err := h.AppendHeaders(b)
+								if err != nil {
+									panic(err)
+								}
+								if hdrsAppended != int32(count) {
+									panic("only appended less headers than read")
+								}
+								err = h.Store(b, int32(from))
+								if err != nil {
+									panic("could not store headers in map")
+								}
+
+								// update tip / local tip
+								h.hdrsTip = x.Height
+								maybeTip = x.Height
+
+								// verify added headers back from new tip
+								h.VerifyFromTip(int32(count+1), false)
+							}
+						}
+					} else {
+						fmt.Printf("Already got a header for height %d - possible reorg (unhandled)\n", x.Height)
+					}
 				}
 			}
 		}
