@@ -107,8 +107,8 @@ func (s *SingleNode) Stop() {
 	fmt.Println("..stopped single node")
 }
 
-func (s *SingleNode) GetServerConn() (*electrumx.ElectrumXSvrConn, error) {
-	return s.Server, nil
+func (s *SingleNode) GetServerConn() *electrumx.ElectrumXSvrConn {
+	return s.Server
 }
 
 var ErrServerNotRunning error = errors.New("server not running")

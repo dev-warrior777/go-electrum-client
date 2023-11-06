@@ -106,8 +106,8 @@ func main() {
 	}
 
 	// go ec.SyncHeaders()
-	// if you do this make an error channel back to here. If this fails
-	// the client initialization is a fail
+	// If you do this^ then make an error channel back to here and wait on it. If
+	// SyncHeaders fails the client initialization is a fail.
 
 	fmt.Println("syncing headers")
 	err = ec.SyncClientHeaders()
@@ -127,9 +127,8 @@ func main() {
 	}
 
 	// dev
-	// <-time.After(time.Second * 200)
-	sc, _ := ec.GetNode().GetServerConn()
-	<-sc.SvrConn.Done()
+	sc := ec.GetNode().GetServerConn().SvrConn
+	<-sc.Done()
 
 	// Stop the running node
 	ec.GetNode().Stop()

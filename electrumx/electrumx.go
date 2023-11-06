@@ -57,7 +57,7 @@ var DebugMode bool
 type ElectrumXNode interface {
 	Start() error
 	Stop()
-	GetServerConn() (*ElectrumXSvrConn, error)
+	GetServerConn() *ElectrumXSvrConn
 	BlockHeaders(startHeight, blockCount uint32) (*GetBlockHeadersResult, error)
 	SubscribeHeaders() (*SubscribeHeadersResult, <-chan *SubscribeHeadersResult, error)
 	// + subscribe transactions

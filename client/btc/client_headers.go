@@ -9,7 +9,7 @@ import (
 
 // SyncClientHeaders reads blockchain_headers file, then gets any missing block from
 // end of file to current tip from server. The current set of headers is also
-// stored in headers map and the chain veirfied by checking previous block
+// stored in headers map and the chain verified by checking previous block
 // hashes backwards from Tip.
 // SyncClientHeaders is part of the ElectrumClient interface inmplementation
 func (ec *BtcElectrumClient) SyncClientHeaders() error {
@@ -69,21 +69,19 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 		doneGathering = true
 	}
 
-	sc, err := node.GetServerConn()
-	if err != nil {
-		return err
-	}
-	svrCtx := sc.SvrCtx
+	svrCtx := node.GetServerConn().SvrCtx
 
 	for !doneGathering {
 
 		startHeight += blockDelta
 
 		select {
+
 		case <-svrCtx.Done():
 			fmt.Println("Server shutdown - gathering")
 			node.Stop()
 			return nil
+
 		case <-time.After(time.Millisecond * 33):
 			hdrsRes, err := node.BlockHeaders(startHeight, blockCount)
 			if err != nil {
@@ -141,7 +139,10 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	return nil
 }
 
-// SubscribeClientHeaders is part of the ElectrumClient interface inmplementation
+// SubscribeClientHeaders subscribes to new block notifications from the electrumx
+// server and handles them as they arrive. The client local 'blochain_headers
+// file is appended and the headers map updated and verified.
+// SubscribeClientHeaders is part of the ElectrumClient interface implementation
 func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 	h := ec.clientHeaders
 
@@ -158,11 +159,7 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 		return err
 	}
 
-	sc, err := node.GetServerConn()
-	if err != nil {
-		return err
-	}
-	svrCtx := sc.SvrCtx
+	svrCtx := node.GetServerConn().SvrCtx
 
 	go func() {
 		fmt.Println("=== Waiting for headers ===")
@@ -209,7 +206,7 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 						} else {
 							// Server can skip any amount of headers but we should
 							// trust that this SingleNode's tip is the tip.
-							fmt.Println("More tha one header(s)")
+							fmt.Println("More than one header..")
 							numMissing := uint32(x.Height - maybeTip)
 							from := uint32(maybeTip + 1)
 							numToGet := numMissing

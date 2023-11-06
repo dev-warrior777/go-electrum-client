@@ -143,8 +143,7 @@ func (h *Headers) ReadAllBytesFromFile() ([]byte, error) {
 }
 
 // store 'numHdrs' headers starting at height 'height' in 'hdrs' map
-// 'b' should have exactly 'numHdrs' x 'HEADER_SIZE' bytes. A few more
-// bytes will be ignored here though. A few less will error EOF. Caveat emptor!
+// 'b' should have exactly 'numHdrs' x 'HEADER_SIZE' bytes.
 func (h *Headers) Store(b []byte, startHeight int32) error {
 	numHdrs, err := h.BytesToNumHdrs(len(b))
 	if err != nil {
@@ -181,7 +180,8 @@ func (h *Headers) VerifyFromTip(depth int32, all bool) error {
 		if prevHdr.BlockHash() != thisHdr.PrevBlock {
 			return errors.New("verify failed")
 		}
-		fmt.Printf("verified header at height %d has blockhash %s\n", height-1, prevHdrBlkHash.String())
+		fmt.Printf("verified header at height %d has blockhash %s\n",
+			height-1, prevHdrBlkHash.String())
 	}
 	return nil
 }
@@ -215,7 +215,8 @@ func (h *Headers) DumpAll() {
 
 func (h *Headers) BytesToNumHdrs(numBytes int) (int32, error) {
 	if numBytes%HEADER_SIZE != 0 {
-		return 0, errors.New("invalid bytes length - not a multiple of header size")
+		return 0, errors.New(
+			"invalid bytes length - not a multiple of header size")
 	}
 	return int32(numBytes / HEADER_SIZE), nil
 }
