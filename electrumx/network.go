@@ -677,3 +677,14 @@ func (sc *ServerConn) SubscribeHeaders(ctx context.Context) (*SubscribeHeadersRe
 
 	return &resp, ntfnChan, nil
 }
+
+// Broadcast broadcasts a raw tx as a hexadecimal string to the network. The tx
+// hash is returned as a hexadecimal string.
+func (sc *ServerConn) Broadcast(ctx context.Context, rawTx string) (string, error) {
+	var resp string
+	err := sc.Request(ctx, "blockchain.transaction.broadcast", positional{rawTx}, &resp)
+	if err != nil {
+		return "", err
+	}
+	return resp, nil
+}

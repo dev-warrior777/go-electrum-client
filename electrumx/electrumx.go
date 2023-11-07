@@ -61,6 +61,7 @@ type ElectrumXNode interface {
 	BlockHeaders(startHeight, blockCount uint32) (*GetBlockHeadersResult, error)
 	SubscribeHeaders() (*SubscribeHeadersResult, <-chan *SubscribeHeadersResult, error)
 	// + subscribe transactions
+	Broadcast(rawTx string) (string, error)
 }
 
 type ElectrumXSvrConn struct {

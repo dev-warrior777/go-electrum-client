@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -11,6 +12,10 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
@@ -127,6 +132,55 @@ func (s *SingleNode) SubscribeHeaders() (*electrumx.SubscribeHeadersResult, <-ch
 		return nil, nil, ErrServerNotRunning
 	}
 	return server.SvrConn.SubscribeHeaders(server.SvrCtx)
+}
+
+func (s *SingleNode) Broadcast(rawTx string) (string, error) {
+	server := s.Server
+	if !server.Running {
+		return "", ErrServerNotRunning
+	}
+	return server.SvrConn.Broadcast(server.SvrCtx, rawTx)
+}
+
+// /////////////////////////////////////////////////////////////////////////////
+// Helpers
+// ///////
+
+// https://electrumx.readthedocs.io/en/latest/protocol-basics.html
+
+// addrToScripthash takes a bech or legacy bitcoin address and makes an electrum
+// 1.4 protocol 'scripthash'
+func addrToScripthash(addr string, network *chaincfg.Params) (string, error) {
+	var scripthash string
+	if len(addr) <= 0 {
+		return "", errors.New("zero length string")
+	}
+
+	revBytes := func(b []byte) []byte {
+		size := len(b)
+		buf := make([]byte, size)
+		var i int
+		for i = 0; i < size; i++ {
+			buf[i] = b[size-i-1]
+		}
+		return buf
+	}
+
+	address, err := btcutil.DecodeAddress(addr, network)
+	if err != nil {
+		return "", err
+	}
+
+	pkscript, err := txscript.PayToAddrScript(address)
+	if err != nil {
+		return "", err
+	}
+
+	pkScriptHashBytes := chainhash.HashB(pkscript)
+	revScriptHashBytes := revBytes(pkScriptHashBytes)
+	scripthash = hex.EncodeToString(revScriptHashBytes)
+
+	return scripthash, nil
 }
 
 // /////////////////////////////////////////////////////////////////////////////
