@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg"
 	ex "github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
@@ -105,48 +104,5 @@ func RunNode(t *testing.T, network ex.Network, addr, tx, genesis string, useTls 
 	case <-ctx.Done():
 		t.Fatal(ctx.Err())
 	case <-time.After(until):
-	}
-}
-
-var (
-	// bitcoin genesis mainnet
-	bgen           = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-	bgenScriptHash = "8b01df4e368ea28f8dc0423bcf7a4923e3a12d307c875e47a0cfbf90b5c39161"
-	// goele wallet regtest
-	a1           = "mvP2UeXooRghYvsX7H7XVj78FY49jJw6Sq"
-	a1Scripthash = "6036b7e9dcb352f2d7bb4ad0efe0f06e03ba58fad4d16e943a25ae41082d1934"
-	// electrum wallet regtest
-	ab           = "bcrt1q3fx029uese6mrhvq68u4l6me49refj8maqxvfv"
-	abScripthash = "02c21ac0ef859617cbb7ae68943b9af8fb99699d32ea35cb449384aac17b93d5"
-)
-
-func TestScripthash(t *testing.T) {
-	_, err := addrToScripthash("", &chaincfg.MainNetParams)
-	if err == nil {
-		t.Fatal(err)
-	}
-
-	shGen, err := addrToScripthash(bgen, &chaincfg.MainNetParams)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if shGen != bgenScriptHash {
-		t.Fatal(err)
-	}
-
-	sh1, err := addrToScripthash(a1, &chaincfg.RegressionNetParams)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sh1 != a1Scripthash {
-		t.Fatal(err)
-	}
-
-	shb, err := addrToScripthash(ab, &chaincfg.RegressionNetParams)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if shb != abScripthash {
-		t.Fatal(err)
 	}
 }

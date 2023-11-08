@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -12,10 +11,6 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
@@ -76,10 +71,9 @@ func (s *SingleNode) Start() error {
 		return err
 	}
 	s.Server = &electrumx.ElectrumXSvrConn{
-		SvrConn:   sc,
-		SvrCtx:    ctx,
-		SvrCancel: cancel,
-		Running:   true,
+		SvrConn: sc,
+		SvrCtx:  ctx,
+		Running: true,
 	}
 
 	fmt.Println(sc.Proto())
@@ -134,6 +128,31 @@ func (s *SingleNode) SubscribeHeaders() (*electrumx.SubscribeHeadersResult, <-ch
 	return server.SvrConn.SubscribeHeaders(server.SvrCtx)
 }
 
+func (s *SingleNode) GetScripthashNotify() (<-chan *electrumx.ScripthashStatusResult, error) {
+	server := s.Server
+	if !server.Running {
+		return nil, ErrServerNotRunning
+	}
+	return server.SvrConn.GetScripthashNotify(server.SvrCtx), nil
+
+}
+
+func (s *SingleNode) SubscribeScripthashNotify(scripthash string) (*electrumx.ScripthashStatusResult, error) {
+	server := s.Server
+	if !server.Running {
+		return nil, ErrServerNotRunning
+	}
+	return server.SvrConn.SubscribeScripthash(server.SvrCtx, scripthash)
+}
+
+func (s *SingleNode) UnsubscribeScripthashNotify(scripthash string) {
+	server := s.Server
+	if !server.Running {
+		return
+	}
+	server.SvrConn.UnsubscribeScripthash(server.SvrCtx, scripthash)
+}
+
 func (s *SingleNode) Broadcast(rawTx string) (string, error) {
 	server := s.Server
 	if !server.Running {
@@ -145,43 +164,6 @@ func (s *SingleNode) Broadcast(rawTx string) (string, error) {
 // /////////////////////////////////////////////////////////////////////////////
 // Helpers
 // ///////
-
-// https://electrumx.readthedocs.io/en/latest/protocol-basics.html
-
-// addrToScripthash takes a bech or legacy bitcoin address and makes an electrum
-// 1.4 protocol 'scripthash'
-func addrToScripthash(addr string, network *chaincfg.Params) (string, error) {
-	var scripthash string
-	if len(addr) <= 0 {
-		return "", errors.New("zero length string")
-	}
-
-	revBytes := func(b []byte) []byte {
-		size := len(b)
-		buf := make([]byte, size)
-		var i int
-		for i = 0; i < size; i++ {
-			buf[i] = b[size-i-1]
-		}
-		return buf
-	}
-
-	address, err := btcutil.DecodeAddress(addr, network)
-	if err != nil {
-		return "", err
-	}
-
-	pkscript, err := txscript.PayToAddrScript(address)
-	if err != nil {
-		return "", err
-	}
-
-	pkScriptHashBytes := chainhash.HashB(pkscript)
-	revScriptHashBytes := revBytes(pkScriptHashBytes)
-	scripthash = hex.EncodeToString(revScriptHashBytes)
-
-	return scripthash, nil
-}
 
 // /////////////////////////////////////////////////////////////////////////////
 // MultiNode

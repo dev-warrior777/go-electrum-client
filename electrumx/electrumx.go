@@ -60,13 +60,14 @@ type ElectrumXNode interface {
 	GetServerConn() *ElectrumXSvrConn
 	BlockHeaders(startHeight, blockCount uint32) (*GetBlockHeadersResult, error)
 	SubscribeHeaders() (*SubscribeHeadersResult, <-chan *SubscribeHeadersResult, error)
-	// + subscribe transactions
+	SubscribeScripthashNotify(scripthash string) (*ScripthashStatusResult, error)
+	UnsubscribeScripthashNotify(scripthash string)
 	Broadcast(rawTx string) (string, error)
 }
 
 type ElectrumXSvrConn struct {
-	SvrCtx    context.Context
-	SvrCancel context.CancelFunc
-	SvrConn   *ServerConn
-	Running   bool
+	SvrCtx context.Context
+	// SvrCancel context.CancelFunc
+	SvrConn *ServerConn
+	Running bool
 }

@@ -60,6 +60,12 @@ type ServerConn struct {
 
 	ntfnHandlersMtx sync.RWMutex
 	ntfnHandlers    map[string][]chan []byte // method => subscribers
+
+	// The single scripthash notification channel. The channel will be made on
+	// the ConnectServer call and lasts until connection is terminated. It is
+	// closed in the 'listen' below.
+	scripthashNotifyMtx sync.Mutex
+	scripthashNotify    chan *ScripthashStatusResult
 }
 
 func (sc *ServerConn) nextID() uint64 {
@@ -72,8 +78,9 @@ func (sc *ServerConn) listen(ctx context.Context) {
 	// listen is charged with sending on the response and notification channels.
 	// As such, only listen should close these channels, and only after the read
 	// loop has finished.
-	defer sc.cancelRequests()      // close the response chans
-	defer sc.deleteSubscriptions() // close the ntfn chans
+	defer sc.cancelRequests()        // close the response chans
+	defer sc.deleteSubscriptions()   // close the ntfn chans
+	defer sc.closeScripthashNotify() // close the single scripthash notify channel
 
 	reader := bufio.NewReader(io.LimitReader(sc.conn, 1<<18))
 
@@ -237,11 +244,12 @@ func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*Server
 	}
 
 	sc := &ServerConn{
-		conn:         conn,
-		done:         make(chan struct{}),
-		debug:        logger,
-		respHandlers: make(map[uint64]chan *response),
-		ntfnHandlers: make(map[string][]chan []byte),
+		conn:             conn,
+		done:             make(chan struct{}),
+		debug:            logger,
+		respHandlers:     make(map[uint64]chan *response),
+		ntfnHandlers:     make(map[string][]chan []byte),
+		scripthashNotify: make(chan *ScripthashStatusResult, 10),
 	}
 
 	// Wrap the context with a cancel function for internal shutdown, and so the
@@ -349,6 +357,14 @@ func (sc *ServerConn) deleteSubscriptions() {
 		}
 		delete(sc.ntfnHandlers, method)
 	}
+}
+
+// closeScripthashNotify closes the scripthash subscription notify channel
+// once and once only on the listen thread.
+func (sc *ServerConn) closeScripthashNotify() {
+	sc.scripthashNotifyMtx.Lock()
+	defer sc.scripthashNotifyMtx.Unlock()
+	close(sc.scripthashNotify)
 }
 
 // Request performs a request to the remote server for the given method using
@@ -677,6 +693,53 @@ func (sc *ServerConn) SubscribeHeaders(ctx context.Context) (*SubscribeHeadersRe
 
 	return &resp, ntfnChan, nil
 }
+
+// ////////////////////////////////////////////////////////////////////////////
+// scripthash methods
+// //////////////////
+
+// ScripthashStatusResult is the contents of a scripthash notification.
+type ScripthashStatusResult struct {
+	Scripthash int32  `json:"scripthash"`
+	Status     string `json:"status"`
+}
+
+// GetScripthashNotify returns this connection owned recv channel for scripthash
+// status change notifications. This connection will close the channel.
+func (sc *ServerConn) GetScripthashNotify(ctx context.Context) <-chan *ScripthashStatusResult {
+	return sc.scripthashNotify
+}
+
+// SubscribeScripthash subscribes for notifications of changes for an address
+// in our wallet. We send the electrum 'scripthash' of the address rather than
+// the base58 encoded string. See also client_wallet.go.
+func (sc *ServerConn) SubscribeScripthash(ctx context.Context, scripthash string) (*ScripthashStatusResult, error) {
+	const method = "blockchain.scripthash.subscribe"
+
+	var resp ScripthashStatusResult
+	err := sc.Request(ctx, method, positional{scripthash}, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// Unsubscribe from a script hash, preventing future notifications if it's status changes.
+func (sc *ServerConn) UnsubscribeScripthash(ctx context.Context, scripthash string) {
+	const method = "blockchain.scripthash.unsubscribe"
+
+	var resp string
+	err := sc.Request(ctx, method, positional{scripthash}, &resp)
+	if err != nil {
+		fmt.Println("dbg: ", err)
+	}
+
+	// TODO: analyse good response
+}
+
+// ////////////////////////////////////////////////////////////////////////////
+// other wallet methods
+// ////////////////////
 
 // Broadcast broadcasts a raw tx as a hexadecimal string to the network. The tx
 // hash is returned as a hexadecimal string.

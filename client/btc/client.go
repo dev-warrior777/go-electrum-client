@@ -127,14 +127,18 @@ func (ec *BtcElectrumClient) LoadWallet(pw string) error {
 }
 
 // CreateNode creates a single unconnected ElectrumX node
-func (ec *BtcElectrumClient) CreateNode() {
+func (ec *BtcElectrumClient) CreateNode(_ client.NodeType) {
 	nodeCfg := ec.GetConfig().MakeNodeConfig()
 	n := elxbtc.NewSingleNode(nodeCfg)
 	ec.Node = n
 }
 
-// Interface methods in cleint_headers.go
+// Interface methods in client_headers.go
 // SyncHeaders() error
 // SubscribeHeaders() error
+
+// Interface methods in client_wallet.go
+// SubscribeAddressNotify(addr string) error
+// UnsubscribeAddressNotify(addr string)
 
 //////////////////////////////////////////////////////////////////////////////

@@ -100,7 +100,7 @@ func main() {
 	fmt.Println(cfg.Chain, cfg.Params.Name)
 
 	ec := btc.NewBtcElectrumClient(cfg)
-	ec.CreateNode()
+	ec.CreateNode(client.SingleNode)
 	err = ec.GetNode().Start()
 	if err != nil {
 		fmt.Println(err, " - exiting")
@@ -135,7 +135,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// dev
 	sc := ec.GetNode().GetServerConn().SvrConn
 	<-sc.Done()
 }

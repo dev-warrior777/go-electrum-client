@@ -10,7 +10,7 @@ import (
 func TestNodeCreate(t *testing.T) {
 	c := NewBtcElectrumClient(client.NewDefaultConfig())
 	fmt.Println(c.GetConfig().DataDir)
-	c.CreateNode()
+	c.CreateNode(client.SingleNode)
 	n := c.GetNode()
 	fmt.Println(n)
 }
