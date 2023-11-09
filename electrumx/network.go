@@ -104,6 +104,15 @@ func (sc *ServerConn) listen(ctx context.Context) {
 			continue
 		}
 
+		// // dbg
+		// fmt.Println("++++++++++++++++++++++++++++++++++++++++++")
+		// fmt.Println("ID", jsonResp.ID)
+		// fmt.Println("Method", jsonResp.Method)
+		// fmt.Println("Result", jsonResp.Result)
+		// fmt.Println("Error", jsonResp.Error)
+		// fmt.Println("++++++++++++++++++++++++++++++++++++++++++")
+		// fmt.Println("++++++++++++++++++++++++++++++++++++++++++")
+
 		if jsonResp.Method != "" { // notification
 			var ntfnParams ntfnData // the ntfn payload is in the params field of a request object (!)
 			err = json.Unmarshal(msg, &ntfnParams)
@@ -111,6 +120,12 @@ func (sc *ServerConn) listen(ctx context.Context) {
 				sc.debug("notification Unmarshal error: %v", err)
 				continue
 			}
+
+			if jsonResp.Method == "blockchain.scripthash.subscribe" {
+				sc.scripthashStatusNotify(ntfnParams.Params)
+				continue
+			}
+
 			for _, c := range sc.subChans(jsonResp.Method) {
 				select {
 				case c <- ntfnParams.Params:
@@ -359,8 +374,25 @@ func (sc *ServerConn) deleteSubscriptions() {
 	}
 }
 
+// scripthashStatusNotify is called from the listen thread when a
+// scripthash status notification has been received. The raw bytes
+// are 2 non-json strings.
+func (sc *ServerConn) scripthashStatusNotify(raw json.RawMessage) {
+	var strs [2]string
+	if err := json.Unmarshal(raw, &strs); err == nil && len(strs) == 2 {
+		statusResult := ScripthashStatusResult{
+			Scripthash: strs[0],
+			Status:     strs[1],
+		}
+		sc.scripthashNotifyMtx.Lock()
+		defer sc.scripthashNotifyMtx.Unlock()
+		sc.scripthashNotify <- &statusResult
+		fmt.Printf("Scripthash Notify\nScripthash: %s\nStatus: %s\n", statusResult.Scripthash, statusResult.Status)
+	}
+}
+
 // closeScripthashNotify closes the scripthash subscription notify channel
-// once and once only on the listen thread.
+// once and once only. Called from the listen thread.
 func (sc *ServerConn) closeScripthashNotify() {
 	sc.scripthashNotifyMtx.Lock()
 	defer sc.scripthashNotifyMtx.Unlock()
@@ -699,9 +731,10 @@ func (sc *ServerConn) SubscribeHeaders(ctx context.Context) (*SubscribeHeadersRe
 // //////////////////
 
 // ScripthashStatusResult is the contents of a scripthash notification.
+// Raw bytes with no json key names or json [] {} delimiters
 type ScripthashStatusResult struct {
-	Scripthash int32  `json:"scripthash"`
-	Status     string `json:"status"`
+	Scripthash string // 32 byte scripthash - the id of the watched address
+	Status     string // 32 byte sha256 hash of entire history to date
 }
 
 // GetScripthashNotify returns this connection owned recv channel for scripthash
@@ -716,12 +749,18 @@ func (sc *ServerConn) GetScripthashNotify(ctx context.Context) <-chan *Scripthas
 func (sc *ServerConn) SubscribeScripthash(ctx context.Context, scripthash string) (*ScripthashStatusResult, error) {
 	const method = "blockchain.scripthash.subscribe"
 
-	var resp ScripthashStatusResult
-	err := sc.Request(ctx, method, positional{scripthash}, &resp)
+	var status string // no json - sha256 of address history expected, as hex string
+	err := sc.Request(ctx, method, positional{scripthash}, &status)
 	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+
+	statusResult := ScripthashStatusResult{
+		Scripthash: scripthash,
+		Status:     status,
+	}
+
+	return &statusResult, nil
 }
 
 // Unsubscribe from a script hash, preventing future notifications if it's status changes.

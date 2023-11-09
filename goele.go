@@ -135,6 +135,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Here we would grab current addresses (gap range) for this wallet.
+	// Electrum seems to have just 20 external & 10 change..
+	// Currently our wallet has 100+100. Consider sya 20+20
+
+	// Setup Notify for all these addresses
+
+	// dbg: one address only
+	err = ec.SubscribeAddressNotify("mvP2UeXooRghYvsX7H7XVj78FY49jJw6Sq")
+	if err != nil {
+		ec.GetNode().Stop()
+		fmt.Println(err, " - exiting")
+		os.Exit(1)
+	}
+
+	// start goroutine to listen for scripthash status change notifications arriving
+
 	sc := ec.GetNode().GetServerConn().SvrConn
 	<-sc.Done()
 }
