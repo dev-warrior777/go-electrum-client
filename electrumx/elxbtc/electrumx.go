@@ -52,7 +52,7 @@ func (s *SingleNode) Start() error {
 
 	opts := &electrumx.ConnectOpts{
 		TLSConfig:   tlsConfig,
-		DebugLogger: electrumx.StdoutPrinter,
+		DebugLogger: electrumx.StderrPrinter,
 	}
 
 	network := s.Config.Params.Name
@@ -112,6 +112,22 @@ func (s *SingleNode) GetServerConn() *electrumx.ElectrumXSvrConn {
 
 var ErrServerNotRunning error = errors.New("server not running")
 
+func (s *SingleNode) GetHeadersNotify() (<-chan *electrumx.HeadersNotifyResult, error) {
+	server := s.Server
+	if !server.Running {
+		return nil, ErrServerNotRunning
+	}
+	return server.SvrConn.GetHeadersNotify(server.SvrCtx), nil
+}
+
+func (s *SingleNode) SubscribeHeaders() (*electrumx.HeadersNotifyResult, error) {
+	server := s.Server
+	if !server.Running {
+		return nil, ErrServerNotRunning
+	}
+	return server.SvrConn.SubscribeHeaders(server.SvrCtx)
+}
+
 func (s *SingleNode) BlockHeaders(startHeight, blockCount uint32) (*electrumx.GetBlockHeadersResult, error) {
 	server := s.Server
 	if !server.Running {
@@ -120,21 +136,12 @@ func (s *SingleNode) BlockHeaders(startHeight, blockCount uint32) (*electrumx.Ge
 	return server.SvrConn.BlockHeaders(server.SvrCtx, startHeight, blockCount)
 }
 
-func (s *SingleNode) SubscribeHeaders() (*electrumx.SubscribeHeadersResult, <-chan *electrumx.SubscribeHeadersResult, error) {
-	server := s.Server
-	if !server.Running {
-		return nil, nil, ErrServerNotRunning
-	}
-	return server.SvrConn.SubscribeHeaders(server.SvrCtx)
-}
-
 func (s *SingleNode) GetScripthashNotify() (<-chan *electrumx.ScripthashStatusResult, error) {
 	server := s.Server
 	if !server.Running {
 		return nil, ErrServerNotRunning
 	}
 	return server.SvrConn.GetScripthashNotify(server.SvrCtx), nil
-
 }
 
 func (s *SingleNode) SubscribeScripthashNotify(scripthash string) (*electrumx.ScripthashStatusResult, error) {

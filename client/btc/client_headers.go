@@ -140,7 +140,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 }
 
 // SubscribeClientHeaders subscribes to new block notifications from the electrumx
-// server and handles them as they arrive. The client local 'blochain_headers
+// server and handles them as they arrive. The client local 'blockhain_headers
 // file is appended and the headers map updated and verified.
 // SubscribeClientHeaders is part of the ElectrumClient interface implementation
 func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
@@ -154,10 +154,19 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 	// possible ddos
 	<-time.After(time.Second)
 
-	_, hdrResNotifyCh, err := node.SubscribeHeaders()
+	hdrResNotifyCh, err := node.GetHeadersNotify()
 	if err != nil {
 		return err
 	}
+
+	hdrRes, err := node.SubscribeHeaders()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Subscribe Headers")
+	fmt.Println("hdrRes.Height", hdrRes.Height, "maybeTip", maybeTip, "diff", hdrRes.Height-maybeTip)
+	fmt.Println("hdrRes.Hex", hdrRes.Hex)
 
 	svrCtx := node.GetServerConn().SvrCtx
 

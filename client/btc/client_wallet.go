@@ -3,6 +3,7 @@ package btc
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -82,6 +83,21 @@ func (ec *BtcElectrumClient) SubscribeAddressNotify(addr string) error {
 	}
 
 	// subscribe
+	scripthash, err := AddrToScripthash(addr, ec.GetConfig().Params)
+	if err != nil {
+		return err
+	}
+	res, err := ec.GetNode().SubscribeScripthashNotify(scripthash)
+	if err != nil {
+		return err
+	}
+	if res == nil {
+		return errors.New("empty result")
+	}
+
+	fmt.Println("Subscribed scripthash")
+	fmt.Println("Scripthash", res.Scripthash)
+	fmt.Println("Status", res.Status)
 
 	return nil
 }

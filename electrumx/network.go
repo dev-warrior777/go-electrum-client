@@ -58,14 +58,17 @@ type ServerConn struct {
 	respHandlersMtx sync.Mutex
 	respHandlers    map[uint64]chan *response // reqID => requestor
 
-	ntfnHandlersMtx sync.RWMutex
-	ntfnHandlers    map[string][]chan []byte // method => subscribers
-
 	// The single scripthash notification channel. The channel will be made on
 	// the ConnectServer call and lasts until connection is terminated. It is
 	// closed in the 'listen' below.
 	scripthashNotifyMtx sync.Mutex
 	scripthashNotify    chan *ScripthashStatusResult
+
+	// The single headers notification channel. The channel will be made on
+	// the ConnectServer call and lasts until connection is terminated. It is
+	// closed in the 'listen' below.
+	headersNotifyMtx sync.Mutex
+	headersNotify    chan *HeadersNotifyResult
 }
 
 func (sc *ServerConn) nextID() uint64 {
@@ -79,7 +82,7 @@ func (sc *ServerConn) listen(ctx context.Context) {
 	// As such, only listen should close these channels, and only after the read
 	// loop has finished.
 	defer sc.cancelRequests()        // close the response chans
-	defer sc.deleteSubscriptions()   // close the ntfn chans
+	defer sc.closeHeadersNotify()    // close the single headers notify channel
 	defer sc.closeScripthashNotify() // close the single scripthash notify channel
 
 	reader := bufio.NewReader(io.LimitReader(sc.conn, 1<<18))
@@ -88,6 +91,8 @@ func (sc *ServerConn) listen(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+
+		// read msg chunk from stream
 		msg, err := reader.ReadBytes(newline)
 		if err != nil {
 			if ctx.Err() == nil { // unexpected
@@ -104,23 +109,31 @@ func (sc *ServerConn) listen(ctx context.Context) {
 			continue
 		}
 
-		if jsonResp.Method != "" { // notification
-			var ntfnParams ntfnData // the ntfn payload is in the params field of a request object (!)
+		// sc.debug("[Debug] ", string(msg), "\n[<-Debug]\n\n")
+
+		// Notifications
+		if jsonResp.Method != "" {
+			var ntfnParams ntfnData // the ntfn payload
 			err = json.Unmarshal(msg, &ntfnParams)
 			if err != nil {
 				sc.debug("notification Unmarshal error: %v", err)
 				continue
 			}
-			for _, c := range sc.subChans(jsonResp.Method) {
-				select {
-				case c <- ntfnParams.Params:
-				default: // non-blocking, but consider deleting sub and closing chan
-				}
+
+			if jsonResp.Method == "blockchain.headers.subscribe" {
+				sc.headersTipChangeNotify(ntfnParams.Params)
+				continue
 			}
+
+			if jsonResp.Method == "blockchain.scripthash.subscribe" {
+				sc.scripthashStatusNotify(ntfnParams.Params)
+				continue
+			}
+			sc.debug("Received notification for unknown method %s", jsonResp.Method)
 			continue
 		}
-		// sc.debug("[Debug] ", string(msg), "\n[<-Debug]\n\n")
 
+		// Responses
 		c := sc.responseChan(jsonResp.ID)
 		if c == nil {
 			sc.debug("Received response for unknown request ID %d", jsonResp.ID)
@@ -248,8 +261,8 @@ func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*Server
 		done:             make(chan struct{}),
 		debug:            logger,
 		respHandlers:     make(map[uint64]chan *response),
-		ntfnHandlers:     make(map[string][]chan []byte),
 		scripthashNotify: make(chan *ScripthashStatusResult, 10),
+		headersNotify:    make(chan *HeadersNotifyResult, 10),
 	}
 
 	// Wrap the context with a cancel function for internal shutdown, and so the
@@ -266,8 +279,8 @@ func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*Server
 	sc.debug("Connected to server %s using negotiated protocol version %s",
 		addr, sc.proto)
 
-	go sc.listen(ctx) // must be running to receive response
-	go sc.pinger(ctx)
+	go sc.listen(ctx) // must be running to receive response & notifications
+	go sc.pinger(ctx) // must be running or the server will disconnect after some time
 
 	go func() {
 		<-ctx.Done()
@@ -331,40 +344,67 @@ func (sc *ServerConn) cancelRequests() {
 	}
 }
 
-func (sc *ServerConn) registerSub(method string) <-chan []byte {
-	c := make(chan []byte, 1)
-	sc.ntfnHandlersMtx.Lock()
-	sc.ntfnHandlers[method] = append(sc.ntfnHandlers[method], c)
-	sc.ntfnHandlersMtx.Unlock()
-	return c
-}
-
-func (sc *ServerConn) subChans(method string) []chan []byte {
-	sc.ntfnHandlersMtx.RLock()
-	defer sc.ntfnHandlersMtx.RUnlock()
-	return sc.ntfnHandlers[method]
-}
-
-// deleteSubscriptions deletes all subscriptions from the ntfnHandlers map and
-// closes all of the channels. As such, this method MUST be called from the same
-// goroutine that sends on the channel.
-func (sc *ServerConn) deleteSubscriptions() {
-	sc.ntfnHandlersMtx.Lock()
-	defer sc.ntfnHandlersMtx.Unlock()
-	for method, cs := range sc.ntfnHandlers {
-		for _, c := range cs {
-			close(c) // sub handler loop receives nil immediately
+// scripthashStatusNotify is called from the listen thread when a
+// scripthash status notification has been received. The raw bytes
+// are 2 non-json strings.
+//
+// Incoming data from the server:
+// raw '\[s1, s2\]'
+//
+// Which we decode into:
+// statusResult [ScriptHash, Status]
+func (sc *ServerConn) scripthashStatusNotify(raw json.RawMessage) {
+	var strs [2]string
+	if err := json.Unmarshal(raw, &strs); err == nil && len(strs) == 2 {
+		statusResult := ScripthashStatusResult{
+			Scripthash: strs[0],
+			Status:     strs[1],
 		}
-		delete(sc.ntfnHandlers, method)
+		sc.scripthashNotifyMtx.Lock()
+		defer sc.scripthashNotifyMtx.Unlock()
+		sc.scripthashNotify <- &statusResult
+		sc.debug("Scripthash Notify\nScripthash: %s\nStatus: %s\n", statusResult.Scripthash, statusResult.Status)
+	} else {
+		sc.debug("Scripthash Status Notify\nError: %v\nRaw: %s\n", err, string(raw))
 	}
 }
 
 // closeScripthashNotify closes the scripthash subscription notify channel
-// once and once only on the listen thread.
+// once and once only. Called once from the listen thread when it exits.
 func (sc *ServerConn) closeScripthashNotify() {
 	sc.scripthashNotifyMtx.Lock()
 	defer sc.scripthashNotifyMtx.Unlock()
 	close(sc.scripthashNotify)
+}
+
+// headersTipChangeNotify is called from the listen thread when a header
+// tip change notification has been received.
+//
+// Incoming data from the server:
+// raw '\[\{...\}\{...\}   ...   \{...\}\]'
+//
+// Which we decode into:
+// headersResults [{Height,Hex}{Height,Hex}...{Height,Hex}]
+func (sc *ServerConn) headersTipChangeNotify(raw json.RawMessage) {
+	var headersResults []*HeadersNotifyResult
+	if err := json.Unmarshal(raw, &headersResults); err == nil {
+		sc.headersNotifyMtx.Lock()
+		defer sc.headersNotifyMtx.Unlock()
+		for _, r := range headersResults {
+			sc.headersNotify <- r
+			sc.debug("Headers Notify:\n  Height: %d\n  Hex: %s\n", r.Height, r.Hex)
+		}
+	} else {
+		sc.debug("Headers Notify\nError: %v\nRaw: %s\n", err, string(raw))
+	}
+}
+
+// closeScripthashNotify closes the scripthash subscription notify channel
+// once and once only. Called from the listen thread.
+func (sc *ServerConn) closeHeadersNotify() {
+	sc.headersNotifyMtx.Lock()
+	defer sc.headersNotifyMtx.Unlock()
+	close(sc.headersNotify)
 }
 
 // Request performs a request to the remote server for the given method using
@@ -621,6 +661,10 @@ func (sc *ServerConn) GetTransaction(ctx context.Context, txid string) (*GetTran
 	return &resp, nil
 }
 
+// ////////////////////////////////////////////////////////////////////////////
+// block headers methods
+// /////////////////////
+
 // BlockHeader requests the block header at the given height, returning
 // hexadecimal encoded serialized header.
 func (sc *ServerConn) BlockHeader(ctx context.Context, height uint32) (string, error) {
@@ -653,45 +697,31 @@ func (sc *ServerConn) BlockHeaders(ctx context.Context, startHeight, count uint3
 	return &resp, nil
 }
 
-// SubscribeHeadersResult is the contents of a block header notification.
-type SubscribeHeadersResult struct {
+// HeadersNotifyResult is the contents of a block header notification.
+type HeadersNotifyResult struct {
 	Height int32  `json:"height"`
 	Hex    string `json:"hex"`
+}
+
+// GetHeadersNotify returns this connection owned recv channel for headers
+// tip change notifications. This connection will close the channel.
+func (sc *ServerConn) GetHeadersNotify(ctx context.Context) <-chan *HeadersNotifyResult {
+	return sc.headersNotify
 }
 
 // SubscribeHeaders subscribes for block header notifications. There seems to be
 // no guarantee that we will be notified of all new blocks, such as when there
 // are blocks in rapid succession.
-func (sc *ServerConn) SubscribeHeaders(ctx context.Context) (*SubscribeHeadersResult, <-chan *SubscribeHeadersResult, error) {
+func (sc *ServerConn) SubscribeHeaders(ctx context.Context) (*HeadersNotifyResult, error) {
 	const method = "blockchain.headers.subscribe"
-	c := sc.registerSub(method)
 
-	var resp SubscribeHeadersResult
+	var resp HeadersNotifyResult
 	err := sc.Request(ctx, method, nil, &resp)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	ntfnChan := make(chan *SubscribeHeadersResult, 10)
-
-	go func() {
-		defer close(ntfnChan)
-
-		for data := range c {
-			var res []*SubscribeHeadersResult
-			err = json.Unmarshal(data, &res)
-			if err != nil {
-				sc.debug("SubscribeHeaders - unmarshal ntfn data: %v", err)
-				continue
-			}
-
-			for _, r := range res { // should just be one, but the params are a slice...
-				ntfnChan <- r
-			}
-		}
-	}()
-
-	return &resp, ntfnChan, nil
+	return &resp, nil
 }
 
 // ////////////////////////////////////////////////////////////////////////////
@@ -699,9 +729,10 @@ func (sc *ServerConn) SubscribeHeaders(ctx context.Context) (*SubscribeHeadersRe
 // //////////////////
 
 // ScripthashStatusResult is the contents of a scripthash notification.
+// Raw bytes with no json key names or json [] {} delimiters
 type ScripthashStatusResult struct {
-	Scripthash int32  `json:"scripthash"`
-	Status     string `json:"status"`
+	Scripthash string // 32 byte scripthash - the id of the watched address
+	Status     string // 32 byte sha256 hash of entire history to date
 }
 
 // GetScripthashNotify returns this connection owned recv channel for scripthash
@@ -716,12 +747,18 @@ func (sc *ServerConn) GetScripthashNotify(ctx context.Context) <-chan *Scripthas
 func (sc *ServerConn) SubscribeScripthash(ctx context.Context, scripthash string) (*ScripthashStatusResult, error) {
 	const method = "blockchain.scripthash.subscribe"
 
-	var resp ScripthashStatusResult
-	err := sc.Request(ctx, method, positional{scripthash}, &resp)
+	var status string // no json - sha256 of address history expected, as hex string
+	err := sc.Request(ctx, method, positional{scripthash}, &status)
 	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+
+	statusResult := ScripthashStatusResult{
+		Scripthash: scripthash,
+		Status:     status,
+	}
+
+	return &statusResult, nil
 }
 
 // Unsubscribe from a script hash, preventing future notifications if it's status changes.
