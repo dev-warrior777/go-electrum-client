@@ -2,6 +2,7 @@ package btc
 
 import (
 	"encoding/hex"
+	"fmt"
 	"strings"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -68,6 +69,7 @@ func (as *AddressSynchronizer) addressToElectrumScripthash(address btcutil.Addre
 	if err != nil {
 		return "", err
 	}
+	fmt.Println("pkscript", hex.EncodeToString(pkscript), " before electrum extra hashing")
 
 	pkScriptHashBytes := chainhash.HashB(pkscript)
 	revScriptHashBytes := revBytes(pkScriptHashBytes)

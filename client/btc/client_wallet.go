@@ -1,7 +1,6 @@
 package btc
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -39,19 +38,19 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 
 	for _, address := range addresses {
 
-		// fun with dick & jane
-		script := address.ScriptAddress()
-		s := hex.EncodeToString(script)
-		fmt.Println("ScriptAddress", s)
-		segwitAddress, swerr := btcutil.NewAddressWitnessPubKeyHash(script, ec.GetConfig().Params)
-		if swerr != nil {
-			fmt.Println(swerr)
-			continue
-		}
-		fmt.Println("segwitAddress", segwitAddress.String())
-		fmt.Println("segwitAddress", segwitAddress.EncodeAddress())
-		address = segwitAddress
-		// end fun
+		// // fun with dick & jane
+		// script := address.ScriptAddress()
+		// s := hex.EncodeToString(script)
+		// fmt.Println("ScriptAddress", s)
+		// segwitAddress, swerr := btcutil.NewAddressWitnessPubKeyHash(script, ec.GetConfig().Params)
+		// if swerr != nil {
+		// 	fmt.Println(swerr)
+		// 	continue
+		// }
+		// fmt.Println("segwitAddress", segwitAddress.String())
+		// fmt.Println("segwitAddress", segwitAddress.EncodeAddress())
+		// address = segwitAddress
+		// // end fun
 
 		err := ec.SubscribeAddressNotify(address)
 		if err != nil {
