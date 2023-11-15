@@ -1,6 +1,7 @@
 package client
 
 import (
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
@@ -8,8 +9,9 @@ import (
 type NodeType int
 
 const (
-	SingleNode NodeType = iota
-	MultiNode  NodeType = 1
+	SingleNode      NodeType = iota
+	MultiNode       NodeType = 1
+	LOOKAHEADWINDOW          = 30
 )
 
 type ElectrumClient interface {
@@ -23,11 +25,13 @@ type ElectrumClient interface {
 	SubscribeClientHeaders() error
 	//
 	CreateWallet(pw string) error
-	RecreateElectrumWallet(pw, mnenomic string) error
+	RecreateWallet(pw, mnenomic string) error
 	LoadWallet(pw string) error
 	//
 	Broadcast(rawTx string) (string, error)
-	SubscribeAddressNotify(addr string) error
-	UnsubscribeAddressNotify(addr string)
+	//
+	SyncWallet() error
+	SubscribeAddressNotify(address btcutil.Address) error
+	UnsubscribeAddressNotify(address btcutil.Address)
 	//...
 }

@@ -21,7 +21,7 @@ var (
 	nets  = []string{"mainnet", "testnet", "regtest", "simnet"}
 )
 
-var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
+// var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
 
 func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 	contains := func(s []string, str string) bool {
@@ -99,7 +99,10 @@ func main() {
 	}
 	fmt.Println(cfg.Chain, cfg.Params.Name)
 
+	// make basic client
 	ec := btc.NewBtcElectrumClient(cfg)
+
+	// make the client's node
 	ec.CreateNode(client.SingleNode)
 	err = ec.GetNode().Start()
 	if err != nil {
@@ -107,10 +110,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// go ec.SyncHeaders()
-	// If you do this^ then make an error channel back to here and wait on it. If
-	// SyncHeaders fails the client initialization is a fail.
-
+	// get up to date with client's copy of the needed blockchain headers
 	fmt.Println("syncing headers")
 	err = ec.SyncClientHeaders()
 	if err != nil {
@@ -119,7 +119,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// start goroutine to listen for blockchain headers arriving
+	// start goroutine to listen for new blockchain headers arriving
 	fmt.Println("subscribe headers")
 	err = ec.SubscribeClientHeaders()
 	if err != nil {
@@ -128,6 +128,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	// make the client's wallet
+	// err = ec.RecreateWallet("abc", mnemonic)
+
+	// load the client's wallet
 	err = ec.LoadWallet("abc")
 	if err != nil {
 		ec.GetNode().Stop()
@@ -135,22 +139,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Here we would grab current addresses (gap range) for this wallet.
-	// Electrum seems to have just 20 external & 10 change..
-	// Currently our wallet has 100+100. Consider say 20+20
-
-	// Setup Notify for all those addresses
-
-	// dbg: one address only
-	err = ec.SubscribeAddressNotify("mvP2UeXooRghYvsX7H7XVj78FY49jJw6Sq")
+	// set up Notify for all our receive addresses and get any changes to the
+	// state of the transaction history from the node
+	err = ec.SyncWallet()
 	if err != nil {
 		ec.GetNode().Stop()
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
 
-	// start goroutine to listen for scripthash status change notifications arriving
 	//TODO:
+
 	sc := ec.GetNode().GetServerConn().SvrConn
 	<-sc.Done()
 }

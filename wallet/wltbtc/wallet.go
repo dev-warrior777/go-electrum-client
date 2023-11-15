@@ -17,6 +17,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcwallet/wallet/txrules"
+	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	"github.com/tyler-smith/go-bip39"
 )
@@ -165,11 +166,11 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 	if config.Params != &chaincfg.MainNetParams {
 		fmt.Println("Created: ", w.creationDate)
 		fmt.Println(hex.EncodeToString(sm.store.Seed))
-		fmt.Println("Addresses")
+		fmt.Println("Created Addresses:")
 		for i, adr := range w.txstore.adrs {
 			fmt.Printf("%d %v\n", i, adr)
-			if i > 3 {
-				break
+			if i == client.LOOKAHEADWINDOW-1 {
+				fmt.Println(" ---")
 			}
 		}
 	}
@@ -233,11 +234,11 @@ func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrum
 	if config.Params != &chaincfg.MainNetParams {
 		fmt.Println("Stored Creation Date: ", w.creationDate)
 		fmt.Println(hex.EncodeToString(sm.store.Seed))
-		fmt.Println("Addresses")
+		fmt.Println("Loaded Addresses:")
 		for i, adr := range w.txstore.adrs {
 			fmt.Printf("%d %v\n", i, adr)
-			if i > 3 {
-				break
+			if i == client.LOOKAHEADWINDOW-1 {
+				fmt.Println(" ---")
 			}
 		}
 	}

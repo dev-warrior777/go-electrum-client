@@ -210,7 +210,8 @@ func TestKeyManager_GetFreshKey(t *testing.T) {
 	if len(km.GetKeys()) != LOOKAHEADWINDOW*2+1 {
 		t.Error("Failed to create additional key")
 	}
-	key2, err := km.generateChildKey(wallet.EXTERNAL, 100)
+	edgeCaseKeyNumber := uint32(LOOKAHEADWINDOW)
+	key2, err := km.generateChildKey(wallet.EXTERNAL, edgeCaseKeyNumber)
 	if err != nil {
 		t.Error(err)
 	}

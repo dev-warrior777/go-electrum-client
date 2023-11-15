@@ -88,6 +88,9 @@ type ElectrumWallet interface {
 	// should be also counted as confirmed even if the spending transaction is unconfirmed.
 	Balance() (confirmed, unconfirmed int64)
 
+	// Returns a list of addresses for this wallet
+	ListAddresses() []btcutil.Address
+
 	// Returns a list of transactions for this wallet
 	Transactions() ([]Txn, error)
 

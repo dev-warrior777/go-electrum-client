@@ -64,7 +64,7 @@ func TestWalletRecreate(t *testing.T) {
 	cfg.Testing = true
 	ec := NewBtcElectrumClient(cfg)
 	pw := "abc"
-	err = ec.RecreateElectrumWallet(pw, mnemonic)
+	err = ec.RecreateWallet(pw, mnemonic)
 	if err != nil {
 		t.Fatal(err)
 	}

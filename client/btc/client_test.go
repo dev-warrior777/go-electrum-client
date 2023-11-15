@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/dev-warrior777/go-electrum-client/client"
+	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
 var (
@@ -18,13 +20,21 @@ var (
 	abScripthash = "02c21ac0ef859617cbb7ae68943b9af8fb99699d32ea35cb449384aac17b93d5"
 )
 
+func AddrToElectrumScripthash(addr string, network *chaincfg.Params) (string, error) {
+	cfg := client.NewDefaultConfig()
+	cfg.Chain = wallet.Bitcoin
+	cfg.Params = network
+	walletSync := NewWalletSychronizer(cfg)
+	return walletSync.addrToElectrumScripthash(addr, network)
+}
+
 func TestScripthash(t *testing.T) {
-	_, err := AddrToScripthash("", &chaincfg.MainNetParams)
+	_, err := AddrToElectrumScripthash("", &chaincfg.MainNetParams)
 	if err == nil {
 		t.Fatal(err)
 	}
 
-	shGen, err := AddrToScripthash(bgen, &chaincfg.MainNetParams)
+	shGen, err := AddrToElectrumScripthash(bgen, &chaincfg.MainNetParams)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +42,7 @@ func TestScripthash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sh1, err := AddrToScripthash(a1, &chaincfg.RegressionNetParams)
+	sh1, err := AddrToElectrumScripthash(a1, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +50,7 @@ func TestScripthash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	shb, err := AddrToScripthash(ab, &chaincfg.RegressionNetParams)
+	shb, err := AddrToElectrumScripthash(ab, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Fatal(err)
 	}

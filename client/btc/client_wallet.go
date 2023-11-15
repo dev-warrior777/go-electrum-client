@@ -6,9 +6,6 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
 )
 
 // Here is the client interface between the node & wallet for transaction
@@ -16,74 +13,68 @@ import (
 
 // https://electrumx.readthedocs.io/en/latest/protocol-basics.html
 
-func init() {
-	addrToScriptHash = make(map[string]*subscription)
-}
-
-// AddrToScripthash takes a bech or legacy bitcoin address and makes an electrum
-// 1.4 protocol 'scripthash'
-func AddrToScripthash(addr string, network *chaincfg.Params) (string, error) {
-	var scripthash string
-	if len(addr) <= 0 {
-		return "", errors.New("zero length string")
-	}
-
-	revBytes := func(b []byte) []byte {
-		size := len(b)
-		buf := make([]byte, size)
-		var i int
-		for i = 0; i < size; i++ {
-			buf[i] = b[size-i-1]
-		}
-		return buf
-	}
-
-	address, err := btcutil.DecodeAddress(addr, network)
-	if err != nil {
-		return "", err
-	}
-
-	pkscript, err := txscript.PayToAddrScript(address)
-	if err != nil {
-		return "", err
-	}
-
-	pkScriptHashBytes := chainhash.HashB(pkscript)
-	revScriptHashBytes := revBytes(pkScriptHashBytes)
-	scripthash = hex.EncodeToString(revScriptHashBytes)
-
-	return scripthash, nil
-}
-
-type history struct {
-	height int32
-	txHash string
-}
-
-type subscription struct {
-	scriptHash  string
-	historyList []*history
-}
+// It can get confusing. 'scripthash' is an electrum value.
 
 var (
-	addrToScriptHash     map[string]*subscription
 	ErrAlreadySubscribed error = errors.New("addr already subscribed")
 )
 
 // alreadySubscribed checks if this addr is already subscribed
-func alreadySubscribed(addr string) bool {
-	_, exists := addrToScriptHash[addr]
+func (ec *BtcElectrumClient) alreadySubscribed(address btcutil.Address) bool {
+	_, exists := ec.walletSynchronizer.scriptHashToAddr[address]
 	return exists
 }
 
-// SubscribeAddressNotify subscribes to notifications for an address
-func (ec *BtcElectrumClient) SubscribeAddressNotify(addr string) error {
-	if alreadySubscribed(addr) {
+func (ec *BtcElectrumClient) SyncWallet() error {
+
+	// - get all receive addresses in wallet
+	addresses := ec.GetWallet().ListAddresses()
+
+	// for each
+	//   - subscribe for scripthash notifications
+	//   - on sub the return is hash of all known history known to server
+	//   - get the prev stored history for the address from db if any
+	//   - hash prev history and compare to what the server sends back
+	//   - if different get the up to date
+
+	for _, address := range addresses {
+
+		// fun with dick & jane
+		script := address.ScriptAddress()
+		s := hex.EncodeToString(script)
+		fmt.Println("ScriptAddress", s)
+		segwitAddress, swerr := btcutil.NewAddressWitnessPubKeyHash(script, ec.GetConfig().Params)
+		if swerr != nil {
+			fmt.Println(swerr)
+			continue
+		}
+		fmt.Println("segwitAddress", segwitAddress.String())
+		fmt.Println("segwitAddress", segwitAddress.EncodeAddress())
+		address = segwitAddress
+		// end fun
+
+		err := ec.SubscribeAddressNotify(address)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	// start goroutine to listen for scripthash status change notifications arriving
+
+	return nil
+}
+
+// SubscribeAddressNotify subscribes to notifications for an address and retreives
+// & stores address history known to the server
+func (ec *BtcElectrumClient) SubscribeAddressNotify(address btcutil.Address) error {
+	if ec.alreadySubscribed(address) {
 		return ErrAlreadySubscribed
 	}
 
 	// subscribe
-	scripthash, err := AddrToScripthash(addr, ec.GetConfig().Params)
+	scripthash, err := ec.walletSynchronizer.addressToElectrumScripthash(
+		address, ec.GetConfig().Params)
 	if err != nil {
 		return err
 	}
@@ -103,12 +94,19 @@ func (ec *BtcElectrumClient) SubscribeAddressNotify(addr string) error {
 }
 
 // UnsubscribeAddressNotify unsubscribes from notifications for an address
-func (ec *BtcElectrumClient) UnsubscribeAddressNotify(addr string) {
-	if !alreadySubscribed(addr) {
+func (ec *BtcElectrumClient) UnsubscribeAddressNotify(address btcutil.Address) {
+	if !ec.alreadySubscribed(address) {
 		return
 	}
 
 	// unsubscribe
+	scripthash, err := ec.walletSynchronizer.addressToElectrumScripthash(
+		address, ec.GetConfig().Params)
+	if err != nil {
+		return
+	}
+	ec.GetNode().UnsubscribeScripthashNotify(scripthash)
+	fmt.Println("unsubscribed scripthash")
 }
 
 // Broadcast sends a transaction to the server for broadcast on the bitcoin

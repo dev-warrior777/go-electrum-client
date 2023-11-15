@@ -21,6 +21,8 @@ type BtcElectrumClient struct {
 	Node         electrumx.ElectrumXNode
 	// client copy of blockchain headers
 	clientHeaders *Headers
+	// client wallet receive address synchronization with the node
+	walletSynchronizer *AddressSynchronizer
 }
 
 func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
@@ -30,6 +32,7 @@ func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 		Node:         nil,
 	}
 	ec.clientHeaders = NewHeaders(cfg)
+	ec.walletSynchronizer = NewWalletSychronizer(cfg)
 	return &ec
 }
 
@@ -77,10 +80,10 @@ func (ec *BtcElectrumClient) CreateWallet(pw string) error {
 	return nil
 }
 
-// RecreateElectrumWallet recreates a wallet from an existing mnemonic seed.
+// RecreateWallet recreates a wallet from an existing mnemonic seed.
 // The password is to encrypt the stored xpub, xprv and other sensitive data
 // and can be different from the original wallet's password.
-func (ec *BtcElectrumClient) RecreateElectrumWallet(pw, mnenomic string) error {
+func (ec *BtcElectrumClient) RecreateWallet(pw, mnenomic string) error {
 	cfg := ec.ClientConfig
 	datadir := ec.ClientConfig.DataDir
 	if _, err := os.Stat(path.Join(datadir, "wallet.db")); err == nil {
@@ -134,11 +137,15 @@ func (ec *BtcElectrumClient) CreateNode(_ client.NodeType) {
 }
 
 // Interface methods in client_headers.go
+//
 // SyncHeaders() error
 // SubscribeHeaders() error
 
 // Interface methods in client_wallet.go
+//
+// SyncWallet() error
 // SubscribeAddressNotify(addr string) error
 // UnsubscribeAddressNotify(addr string)
+// Broadcast(rawTx string) (string, error)
 
 //////////////////////////////////////////////////////////////////////////////

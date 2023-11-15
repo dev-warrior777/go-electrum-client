@@ -5,10 +5,12 @@ import (
 
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-const LOOKAHEADWINDOW = 100
+// Lookahead window size from client constants
+const LOOKAHEADWINDOW = client.LOOKAHEADWINDOW
 
 type KeyManager struct {
 	datastore wallet.Keys

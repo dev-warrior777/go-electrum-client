@@ -148,7 +148,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 // prior blocks, the server may only notify of the most recent chain tip. The
 // protocol does not guarantee notification of all intermediate block headers.
 //
-// SubscribeClientHeaders is part of the ElectrumClient inter	face implementation
+// SubscribeClientHeaders is part of the ElectrumClient interface implementation
 func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 	h := ec.clientHeaders
 

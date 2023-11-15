@@ -761,7 +761,7 @@ func (sc *ServerConn) SubscribeScripthash(ctx context.Context, scripthash string
 	return &statusResult, nil
 }
 
-// Unsubscribe from a script hash, preventing future notifications if it's status changes.
+// Unsubscribe from a script hash, preventing future status change notifications.
 func (sc *ServerConn) UnsubscribeScripthash(ctx context.Context, scripthash string) {
 	const method = "blockchain.scripthash.unsubscribe"
 
