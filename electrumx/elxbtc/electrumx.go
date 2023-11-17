@@ -160,6 +160,14 @@ func (s *SingleNode) UnsubscribeScripthashNotify(scripthash string) {
 	server.SvrConn.UnsubscribeScripthash(server.SvrCtx, scripthash)
 }
 
+func (s *SingleNode) GetHistory(scripthash string) (electrumx.HistoryResult, error) {
+	server := s.Server
+	if !server.Running {
+		return nil, ErrServerNotRunning
+	}
+	return server.SvrConn.GetHistory(server.SvrCtx, scripthash)
+}
+
 func (s *SingleNode) Broadcast(rawTx string) (string, error) {
 	server := s.Server
 	if !server.Running {

@@ -55,5 +55,6 @@ type ElectrumClient interface {
 	SyncWallet() error
 	SubscribeAddressNotify(address btcutil.Address) error
 	UnsubscribeAddressNotify(address btcutil.Address)
+	GetAddressHistory(address btcutil.Address) error
 	//...
 }

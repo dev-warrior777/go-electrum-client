@@ -64,6 +64,8 @@ type ElectrumXNode interface {
 	GetScripthashNotify() (<-chan *ScripthashStatusResult, error)
 	SubscribeScripthashNotify(scripthash string) (*ScripthashStatusResult, error)
 	UnsubscribeScripthashNotify(scripthash string)
+	GetHistory(scripthash string) (HistoryResult, error)
+	//
 	Broadcast(rawTx string) (string, error)
 }
 

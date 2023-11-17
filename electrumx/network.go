@@ -732,7 +732,7 @@ func (sc *ServerConn) SubscribeHeaders(ctx context.Context) (*HeadersNotifyResul
 // Raw bytes with no json key names or json [] {} delimiters
 type ScripthashStatusResult struct {
 	Scripthash string // 32 byte scripthash - the id of the watched address
-	Status     string // 32 byte sha256 hash of entire history to date
+	Status     string // 32 byte sha256 hash of entire history to date or null
 }
 
 // GetScripthashNotify returns this connection owned recv channel for scripthash
@@ -772,6 +772,25 @@ func (sc *ServerConn) UnsubscribeScripthash(ctx context.Context, scripthash stri
 	}
 
 	// TODO: analyse good response
+}
+
+type History struct {
+	Height int32  `json:"height"`
+	TxHash string `json:"tx_hash"`
+	Fee    int64  `json:"fee,omitempty"` // satoshis; iff in mempool
+}
+
+type HistoryResult []History
+
+// GetHistory gets a list of [{height, txid and fee},...] for
+// the scripthash of an address of interest to the client
+func (sc *ServerConn) GetHistory(ctx context.Context, scripthash string) (HistoryResult, error) {
+	var resp HistoryResult
+	err := sc.Request(ctx, "blockchain.scripthash.get_history", positional{scripthash}, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 // ////////////////////////////////////////////////////////////////////////////

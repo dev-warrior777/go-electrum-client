@@ -56,6 +56,11 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		return err
 	}
 
+	err = ec.GetAddressHistory(address)
+	if err != nil {
+		return err
+	}
+
 	// start goroutine to listen for scripthash status change notifications arriving
 
 	return nil
@@ -153,6 +158,31 @@ func (ec *BtcElectrumClient) UnsubscribeAddressNotify(address btcutil.Address) {
 	ec.GetNode().UnsubscribeScripthashNotify(scripthash)
 	ec.walletSynchronizer.removeSubscription(address)
 	fmt.Println("unsubscribed scripthash")
+}
+
+func (ec *BtcElectrumClient) GetAddressHistory(address btcutil.Address) error {
+	scripthash, err := ec.walletSynchronizer.addressToElectrumScripthash(
+		address, ec.GetConfig().Params)
+	if err != nil {
+		return err
+	}
+	res, err := ec.GetNode().GetHistory(scripthash)
+	if err != nil {
+		return err
+	}
+
+	if len(res) == 0 {
+		fmt.Println("empty history result for: ", address.String())
+		return nil
+	}
+	fmt.Println("History for address ", address.String())
+	for _, history := range res {
+		fmt.Println("Height:", history.Height)
+		fmt.Println("TxHash: ", history.TxHash)
+		fmt.Println("Fee: ", history.Fee)
+	}
+
+	return nil
 }
 
 // Broadcast sends a transaction to the server for broadcast on the bitcoin
