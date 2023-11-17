@@ -563,8 +563,15 @@ func (w *BtcElectrumWallet) GenerateMultisigScript(keys []hdkeychain.ExtendedKey
 
 // Add a script to the wallet and get notifications back when coins are received or spent from it
 func (w *BtcElectrumWallet) AddWatchedScript(script []byte) error {
-	// not yet implemented
-	return wallet.ErrWalletFnNotImplemented
+	err := w.txstore.WatchedScripts().Put(script)
+	if err != nil {
+		return err
+	}
+	err = w.txstore.PopulateAdrs()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // AddTransactionListener

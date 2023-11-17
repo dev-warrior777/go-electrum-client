@@ -53,12 +53,6 @@ type ElectrumWallet interface {
 	// Check if this amount is considered dust < 1000 sats/equivalent for now
 	IsDust(amount int64) bool
 
-	// Get the master private key
-	MasterPrivateKey() *hd.ExtendedKey
-
-	// Get the master public key
-	MasterPublicKey() *hd.ExtendedKey
-
 	// CurrentAddress returns an address suitable for receiving payments. `purpose` specifies
 	// whether the address should be internal or external. External addresses are typically
 	// requested when receiving funds from outside the wallet .Internal addresses are typically

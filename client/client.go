@@ -1,5 +1,22 @@
 package client
 
+///////////////////////////////// Client interface ///////////////////////////
+//
+//	architecture
+//
+//	   Client
+//
+//	     /\
+//	 (controller)
+//	   /    \
+//	  /      \
+//	 /        \
+//
+// Wallet     Node
+//
+// The client interface describes the behaviors of the client controller.
+// It is implemented for each coin asset client.
+
 import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
@@ -9,9 +26,14 @@ import (
 type NodeType int
 
 const (
-	SingleNode      NodeType = iota
-	MultiNode       NodeType = 1
-	LOOKAHEADWINDOW          = 30
+	// ElectrumX Server(s)
+	SingleNode NodeType = iota
+	MultiNode  NodeType = 1
+)
+
+const (
+	// Electrum Wallet
+	LOOKAHEADWINDOW = 10
 )
 
 type ElectrumClient interface {

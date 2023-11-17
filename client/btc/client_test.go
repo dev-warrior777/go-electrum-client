@@ -28,7 +28,7 @@ func AddrToElectrumScripthash(addr string, network *chaincfg.Params) (string, er
 	return walletSync.addrToElectrumScripthash(addr, network)
 }
 
-func TestScripthash(t *testing.T) {
+func TestElectrumScripthash(t *testing.T) {
 	_, err := AddrToElectrumScripthash("", &chaincfg.MainNetParams)
 	if err == nil {
 		t.Fatal(err)

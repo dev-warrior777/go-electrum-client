@@ -21,7 +21,7 @@ var (
 	nets  = []string{"mainnet", "testnet", "regtest", "simnet"}
 )
 
-// var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
+var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
 
 func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 	contains := func(s []string, str string) bool {
@@ -129,10 +129,10 @@ func main() {
 	}
 
 	// make the client's wallet
-	// err = ec.RecreateWallet("abc", mnemonic)
+	err = ec.RecreateWallet("abc", mnemonic)
 
 	// load the client's wallet
-	err = ec.LoadWallet("abc")
+	// err = ec.LoadWallet("abc")
 	if err != nil {
 		ec.GetNode().Stop()
 		fmt.Println(err, " - exiting")

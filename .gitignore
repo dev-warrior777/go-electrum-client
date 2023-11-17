@@ -30,3 +30,6 @@ goele
 #vscode
 .vscode/
 __debug_bin*
+
+#kept spv related versions of files being changed
+*.spv

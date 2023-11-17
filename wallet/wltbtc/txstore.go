@@ -3,13 +3,11 @@ package wltbtc
 import (
 	"bytes"
 	"errors"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/btcutil/bloom"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
@@ -51,122 +49,6 @@ func NewTxStore(p *chaincfg.Params, db wallet.Datastore, keyManager *KeyManager)
 	return txs, nil
 }
 
-// ... or I'm gonna fade away
-func (ts *TxStore) GimmeFilter() (*bloom.Filter, error) {
-	ts.PopulateAdrs()
-
-	// get all utxos to add outpoints to filter
-	allUtxos, err := ts.Utxos().GetAll()
-	if err != nil {
-		return nil, err
-	}
-
-	allStxos, err := ts.Stxos().GetAll()
-	if err != nil {
-		return nil, err
-	}
-	ts.addrMutex.Lock()
-	elem := uint32(len(ts.adrs)+len(allUtxos)+len(allStxos)) + uint32(len(ts.watchedScripts))
-	f := bloom.NewFilter(elem, 0, 0.00003, wire.BloomUpdateAll)
-
-	// note there could be false positives since we're just looking
-	// for the 20 byte PKH without the opcodes.
-	for _, a := range ts.adrs { // add 20-byte pubkeyhash
-		f.Add(a.ScriptAddress())
-	}
-	ts.addrMutex.Unlock()
-	for _, u := range allUtxos {
-		f.AddOutPoint(&u.Op)
-	}
-
-	for _, s := range allStxos {
-		f.AddOutPoint(&s.Utxo.Op)
-	}
-	for _, w := range ts.watchedScripts {
-		_, addrs, _, err := txscript.ExtractPkScriptAddrs(w, ts.params)
-		if err != nil {
-			continue
-		}
-		f.Add(addrs[0].ScriptAddress())
-	}
-
-	return f, nil
-}
-
-// CheckDoubleSpends takes a transaction and compares it with
-// all transactions in the db.  It returns a slice of all txids in the db
-// which are double spent by the received tx.
-func (ts *TxStore) CheckDoubleSpends(argTx *wire.MsgTx) ([]*chainhash.Hash, error) {
-	var dubs []*chainhash.Hash // slice of all double-spent txs
-	argTxid := argTx.TxHash()
-	txs, err := ts.Txns().GetAll(true)
-	if err != nil {
-		return dubs, err
-	}
-	for _, compTx := range txs {
-		if compTx.Height < 0 {
-			continue
-		}
-		r := bytes.NewReader(compTx.Bytes)
-		msgTx := wire.NewMsgTx(1)
-		msgTx.BtcDecode(r, 1, wire.WitnessEncoding)
-		compTxid := msgTx.TxHash()
-		for _, argIn := range argTx.TxIn {
-			// iterate through inputs of compTx
-			for _, compIn := range msgTx.TxIn {
-				if outPointsEqual(argIn.PreviousOutPoint, compIn.PreviousOutPoint) && !compTxid.IsEqual(&argTxid) {
-					// found double spend
-					dubs = append(dubs, &compTxid)
-					break // back to argIn loop
-				}
-			}
-		}
-	}
-	return dubs, nil
-}
-
-// GetPendingInv returns an inv message containing all txs known to the
-// db which are at height 0 (not known to be confirmed).
-// This can be useful on startup or to rebroadcast unconfirmed txs.
-func (ts *TxStore) GetPendingInv() (*wire.MsgInv, error) {
-	// use a map (really a set) do avoid dupes
-	txidMap := make(map[chainhash.Hash]struct{})
-
-	utxos, err := ts.Utxos().GetAll() // get utxos from db
-	if err != nil {
-		return nil, err
-	}
-	stxos, err := ts.Stxos().GetAll() // get stxos from db
-	if err != nil {
-		return nil, err
-	}
-
-	// iterate through utxos, adding txids of anything with height 0
-	for _, utxo := range utxos {
-		if utxo.AtHeight == 0 {
-			txidMap[utxo.Op.Hash] = struct{}{} // adds to map
-		}
-	}
-	// do the same with stxos based on height at which spent
-	for _, stxo := range stxos {
-		if stxo.SpendHeight == 0 {
-			txidMap[stxo.SpendTxid] = struct{}{}
-		}
-	}
-
-	invMsg := wire.NewMsgInv()
-	for txid := range txidMap {
-		item := wire.NewInvVect(wire.InvTypeTx, &txid)
-		err = invMsg.AddInvVect(item)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// return inv message with all txids (maybe none)
-	return invMsg, nil
-}
-
 // PopulateAdrs just puts a bunch of adrs in ram; it doesn't touch the DB
 func (ts *TxStore) PopulateAdrs() error {
 	keys := ts.keyManager.GetKeys()
@@ -197,7 +79,7 @@ func (ts *TxStore) PopulateAdrs() error {
 func (ts *TxStore) Ingest(tx *wire.MsgTx, height int64, timestamp time.Time) (uint32, error) {
 	var hits uint32
 	var err error
-	// Tx has been OK'd by SPV; check tx sanity
+	// Tx has been OK'd by ElectrumX; check tx sanity
 	utilTx := btcutil.NewTx(tx) // convert for validation
 	// Checks basic stuff like there are inputs and ouputs
 	err = blockchain.CheckTransactionSanity(utilTx)
@@ -446,26 +328,36 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 	return nil
 }
 
-func (ts *TxStore) processReorg(lastGoodHeight uint32) error {
-	txns, err := ts.Txns().GetAll(true)
+// CheckDoubleSpends takes a transaction and compares it with
+// all transactions in the db.  It returns a slice of all txids in the db
+// which are double spent by the received tx.
+func (ts *TxStore) CheckDoubleSpends(argTx *wire.MsgTx) ([]*chainhash.Hash, error) {
+	var dubs []*chainhash.Hash // slice of all double-spent txs
+	argTxid := argTx.TxHash()
+	txs, err := ts.Txns().GetAll(true)
 	if err != nil {
-		return err
+		return dubs, err
 	}
-	for i := len(txns) - 1; i >= 0; i-- {
-		if txns[i].Height > int64(lastGoodHeight) {
-			txid, err := chainhash.NewHashFromStr(txns[i].Txid)
-			if err != nil {
-				log.Println(err.Error())
-				continue
-			}
-			err = ts.markAsDead(*txid)
-			if err != nil {
-				log.Println(err.Error())
-				continue
+	for _, compTx := range txs {
+		if compTx.Height < 0 {
+			continue
+		}
+		r := bytes.NewReader(compTx.Bytes)
+		msgTx := wire.NewMsgTx(1)
+		msgTx.BtcDecode(r, 1, wire.WitnessEncoding)
+		compTxid := msgTx.TxHash()
+		for _, argIn := range argTx.TxIn {
+			// iterate through inputs of compTx
+			for _, compIn := range msgTx.TxIn {
+				if outPointsEqual(argIn.PreviousOutPoint, compIn.PreviousOutPoint) && !compTxid.IsEqual(&argTxid) {
+					// found double spend
+					dubs = append(dubs, &compTxid)
+					break // back to argIn loop
+				}
 			}
 		}
 	}
-	return nil
+	return dubs, nil
 }
 
 func (ts *TxStore) extractScriptAddress(script []byte) ([]byte, error) {
