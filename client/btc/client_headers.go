@@ -167,9 +167,6 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 
 	node := ec.GetNode()
 
-	// possible ddos
-	<-time.After(time.Second)
-
 	hdrResNotifyCh, err := node.GetHeadersNotify()
 	if err != nil {
 		return err

@@ -1,46 +1,32 @@
 package btc
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
 )
 
 // Here is the client interface between the node & wallet for transaction
-// broadcast, address monitoring & status of wallet 'scripthashes'
+// broadcast and wallet synchronize
 
-// https://electrumx.readthedocs.io/en/latest/protocol-basics.html
-
-// It can get confusing! Here 'scripthash' is an electrum value. But the
-// ScriptHash from (btcutl.Address).SciptHash() is the normal RIPEMD160
-// hash -- except for SegwitScripthash addresses which are 32 bytes long.
-//
-// An electrum scripthash is the full output payment script which is then
-// sha256 hashed. The result has bytes reversed for network send. It is sent
-// to ElectrumX as a string.
-
-var (
-	ErrAlreadySubscribed error = errors.New("address already subscribed")
-)
-
-// alreadySubscribed checks if this address is already subscribed
-func (ec *BtcElectrumClient) alreadySubscribed(address btcutil.Address) bool {
-	return ec.walletSynchronizer.isSubscribed(address)
-}
-
-// devdbg
+// devdbg: just one known wallet address
 func (ec *BtcElectrumClient) SyncWallet() error {
+
+	// start goroutine to listen for scripthash status change notifications arriving
+	err := ec.addressStatusNotify()
+	if err != nil {
+		return err
+	}
 
 	// - get all receive addresses in wallet
 	addresses := ec.GetWallet().ListAddresses()
 
+	// just get 1
 	address := addresses[0]
 
 	fmt.Println(address.String())
 
-	err := ec.SubscribeAddressNotify(address)
+	err = ec.SubscribeAddressNotify(address)
 	if err != nil {
 		return err
 	}
@@ -56,12 +42,11 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		return err
 	}
 
-	err = ec.GetAddressHistory(address)
+	history, err := ec.GetAddressHistory(address)
 	if err != nil {
 		return err
 	}
-
-	// start goroutine to listen for scripthash status change notifications arriving
+	dumpHistory(address, history)
 
 	return nil
 }

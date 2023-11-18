@@ -261,7 +261,7 @@ func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*Server
 		done:             make(chan struct{}),
 		debug:            logger,
 		respHandlers:     make(map[uint64]chan *response),
-		scripthashNotify: make(chan *ScripthashStatusResult, 10),
+		scripthashNotify: make(chan *ScripthashStatusResult, 256), // 64 bytes/slot
 		headersNotify:    make(chan *HeadersNotifyResult, 10),
 	}
 
