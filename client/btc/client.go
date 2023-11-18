@@ -139,13 +139,10 @@ func (ec *BtcElectrumClient) CreateNode(_ client.NodeType) {
 // Interface methods in client_headers.go
 //
 // SyncHeaders() error
-// SubscribeHeaders() error
 
 // Interface methods in client_wallet.go
 //
 // SyncWallet() error
-// SubscribeAddressNotify(addr string) error
-// UnsubscribeAddressNotify(addr string)
 // Broadcast(rawTx string) (string, error)
 
 //////////////////////////////////////////////////////////////////////////////

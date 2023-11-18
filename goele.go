@@ -110,16 +110,7 @@ func main() {
 
 	// get up to date with client's copy of the needed blockchain headers
 	fmt.Println("syncing headers")
-	err = ec.SyncClientHeaders()
-	if err != nil {
-		ec.GetNode().Stop()
-		fmt.Println(err, " - exiting")
-		os.Exit(1)
-	}
-
-	// start goroutine to listen for new blockchain headers arriving
-	fmt.Println("subscribe headers")
-	err = ec.SubscribeClientHeaders()
+	err = ec.SyncHeaders()
 	if err != nil {
 		ec.GetNode().Stop()
 		fmt.Println(err, " - exiting")

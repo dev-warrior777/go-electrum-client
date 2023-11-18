@@ -18,7 +18,6 @@ package client
 // It is implemented for each coin asset client.
 
 import (
-	"github.com/btcsuite/btcd/btcutil"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
@@ -43,18 +42,16 @@ type ElectrumClient interface {
 	//
 	CreateNode(nodeType NodeType)
 	//
-	SyncClientHeaders() error
+	SyncHeaders() error
 	SubscribeClientHeaders() error
 	//
 	CreateWallet(pw string) error
 	RecreateWallet(pw, mnenomic string) error
 	LoadWallet(pw string) error
 	//
-	Broadcast(rawTx string) (string, error)
-	//
 	SyncWallet() error
-	SubscribeAddressNotify(address btcutil.Address) error
-	UnsubscribeAddressNotify(address btcutil.Address)
-	GetAddressHistory(address btcutil.Address) error
+	//
+	// Small subset of electrum python console methods
+	Broadcast(rawTx string) (string, error)
 	//...
 }

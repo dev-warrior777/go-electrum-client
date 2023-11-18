@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+// SyncHeaders uodates the client headers and then subscribes for new update
+// tip notifications and listens for them
+func (ec *BtcElectrumClient) SyncHeaders() error {
+	err := ec.SyncClientHeaders()
+	if err != nil {
+		return err
+	}
+	return ec.SubscribeClientHeaders()
+}
+
 // SyncClientHeaders reads blockchain_headers file, then gets any missing block from
 // end of file to current tip from server. The current set of headers is also
 // stored in headers map and the chain verified by checking previous block
@@ -113,7 +123,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	}
 
 	// 3. Read up to date blockchain_headers file - this can be improved since
-	//    we already read most of it but for now; simplicity
+	//    we already read most of it but for now: simplicity
 	b2, err := h.ReadAllBytesFromFile()
 	if err != nil {
 		return err
@@ -182,7 +192,7 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 			select {
 
 			case <-svrCtx.Done():
-				fmt.Println("Server shutdown - subscribe headers")
+				fmt.Println("Server shutdown - subscribe headers notify")
 				node.Stop()
 				return
 

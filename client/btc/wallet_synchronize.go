@@ -2,6 +2,7 @@ package btc
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -71,7 +72,9 @@ func (as *AddressSynchronizer) addSubscription(address btcutil.Address, scriptha
 }
 
 func (as *AddressSynchronizer) removeSubscription(address btcutil.Address) {
-	delete(as.subscriptions, address)
+	if as.subscriptions[address] != nil {
+		delete(as.subscriptions, address)
+	}
 }
 
 func NewWalletSychronizer(cfg *client.ClientConfig) *AddressSynchronizer {
@@ -116,4 +119,79 @@ func (as *AddressSynchronizer) addrToElectrumScripthash(addr string, network *ch
 		return "", err
 	}
 	return as.addressToElectrumScripthash(address, network)
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// client wallet node
+/////////////////////
+
+// SubscribeAddressNotify subscribes to notifications for an address and retrieves
+// & stores address history known to the server
+func (ec *BtcElectrumClient) SubscribeAddressNotify(address btcutil.Address) error {
+	if ec.alreadySubscribed(address) {
+		return ErrAlreadySubscribed
+	}
+
+	// subscribe
+	scripthash, err := ec.walletSynchronizer.addressToElectrumScripthash(
+		address, ec.GetConfig().Params)
+	if err != nil {
+		return err
+	}
+	res, err := ec.GetNode().SubscribeScripthashNotify(scripthash)
+	if err != nil {
+		return err
+	}
+	if res == nil {
+		return errors.New("empty result")
+	}
+	ec.walletSynchronizer.addSubscription(address, scripthash)
+
+	fmt.Println("Subscribed scripthash")
+	fmt.Println("Scripthash", res.Scripthash)
+	fmt.Println("Status", res.Status)
+
+	return nil
+}
+
+// UnsubscribeAddressNotify unsubscribes from notifications for an address
+func (ec *BtcElectrumClient) UnsubscribeAddressNotify(address btcutil.Address) {
+	if !ec.alreadySubscribed(address) {
+		return
+	}
+
+	// unsubscribe
+	scripthash, err := ec.walletSynchronizer.addressToElectrumScripthash(
+		address, ec.GetConfig().Params)
+	if err != nil {
+		return
+	}
+	ec.GetNode().UnsubscribeScripthashNotify(scripthash)
+	ec.walletSynchronizer.removeSubscription(address)
+	fmt.Println("unsubscribed scripthash")
+}
+
+func (ec *BtcElectrumClient) GetAddressHistory(address btcutil.Address) error {
+	scripthash, err := ec.walletSynchronizer.addressToElectrumScripthash(
+		address, ec.GetConfig().Params)
+	if err != nil {
+		return err
+	}
+	res, err := ec.GetNode().GetHistory(scripthash)
+	if err != nil {
+		return err
+	}
+
+	if len(res) == 0 {
+		fmt.Println("empty history result for: ", address.String())
+		return nil
+	}
+	fmt.Println("History for address ", address.String())
+	for _, history := range res {
+		fmt.Println("Height:", history.Height)
+		fmt.Println("TxHash: ", history.TxHash)
+		fmt.Println("Fee: ", history.Fee)
+	}
+
+	return nil
 }
