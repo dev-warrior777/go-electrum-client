@@ -431,6 +431,11 @@ func (w *BtcElectrumWallet) Transactions() ([]wallet.Txn, error) {
 	}
 	return txns, nil
 }
+func (w *BtcElectrumWallet) HasTransaction(txid chainhash.Hash) bool {
+	_, err := w.txstore.Txns().Get(txid)
+	// error only for 'no rows in rowset'
+	return err == nil
+}
 
 func (w *BtcElectrumWallet) GetTransaction(txid chainhash.Hash) (wallet.Txn, error) {
 	txn, err := w.txstore.Txns().Get(txid)

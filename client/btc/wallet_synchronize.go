@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -55,8 +56,9 @@ type subscription struct {
 }
 
 type AddressSynchronizer struct {
-	subscriptions map[btcutil.Address]*subscription
-	network       *chaincfg.Params
+	subscriptions    map[btcutil.Address]*subscription
+	subscriptionsMtx sync.Mutex
+	network          *chaincfg.Params
 }
 
 func (as *AddressSynchronizer) getAddressForScripthash(scripthash string) btcutil.Address {
@@ -68,31 +70,32 @@ func (as *AddressSynchronizer) getAddressForScripthash(scripthash string) btcuti
 	return nil
 }
 
-func (as *AddressSynchronizer) getScripthashForAddress(address btcutil.Address) string {
-	sub := as.subscriptions[address]
-	return sub.scripthash
-}
-
 func (as *AddressSynchronizer) isSubscribed(address btcutil.Address) bool {
+	as.subscriptionsMtx.Lock()
+	defer as.subscriptionsMtx.Unlock()
 	return as.subscriptions[address] != nil
 }
 
 func (as *AddressSynchronizer) addSubscription(address btcutil.Address, scripthash string) {
+	as.subscriptionsMtx.Lock()
 	sub := subscription{
 		address:    address,
 		scripthash: scripthash,
 		lastStatus: "",
 	}
 	as.subscriptions[address] = &sub
+	as.subscriptionsMtx.Unlock()
 }
 
 func (as *AddressSynchronizer) removeSubscription(address btcutil.Address) {
+	as.subscriptionsMtx.Lock()
 	if as.subscriptions[address] != nil {
 		delete(as.subscriptions, address)
 	}
+	as.subscriptionsMtx.Unlock()
 }
 
-func (as *AddressSynchronizer) getSubscriptionForscripthash(scripthash string) *subscription {
+func (as *AddressSynchronizer) getSubscriptionForScripthash(scripthash string) *subscription {
 	address := as.getAddressForScripthash(scripthash)
 	return as.subscriptions[address]
 }
@@ -164,34 +167,33 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 				node.Stop()
 				return
 
-			case <-scripthashNotifyCh:
-				for status := range scripthashNotifyCh {
-					fmt.Println("scripthash notify")
-					fmt.Println("Scripthash", status.Scripthash)
-					fmt.Println("Status", status.Status)
-					if status.Status == "" {
-						continue
-					}
-					// is status same as last status?
-					sub := ec.walletSynchronizer.getSubscriptionForscripthash(status.Scripthash)
-					if sub == nil {
-						panic("no synchronizer subscription for subscribed scripthash ")
-					}
-					if sub.lastStatus == status.Status {
-						continue
-					}
-					sub.lastStatus = status.Status
-
-					// get scripthash history
-					history, err := ec.GetAddressHistory(sub.address)
-					if err != nil {
-						continue
-					}
-					dumpHistory(sub.address, history)
-
-					// update wallet txstore
-
+			case status := <-scripthashNotifyCh:
+				fmt.Println("<-scripthashNotifyCh - # items left in buffer", len(scripthashNotifyCh))
+				fmt.Println("scripthash notify")
+				fmt.Println("Scripthash", status.Scripthash)
+				fmt.Println("Status", status.Status)
+				if status.Status == "" {
+					continue
 				}
+				// is status same as last status?
+				sub := ec.walletSynchronizer.getSubscriptionForScripthash(status.Scripthash)
+				if sub == nil {
+					panic("no synchronizer subscription for subscribed scripthash")
+				}
+				if sub.lastStatus == status.Status {
+					continue
+				}
+				sub.lastStatus = status.Status
+
+				// get scripthash history
+				history, err := ec.GetAddressHistory(sub.address)
+				if err != nil {
+					continue
+				}
+				dumpHistory(sub.address, history)
+
+				// update wallet txstore
+				ec.addTxHistoryToWallet(history)
 			}
 		}
 	}()
@@ -269,6 +271,24 @@ func (ec *BtcElectrumClient) GetAddressHistory(address btcutil.Address) (electru
 	return res, nil
 }
 
+func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResult) {
+	for _, h := range history {
+		txid, err := hex.DecodeString(h.TxHash)
+		if err != nil {
+			continue
+		}
+		txhash, err := chainhash.NewHash(txid)
+		if err != nil {
+			continue
+		}
+		if has := ec.GetWallet().HasTransaction(*txhash); has {
+			continue
+		}
+		// add transaction
+		fmt.Println("adding transaction", h.TxHash)
+	}
+}
+
 func dumpHistory(address btcutil.Address, history electrumx.HistoryResult) {
 	fmt.Println("History for address ", address.String())
 	for _, h := range history {
@@ -276,5 +296,4 @@ func dumpHistory(address btcutil.Address, history electrumx.HistoryResult) {
 		fmt.Println("TxHash: ", h.TxHash)
 		fmt.Println("Fee: ", h.Fee)
 	}
-
 }

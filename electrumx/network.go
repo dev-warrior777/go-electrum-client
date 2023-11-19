@@ -363,7 +363,6 @@ func (sc *ServerConn) scripthashStatusNotify(raw json.RawMessage) {
 		sc.scripthashNotifyMtx.Lock()
 		defer sc.scripthashNotifyMtx.Unlock()
 		sc.scripthashNotify <- &statusResult
-		sc.debug("Scripthash Notify\nScripthash: %s\nStatus: %s\n", statusResult.Scripthash, statusResult.Status)
 	} else {
 		sc.debug("Scripthash Status Notify\nError: %v\nRaw: %s\n", err, string(raw))
 	}
@@ -392,7 +391,6 @@ func (sc *ServerConn) headersTipChangeNotify(raw json.RawMessage) {
 		defer sc.headersNotifyMtx.Unlock()
 		for _, r := range headersResults {
 			sc.headersNotify <- r
-			sc.debug("Headers Notify:\n  Height: %d\n  Hex: %s\n", r.Height, r.Hex)
 		}
 	} else {
 		sc.debug("Headers Notify\nError: %v\nRaw: %s\n", err, string(raw))

@@ -12,21 +12,13 @@ import (
 // devdbg: just one known wallet address
 func (ec *BtcElectrumClient) SyncWallet() error {
 
-	// start goroutine to listen for scripthash status change notifications arriving
-	err := ec.addressStatusNotify()
-	if err != nil {
-		return err
-	}
-
-	// - get all receive addresses in wallet
+	// just get 1st adddress in wallet
 	addresses := ec.GetWallet().ListAddresses()
-
-	// just get 1
 	address := addresses[0]
 
 	fmt.Println(address.String())
 
-	err = ec.SubscribeAddressNotify(address)
+	err := ec.SubscribeAddressNotify(address)
 	if err != nil {
 		return err
 	}
@@ -47,6 +39,12 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		return err
 	}
 	dumpHistory(address, history)
+
+	// start goroutine to listen for scripthash status change notifications arriving
+	err = ec.addressStatusNotify()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

@@ -88,6 +88,9 @@ type ElectrumWallet interface {
 	// Returns a list of transactions for this wallet
 	Transactions() ([]Txn, error)
 
+	// Does the wallet have a specific transaction
+	HasTransaction(txid chainhash.Hash) bool
+
 	// Get info on a specific transaction
 	GetTransaction(txid chainhash.Hash) (Txn, error)
 
