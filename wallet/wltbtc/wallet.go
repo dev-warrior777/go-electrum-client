@@ -167,10 +167,11 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 		fmt.Println("Created: ", w.creationDate)
 		fmt.Println(hex.EncodeToString(sm.store.Seed))
 		fmt.Println("Created Addresses:")
+		fmt.Println(" --- Receiving ---")
 		for i, adr := range w.txstore.adrs {
 			fmt.Printf("%d %v\n", i, adr)
-			if i == client.LOOKAHEADWINDOW-1 {
-				fmt.Println(" ---")
+			if i == client.GAP_LIMIT-1 {
+				fmt.Println(" --- Change ---")
 			}
 		}
 	}
@@ -235,10 +236,11 @@ func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrum
 		fmt.Println("Stored Creation Date: ", w.creationDate)
 		fmt.Println(hex.EncodeToString(sm.store.Seed))
 		fmt.Println("Loaded Addresses:")
+		fmt.Println(" --- Receiving ---")
 		for i, adr := range w.txstore.adrs {
 			fmt.Printf("%d %v\n", i, adr)
-			if i == client.LOOKAHEADWINDOW-1 {
-				fmt.Println(" ---")
+			if i == client.GAP_LIMIT-1 {
+				fmt.Println(" --- Change ---")
 			}
 		}
 	}
@@ -302,19 +304,31 @@ func (w *BtcElectrumWallet) ChildKey(keyBytes []byte, chaincode []byte, isPrivat
 	return hdKey.Derive(0)
 }
 
-func (w *BtcElectrumWallet) CurrentAddress(purpose wallet.KeyPurpose) btcutil.Address {
-	key, _ := w.keyManager.GetCurrentKey(purpose)
-	addr, _ := key.Address(w.params)
-	return btcutil.Address(addr)
+func (w *BtcElectrumWallet) GetUnusedAddress(purpose wallet.KeyPurpose) (btcutil.Address, error) {
+	key, err := w.keyManager.GetUnusedKey(purpose)
+	if err != nil {
+		return nil, nil
+	}
+	addrPubKeyHash, _ := key.Address(w.params)
+	if err != nil {
+		return nil, nil
+	}
+	return btcutil.Address(addrPubKeyHash), nil
 }
 
-func (w *BtcElectrumWallet) NewAddress(purpose wallet.KeyPurpose) btcutil.Address {
-	i, _ := w.txstore.Keys().GetUnused(purpose)
-	key, _ := w.keyManager.generateChildKey(purpose, uint32(i[1]))
-	addr, _ := key.Address(w.params)
-	w.txstore.Keys().MarkKeyAsUsed(addr.ScriptAddress())
-	w.txstore.PopulateAdrs()
-	return btcutil.Address(addr)
+func (w *BtcElectrumWallet) CreateNewAddress(purpose wallet.KeyPurpose) btcutil.Address {
+	panic("deprecated method")
+	// i, _ := w.txstore.Keys().GetUnused(purpose)
+	// key, _ := w.keyManager.generateChildKey(purpose, uint32(i[1]))
+	// addr, _ := key.Address(w.params)
+	// w.txstore.Keys().MarkKeyAsUsed(addr.ScriptAddress())
+	// w.txstore.PopulateAdrs()
+	// return btcutil.Address(addr)
+}
+
+// Marks the address as used (involved in at least one transaction)
+func (w *BtcElectrumWallet) MarkAddressUsed(address btcutil.Address) error {
+	return w.txstore.Keys().MarkKeyAsUsed(address.ScriptAddress())
 }
 
 func (w *BtcElectrumWallet) DecodeAddress(addr string) (btcutil.Address, error) {
@@ -572,10 +586,7 @@ func (w *BtcElectrumWallet) AddWatchedScript(script []byte) error {
 	if err != nil {
 		return err
 	}
-	err = w.txstore.PopulateAdrs()
-	if err != nil {
-		return err
-	}
+	w.txstore.PopulateAdrs()
 	return nil
 }
 
@@ -606,6 +617,8 @@ func (w *BtcElectrumWallet) AddWatchedAddresses(addrs ...btcutil.Address) error 
 	}
 
 	err = w.txstore.WatchedScripts().PutAll(watchedScripts)
+
+	// Update txstore object
 	w.txstore.PopulateAdrs()
 
 	// w.wireService.MsgChan() <- updateFiltersMsg{} // not SPV

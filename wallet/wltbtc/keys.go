@@ -10,7 +10,7 @@ import (
 )
 
 // Lookahead window size from client constants
-const LOOKAHEADWINDOW = client.LOOKAHEADWINDOW
+const GAP_LIMIT = client.GAP_LIMIT
 
 type KeyManager struct {
 	datastore wallet.Keys
@@ -67,7 +67,11 @@ func Bip44Derivation(masterPrivKey *hd.ExtendedKey) (internal, external *hd.Exte
 	return internal, external, nil
 }
 
-func (km *KeyManager) GetCurrentKey(purpose wallet.KeyPurpose) (*hd.ExtendedKey, error) {
+// GetUnusedKey gets the first unused key for 'purpose'. CAUTION: There may not
+// be any keys within the gap limit. In this a used key can be used until the
+// gap is updated with new key(s). This happens when a transaction newly gets
+// client.AGEDTX confirmations.
+func (km *KeyManager) GetUnusedKey(purpose wallet.KeyPurpose) (*hd.ExtendedKey, error) {
 	i, err := km.datastore.GetUnused(purpose)
 	if err != nil {
 		return nil, err
@@ -169,8 +173,8 @@ func (km *KeyManager) generateChildKey(purpose wallet.KeyPurpose, index uint32) 
 func (km *KeyManager) lookahead() error {
 	lookaheadWindows := km.datastore.GetLookaheadWindows()
 	for purpose, size := range lookaheadWindows {
-		if size < LOOKAHEADWINDOW {
-			for i := 0; i < (LOOKAHEADWINDOW - size); i++ {
+		if size < GAP_LIMIT {
+			for i := 0; i < (GAP_LIMIT - size); i++ {
 				_, err := km.GetFreshKey(purpose)
 				if err != nil {
 					return err

@@ -32,7 +32,8 @@ const (
 
 const (
 	// Electrum Wallet
-	LOOKAHEADWINDOW = 10
+	GAP_LIMIT = 10
+	AGEDTX    = 3
 )
 
 type ElectrumClient interface {

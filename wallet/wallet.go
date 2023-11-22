@@ -53,16 +53,16 @@ type ElectrumWallet interface {
 	// Check if this amount is considered dust < 1000 sats/equivalent for now
 	IsDust(amount int64) bool
 
-	// CurrentAddress returns an address suitable for receiving payments. `purpose` specifies
-	// whether the address should be internal or external. External addresses are typically
-	// requested when receiving funds from outside the wallet .Internal addresses are typically
-	// change addresses. For utxo based coins we expect this function will return the same
-	// address so long as that address is unused. Whenever the address receives a payment,
-	// CurrentAddress should start returning a new, unused address.
-	CurrentAddress(purpose KeyPurpose) btcutil.Address
+	// GetUnusedAddress returns an address suitable for receiving payments.
+	// `purpose` specifies whether the address should be internal or external.
+	// This function will return the same address so long as that address is
+	// not invloved in a transaction. Whenever the address has it's first
+	// payment tx GetUnusedAddress should start returning a new, unused address.
+	GetUnusedAddress(purpose KeyPurpose) (btcutil.Address, error)
 
-	// NewAddress returns a new, never-before-returned address.
-	NewAddress(purpose KeyPurpose) btcutil.Address
+	// CreateNewAddress returns a new, never-before-returned address.
+	// CAUTION: This will be outside the gap limit.  [deprecated]
+	CreateNewAddress(purpose KeyPurpose) btcutil.Address
 
 	// DecodeAddress parses the address string and return an address interface.
 	DecodeAddress(addr string) (btcutil.Address, error)
@@ -72,10 +72,13 @@ type ElectrumWallet interface {
 	ScriptToAddress(script []byte) (btcutil.Address, error)
 
 	// Turn the given address into an output script
-	AddressToScript(addr btcutil.Address) ([]byte, error)
+	AddressToScript(address btcutil.Address) ([]byte, error)
 
 	// Returns if the wallet has the key for the given address
-	HasKey(addr btcutil.Address) bool
+	HasKey(address btcutil.Address) bool
+
+	// Marks the address as used (involved in at least one transaction)
+	MarkAddressUsed(address btcutil.Address) error
 
 	// Balance returns the confirmed and unconfirmed aggregate balance for the wallet.
 	// For utxo based wallets, if a spend of confirmed coins is made, the resulting "change"

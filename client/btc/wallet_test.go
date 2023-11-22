@@ -45,9 +45,15 @@ func TestWalletCreation(t *testing.T) {
 	}
 	fmt.Println("made a btcWallet", ec.GetWallet())
 
-	adr := ec.GetWallet().CurrentAddress(wallet.EXTERNAL)
+	adr, err := ec.GetWallet().GetUnusedAddress(wallet.EXTERNAL)
+	if err != nil {
+		t.Fatal(err)
+	}
 	fmt.Println("Current External address", adr)
-	adrI := ec.GetWallet().CurrentAddress(wallet.INTERNAL)
+	adrI, err := ec.GetWallet().GetUnusedAddress(wallet.INTERNAL)
+	if err != nil {
+		t.Fatal(err)
+	}
 	fmt.Println("Current Internal address", adrI)
 }
 

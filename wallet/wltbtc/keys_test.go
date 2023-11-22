@@ -10,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -30,7 +31,7 @@ func TestNewKeyManager(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(keys) != LOOKAHEADWINDOW*2 {
+	if len(keys) != client.GAP_LIMIT*2 {
 		t.Error("Failed to generate lookahead windows when creating a new KeyManager")
 	}
 }
@@ -116,7 +117,7 @@ func TestKeyManager_lookahead(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(mock.keys) != n+(LOOKAHEADWINDOW*2) {
+	if len(mock.keys) != n+(client.GAP_LIMIT*2) {
 		t.Error("Failed to generated a correct lookahead window")
 	}
 	unused := 0
@@ -125,7 +126,7 @@ func TestKeyManager_lookahead(t *testing.T) {
 			unused++
 		}
 	}
-	if unused != LOOKAHEADWINDOW*2 {
+	if unused != client.GAP_LIMIT*2 {
 		t.Error("Failed to generated unused keys in lookahead window")
 	}
 }
@@ -154,7 +155,7 @@ func TestKeyManager_MarkKeyAsUsed(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(km.GetKeys()) != (LOOKAHEADWINDOW*2)+1 {
+	if len(km.GetKeys()) != (client.GAP_LIMIT*2)+1 {
 		t.Error("Failed to extend lookahead window when marking as read")
 	}
 	unused, err := km.datastore.GetUnused(wallet.EXTERNAL)
@@ -168,7 +169,7 @@ func TestKeyManager_MarkKeyAsUsed(t *testing.T) {
 	}
 }
 
-func TestKeyManager_GetCurrentKey(t *testing.T) {
+func TestKeyManager_GetUnusedKey(t *testing.T) {
 	masterPrivKey, err := hdkeychain.NewKeyFromString("xprv9s21ZrQH143K25QhxbucbDDuQ4naNntJRi4KUfWT7xo4EKsHt2QJDu7KXp1A3u7Bi1j8ph3EGsZ9Xvz9dGuVrtHHs7pXeTzjuxBrCmmhgC6")
 	if err != nil {
 		t.Error(err)
@@ -185,7 +186,7 @@ func TestKeyManager_GetCurrentKey(t *testing.T) {
 			break
 		}
 	}
-	key, err := km.GetCurrentKey(wallet.EXTERNAL)
+	key, err := km.GetUnusedKey(wallet.EXTERNAL)
 	if err != nil {
 		t.Error(err)
 	}
@@ -207,10 +208,10 @@ func TestKeyManager_GetFreshKey(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(km.GetKeys()) != LOOKAHEADWINDOW*2+1 {
+	if len(km.GetKeys()) != client.GAP_LIMIT*2+1 {
 		t.Error("Failed to create additional key")
 	}
-	edgeCaseKeyNumber := uint32(LOOKAHEADWINDOW)
+	edgeCaseKeyNumber := uint32(client.GAP_LIMIT)
 	key2, err := km.generateChildKey(wallet.EXTERNAL, edgeCaseKeyNumber)
 	if err != nil {
 		t.Error(err)
@@ -226,7 +227,7 @@ func TestKeyManager_GetKeys(t *testing.T) {
 		t.Error(err)
 	}
 	keys := km.GetKeys()
-	if len(keys) != LOOKAHEADWINDOW*2 {
+	if len(keys) != client.GAP_LIMIT*2 {
 		t.Error("Returned incorrect number of keys")
 	}
 	for _, key := range keys {

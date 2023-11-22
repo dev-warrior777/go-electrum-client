@@ -58,6 +58,14 @@ func (h *Headers) ClearMap() {
 	h.hdrs = make(map[int32]wire.BlockHeader)
 }
 
+func (h *Headers) Tip() int32 {
+	return h.hdrsTip
+}
+
+func (h *Headers) Synced() bool {
+	return h.synced
+}
+
 // Get the 'blockchin_headers' file size. Error is returned unexamined as
 // we assume the file exists and ENOENT will not be valid.
 func (h *Headers) StatFileSize() (int64, error) {

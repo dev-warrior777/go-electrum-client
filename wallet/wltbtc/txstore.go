@@ -42,15 +42,12 @@ func NewTxStore(p *chaincfg.Params, db wallet.Datastore, keyManager *KeyManager)
 		txids:      make(map[string]int64),
 		Datastore:  db,
 	}
-	err := txs.PopulateAdrs()
-	if err != nil {
-		return nil, err
-	}
+	txs.PopulateAdrs()
 	return txs, nil
 }
 
 // PopulateAdrs just puts a bunch of adrs in ram; it doesn't touch the DB
-func (ts *TxStore) PopulateAdrs() error {
+func (ts *TxStore) PopulateAdrs() {
 	keys := ts.keyManager.GetKeys()
 	ts.addrMutex.Lock()
 	ts.adrs = []btcutil.Address{}
@@ -60,6 +57,7 @@ func (ts *TxStore) PopulateAdrs() error {
 			continue
 		}
 		ts.adrs = append(ts.adrs, addr)
+		k.Zero()
 	}
 	ts.addrMutex.Unlock()
 
@@ -70,8 +68,6 @@ func (ts *TxStore) PopulateAdrs() error {
 		ts.txids[t.Txid] = t.Height
 	}
 	ts.txidsMutex.Unlock()
-
-	return nil
 }
 
 // Ingest puts a tx into the DB atomically.  This can result in a

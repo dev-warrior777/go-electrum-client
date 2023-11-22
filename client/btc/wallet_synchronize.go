@@ -102,7 +102,7 @@ func (as *AddressSynchronizer) getSubscriptionForScripthash(scripthash string) *
 
 func NewWalletSychronizer(cfg *client.ClientConfig) *AddressSynchronizer {
 	as := AddressSynchronizer{
-		subscriptions: make(map[btcutil.Address]*subscription, client.LOOKAHEADWINDOW*2),
+		subscriptions: make(map[btcutil.Address]*subscription, client.GAP_LIMIT*2),
 		network:       cfg.Params,
 	}
 	return &as
@@ -273,6 +273,11 @@ func (ec *BtcElectrumClient) GetAddressHistory(address btcutil.Address) (electru
 
 func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResult) {
 	for _, h := range history {
+		//	ec.GetWallet().
+		if h.Height <= 0 {
+			// still in mempool
+			continue
+		}
 		txid, err := hex.DecodeString(h.TxHash)
 		if err != nil {
 			continue
