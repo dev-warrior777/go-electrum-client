@@ -30,9 +30,9 @@ type TxStore struct {
 	wallet.Datastore
 }
 
-func NewTxStore(p *chaincfg.Params, db wallet.Datastore, keyManager *KeyManager) (*TxStore, error) {
+func NewTxStore(params *chaincfg.Params, db wallet.Datastore, keyManager *KeyManager) (*TxStore, error) {
 	txs := &TxStore{
-		params:     p,
+		params:     params,
 		keyManager: keyManager,
 		addrMutex:  new(sync.Mutex),
 		cbMutex:    new(sync.Mutex),

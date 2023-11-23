@@ -678,15 +678,15 @@ func (sc *ServerConn) BlockHeader(ctx context.Context, height uint32) (string, e
 // headers via the BlockHeaders method. The serialized block headers are
 // concatenated in the HexConcat field, which contains Count headers.
 type GetBlockHeadersResult struct {
-	Count     uint32 `json:"count"`
+	Count     int    `json:"count"`
 	HexConcat string `json:"hex"`
-	Max       uint32 `json:"max"`
+	Max       int64  `json:"max"`
 }
 
 // BlockHeaders requests a batch of block headers beginning at the given height.
 // The sever may respond with a different number of headers, so the caller
 // should check the Count field of the result.
-func (sc *ServerConn) BlockHeaders(ctx context.Context, startHeight, count uint32) (*GetBlockHeadersResult, error) {
+func (sc *ServerConn) BlockHeaders(ctx context.Context, startHeight int64, count int) (*GetBlockHeadersResult, error) {
 	var resp GetBlockHeadersResult
 	err := sc.Request(ctx, "blockchain.block.headers", positional{startHeight, count}, &resp)
 	if err != nil {
@@ -697,7 +697,7 @@ func (sc *ServerConn) BlockHeaders(ctx context.Context, startHeight, count uint3
 
 // HeadersNotifyResult is the contents of a block header notification.
 type HeadersNotifyResult struct {
-	Height int32  `json:"height"`
+	Height int64  `json:"height"`
 	Hex    string `json:"hex"`
 }
 
@@ -773,9 +773,9 @@ func (sc *ServerConn) UnsubscribeScripthash(ctx context.Context, scripthash stri
 }
 
 type History struct {
-	Height int32  `json:"height"`
+	Height int64  `json:"height"`
 	TxHash string `json:"tx_hash"`
-	Fee    int64  `json:"fee,omitempty"` // satoshis; iff in mempool
+	Fee    int    `json:"fee,omitempty"` // satoshis; iff in mempool
 }
 
 type HistoryResult []History

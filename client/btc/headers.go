@@ -34,15 +34,15 @@ type Headers struct {
 	net *chaincfg.Params
 	// decoded headers stored by height
 	hdrsMtx sync.RWMutex
-	hdrs    map[int32]wire.BlockHeader
-	hdrsTip int32
+	hdrs    map[int64]wire.BlockHeader
+	hdrsTip int64
 	synced  bool
 }
 
 func NewHeaders(cfg *client.ClientConfig) *Headers {
 	filePath := filepath.Join(cfg.DataDir, HEADER_FILE_NAME)
 	hdrsMapInitSize := 2 * ELECTRUM_MAGIC_NUMHDR //4032
-	hdrsMap := make(map[int32]wire.BlockHeader, hdrsMapInitSize)
+	hdrsMap := make(map[int64]wire.BlockHeader, hdrsMapInitSize)
 	hdrs := Headers{
 		hdrFilePath: filePath,
 		net:         cfg.Params,
@@ -55,10 +55,10 @@ func NewHeaders(cfg *client.ClientConfig) *Headers {
 
 func (h *Headers) ClearMap() {
 	h.hdrs = nil // gc
-	h.hdrs = make(map[int32]wire.BlockHeader)
+	h.hdrs = make(map[int64]wire.BlockHeader)
 }
 
-func (h *Headers) Tip() int32 {
+func (h *Headers) Tip() int64 {
 	return h.hdrsTip
 }
 
@@ -78,7 +78,7 @@ func (h *Headers) StatFileSize() (int64, error) {
 }
 
 // Read num headers from offset in 'blockchain_headers' file
-func (h *Headers) ReadHeaders(num, height int32) (int32, error) {
+func (h *Headers) ReadHeaders(num, height int64) (int32, error) {
 	begin := int64(height * HEADER_SIZE)
 	f, err := os.OpenFile(h.hdrFilePath, os.O_CREATE|os.O_RDWR, 0664)
 	if err != nil {
@@ -108,9 +108,9 @@ func (h *Headers) ReadHeaders(num, height int32) (int32, error) {
 // AppendHeaders appends headers from server 'blockchain.block.header(s)' calls
 // to 'blockchain_headers' file. Also appends headers received from the
 // 'blockchain.headers.subscribe' events. Returns the number of headers written.
-func (h *Headers) AppendHeaders(rawHdrs []byte) (int32, error) {
+func (h *Headers) AppendHeaders(rawHdrs []byte) (int64, error) {
 	numBytes := len(rawHdrs)
-	numHdrs, err := h.BytesToNumHdrs(numBytes)
+	numHdrs, err := h.BytesToNumHdrs(int64(numBytes))
 	if err != nil {
 		return 0, err
 	}
@@ -125,7 +125,7 @@ func (h *Headers) AppendHeaders(rawHdrs []byte) (int32, error) {
 		return 0, err
 	}
 
-	return int32(numHdrs), nil
+	return numHdrs, nil
 }
 
 func (h *Headers) ReadAllBytesFromFile() ([]byte, error) {
@@ -152,15 +152,15 @@ func (h *Headers) ReadAllBytesFromFile() ([]byte, error) {
 
 // store 'numHdrs' headers starting at height 'height' in 'hdrs' map
 // 'b' should have exactly 'numHdrs' x 'HEADER_SIZE' bytes.
-func (h *Headers) Store(b []byte, startHeight int32) error {
-	numHdrs, err := h.BytesToNumHdrs(len(b))
+func (h *Headers) Store(b []byte, startHeight int64) error {
+	numHdrs, err := h.BytesToNumHdrs(int64(len(b)))
 	if err != nil {
 		return err
 	}
 	rdr := bytes.NewBuffer(b)
 	h.hdrsMtx.Lock()
 	defer h.hdrsMtx.Unlock()
-	var i int32
+	var i int64
 	for i = 0; i < numHdrs; i++ {
 		blkHdr := wire.BlockHeader{}
 		err := blkHdr.Deserialize(rdr)
@@ -175,12 +175,12 @@ func (h *Headers) Store(b []byte, startHeight int32) error {
 
 // Verify headers prev hash back from tip. If all is true depth is ignored
 // and the whole chain is verified
-func (h *Headers) VerifyFromTip(depth int32, all bool) error {
+func (h *Headers) VerifyFromTip(depth int64, all bool) error {
 	downTo := h.hdrsTip - depth
 	if downTo < 0 || all {
 		downTo = 0
 	}
-	var height int32
+	var height int64
 	for height = h.hdrsTip; height > downTo; height-- {
 		thisHdr := h.hdrs[height]
 		prevHdr := h.hdrs[height-1]
@@ -198,7 +198,7 @@ func (h *Headers) VerifyAll() error {
 	return h.VerifyFromTip(0, true)
 }
 
-func (h *Headers) DumpAt(height int32) {
+func (h *Headers) DumpAt(height int64) {
 	h.hdrsMtx.Lock()
 	defer h.hdrsMtx.Unlock()
 	hdr := h.hdrs[height]
@@ -215,16 +215,16 @@ func (h *Headers) DumpAt(height int32) {
 }
 
 func (h *Headers) DumpAll() {
-	var k int32
+	var k int64
 	for k = 0; k <= h.hdrsTip; k++ {
 		h.DumpAt(k)
 	}
 }
 
-func (h *Headers) BytesToNumHdrs(numBytes int) (int32, error) {
+func (h *Headers) BytesToNumHdrs(numBytes int64) (int64, error) {
 	if numBytes%HEADER_SIZE != 0 {
 		return 0, errors.New(
 			"invalid bytes length - not a multiple of header size")
 	}
-	return int32(numBytes / HEADER_SIZE), nil
+	return numBytes / HEADER_SIZE, nil
 }

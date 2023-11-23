@@ -60,7 +60,7 @@ type ElectrumXNode interface {
 	GetServerConn() *ElectrumXSvrConn
 	GetHeadersNotify() (<-chan *HeadersNotifyResult, error)
 	SubscribeHeaders() (*HeadersNotifyResult, error)
-	BlockHeaders(startHeight, blockCount uint32) (*GetBlockHeadersResult, error)
+	BlockHeaders(startHeight int64, blockCount int) (*GetBlockHeadersResult, error)
 	GetScripthashNotify() (<-chan *ScripthashStatusResult, error)
 	SubscribeScripthashNotify(scripthash string) (*ScripthashStatusResult, error)
 	UnsubscribeScripthashNotify(scripthash string)

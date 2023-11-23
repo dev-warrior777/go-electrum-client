@@ -103,12 +103,12 @@ func TestAppendHeaders(t *testing.T) {
 	h := Headers{
 		hdrFilePath: path.Join("/tmp", fname),
 		net:         &chaincfg.RegressionNetParams,
-		hdrs:        make(map[int32]wire.BlockHeader),
+		hdrs:        make(map[int64]wire.BlockHeader),
 		hdrsTip:     0,
 		synced:      false,
 	}
 
-	var totalHdrs int32 = 0
+	var totalHdrs int64 = 0
 	numHdrs, err := h.AppendHeaders(hdrFileReg[:160])
 	if err != nil {
 		log.Fatal(err)
@@ -135,7 +135,7 @@ func TestAppendHeaders(t *testing.T) {
 	}
 	fmt.Println(fsize, " total bytes stored ", totalHdrs, ", total headers stored")
 
-	if totalHdrs != int32(fsize/HEADER_SIZE) {
+	if totalHdrs != fsize/HEADER_SIZE {
 		log.Fatal("total headers wrong")
 	}
 
@@ -184,7 +184,7 @@ func TestReadStoreHeaderFile(t *testing.T) {
 	if read%HEADER_SIZE != 0 {
 		log.Fatal("invalid file size")
 	}
-	numHdrs := int32(read / HEADER_SIZE)
+	numHdrs := int64(read / HEADER_SIZE)
 	fmt.Printf("read %d bytes %d headers from headerfile\n", read, numHdrs)
 
 	// store headers
@@ -198,7 +198,7 @@ func TestReadStoreHeaderFile(t *testing.T) {
 	fmt.Printf("stored %d headers into hdrs map at height %d\n", numHdrs, 0)
 
 	// verify chain
-	var height int32
+	var height int64
 	for height = h.hdrsTip; height > 0; height-- {
 		thisHdr := h.hdrs[height]
 		prevHdr := h.hdrs[height-1]
@@ -301,7 +301,8 @@ func TestMapIter(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	numHeaders, err := h.BytesToNumHdrs(len(hdrFileReg))
+	numBytes := int64(len(hdrFileReg))
+	numHeaders, err := h.BytesToNumHdrs(numBytes)
 	if err != nil {
 		log.Fatal(err)
 	}

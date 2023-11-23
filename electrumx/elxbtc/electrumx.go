@@ -128,7 +128,7 @@ func (s *SingleNode) SubscribeHeaders() (*electrumx.HeadersNotifyResult, error) 
 	return server.SvrConn.SubscribeHeaders(server.SvrCtx)
 }
 
-func (s *SingleNode) BlockHeaders(startHeight, blockCount uint32) (*electrumx.GetBlockHeadersResult, error) {
+func (s *SingleNode) BlockHeaders(startHeight int64, blockCount int) (*electrumx.GetBlockHeadersResult, error) {
 	server := s.Server
 	if !server.Running {
 		return nil, ErrServerNotRunning

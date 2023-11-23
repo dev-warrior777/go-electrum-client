@@ -176,7 +176,7 @@ const (
 )
 
 type AddressHistory struct {
-	Height int32
+	Height int64
 	TxHash chainhash.Hash
 }
 

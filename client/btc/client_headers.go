@@ -31,7 +31,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	if err != nil {
 		return err
 	}
-	lb := len(b)
+	lb := int64(len(b))
 	fmt.Println("read header bytes", lb)
 	numHeaders, err := h.BytesToNumHdrs(lb)
 	if err != nil {
@@ -39,7 +39,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	}
 	b = nil // gc
 
-	maybeTip := numHeaders - 1
+	var maybeTip int64 = numHeaders - 1
 
 	// 2. Gather new block headers we did not have in file up to current tip
 
@@ -47,8 +47,8 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	// as an anti ddos measure. Magic number 2016 from electrum code
 	const blockDelta = 20 // 20 dev 2016 pro
 	var doneGathering = false
-	var startHeight = uint32(numHeaders)
-	var blockCount = uint32(20)
+	var startHeight = numHeaders
+	var blockCount = 20
 
 	node := ec.GetNode()
 
@@ -69,7 +69,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		maybeTip += int32(count)
+		maybeTip += int64(count)
 
 		fmt.Println(" Appended: ", nh, " headers at ", startHeight, " maybeTip ", maybeTip)
 	}
@@ -110,7 +110,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 				if err != nil {
 					return err
 				}
-				maybeTip += int32(count)
+				maybeTip += int64(count)
 
 				fmt.Println(" Appended: ", nh, " headers at ", startHeight, " maybeTip ", maybeTip)
 			}
@@ -229,9 +229,9 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 							// Server can skip any amount of headers but we should
 							// trust that this SingleNode's tip is the tip.
 							fmt.Println("More than one header..")
-							numMissing := uint32(x.Height - maybeTip)
-							from := uint32(maybeTip + 1)
-							numToGet := numMissing
+							numMissing := x.Height - maybeTip
+							from := maybeTip + 1
+							numToGet := int(numMissing)
 							fmt.Printf("Filling from height %d to height %d inclusive\n", from, x.Height)
 							// go get them with 'block.headers'
 							hdrsRes, err := node.BlockHeaders(from, numToGet)
@@ -240,7 +240,7 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 							}
 							count := hdrsRes.Count
 
-							fmt.Println("Storing: ", count, " headers ", from, "..", from+count-1)
+							fmt.Println("Storing: ", count, " headers ", from, "..", from+int64(count)-1)
 
 							if count > 0 {
 								b, err := hex.DecodeString(hdrsRes.HexConcat)
@@ -251,10 +251,10 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 								if err != nil {
 									panic(err)
 								}
-								if hdrsAppended != int32(count) {
+								if hdrsAppended != int64(count) {
 									panic("only appended less headers than read")
 								}
-								err = h.Store(b, int32(from))
+								err = h.Store(b, from)
 								if err != nil {
 									panic("could not store headers in map")
 								}
@@ -264,7 +264,7 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 								maybeTip = x.Height
 
 								// verify added headers back from new tip
-								h.VerifyFromTip(int32(count+1), false)
+								h.VerifyFromTip(int64(count+1), false)
 							}
 						}
 					} else {
