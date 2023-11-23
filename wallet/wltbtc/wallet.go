@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -78,7 +77,7 @@ func NewBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrumW
 	return makeBtcElectrumWallet(config, pw, seed)
 }
 
-// RecreateElectrumWallet mskes new wallet with a mnenomic seed from an existing wallet.
+// RecreateElectrumWallet makes new wallet with a mnenomic seed from an existing wallet.
 // pw does not need to be the same as the old wallet
 func RecreateElectrumWallet(config *wallet.WalletConfig, pw, mnemonic string) (*BtcElectrumWallet, error) {
 	if pw == "" {
@@ -248,20 +247,25 @@ func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrum
 	return w, nil
 }
 
-func (w *BtcElectrumWallet) Start() {
-	w.running = true
-
-	/* start the Chain Manager here maybe */
-}
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // API
 //
 //////////////
 
+// /////////////////////
+// start interface impl.
+
+func (w *BtcElectrumWallet) Start() {
+	w.running = true
+}
+
 func (w *BtcElectrumWallet) CreationDate() time.Time {
 	return w.creationDate
+}
+
+func (w *BtcElectrumWallet) Params() *chaincfg.Params {
+	return w.params
 }
 
 func (w *BtcElectrumWallet) CurrencyCode() string {
@@ -277,33 +281,6 @@ func (w *BtcElectrumWallet) IsDust(amount int64) bool {
 	return btcutil.Amount(amount) < txrules.DefaultRelayFeePerKb
 }
 
-func (w *BtcElectrumWallet) MasterPrivateKey() *hdkeychain.ExtendedKey {
-	return w.masterPrivateKey
-}
-
-func (w *BtcElectrumWallet) MasterPublicKey() *hdkeychain.ExtendedKey {
-	return w.masterPublicKey
-}
-
-func (w *BtcElectrumWallet) ChildKey(keyBytes []byte, chaincode []byte, isPrivateKey bool) (*hdkeychain.ExtendedKey, error) {
-	parentFP := []byte{0x00, 0x00, 0x00, 0x00}
-	var id []byte
-	if isPrivateKey {
-		id = w.params.HDPrivateKeyID[:]
-	} else {
-		id = w.params.HDPublicKeyID[:]
-	}
-	hdKey := hdkeychain.NewExtendedKey(
-		id,
-		keyBytes,
-		chaincode,
-		parentFP,
-		0,
-		0,
-		isPrivateKey)
-	return hdKey.Derive(0)
-}
-
 func (w *BtcElectrumWallet) GetUnusedAddress(purpose wallet.KeyPurpose) (btcutil.Address, error) {
 	key, err := w.keyManager.GetUnusedKey(purpose)
 	if err != nil {
@@ -316,19 +293,13 @@ func (w *BtcElectrumWallet) GetUnusedAddress(purpose wallet.KeyPurpose) (btcutil
 	return btcutil.Address(addrPubKeyHash), nil
 }
 
-func (w *BtcElectrumWallet) CreateNewAddress(purpose wallet.KeyPurpose) btcutil.Address {
-	panic("deprecated method")
-	// i, _ := w.txstore.Keys().GetUnused(purpose)
-	// key, _ := w.keyManager.generateChildKey(purpose, uint32(i[1]))
-	// addr, _ := key.Address(w.params)
-	// w.txstore.Keys().MarkKeyAsUsed(addr.ScriptAddress())
-	// w.txstore.PopulateAdrs()
-	// return btcutil.Address(addr)
-}
-
 // Marks the address as used (involved in at least one transaction)
 func (w *BtcElectrumWallet) MarkAddressUsed(address btcutil.Address) error {
 	return w.txstore.Keys().MarkKeyAsUsed(address.ScriptAddress())
+}
+
+func (w *BtcElectrumWallet) CreateNewAddress(purpose wallet.KeyPurpose) btcutil.Address {
+	panic("deprecated method")
 }
 
 func (w *BtcElectrumWallet) DecodeAddress(addr string) (btcutil.Address, error) {
@@ -336,76 +307,79 @@ func (w *BtcElectrumWallet) DecodeAddress(addr string) (btcutil.Address, error) 
 }
 
 func (w *BtcElectrumWallet) ScriptToAddress(script []byte) (btcutil.Address, error) {
-	return scriptToAddress(script, w.params)
-}
-
-func scriptToAddress(script []byte, params *chaincfg.Params) (btcutil.Address, error) {
-	_, addrs, _, err := txscript.ExtractPkScriptAddrs(script, params)
+	_, addresses, _, err := txscript.ExtractPkScriptAddrs(script, w.params)
 	if err != nil {
 		return &btcutil.AddressPubKeyHash{}, err
 	}
-	if len(addrs) == 0 {
+	if len(addresses) == 0 {
 		return &btcutil.AddressPubKeyHash{}, errors.New("unknown script")
 	}
-	return addrs[0], nil
+	return addresses[0], nil
 }
 
-func (w *BtcElectrumWallet) AddressToScript(addr btcutil.Address) ([]byte, error) {
-	return txscript.PayToAddrScript(addr)
+func (w *BtcElectrumWallet) AddressToScript(address btcutil.Address) ([]byte, error) {
+	return txscript.PayToAddrScript(address)
 }
 
-func (w *BtcElectrumWallet) HasKey(addr btcutil.Address) bool {
-	_, err := w.keyManager.GetKeyForScript(addr.ScriptAddress())
-	return err == nil
-}
-
-func (w *BtcElectrumWallet) GetKey(addr btcutil.Address) (*btcec.PrivateKey, error) {
-	key, err := w.keyManager.GetKeyForScript(addr.ScriptAddress())
+func (w *BtcElectrumWallet) AddWatchedScript(script []byte) error {
+	err := w.txstore.WatchedScripts().Put(script)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return key.ECPrivKey()
+	return nil
+}
+
+func (w *BtcElectrumWallet) HasAddress(address btcutil.Address) bool {
+	_, err := w.keyManager.GetKeyForScript(address.ScriptAddress())
+	return err == nil
 }
 
 func (w *BtcElectrumWallet) ListAddresses() []btcutil.Address {
 	keys := w.keyManager.GetKeys()
-	addrs := []btcutil.Address{}
+	addresses := []btcutil.Address{}
 	for _, k := range keys {
-		addr, err := k.Address(w.params)
+		address, err := k.Address(w.params)
 		if err != nil {
 			continue
 		}
-		addrs = append(addrs, addr)
+		addresses = append(addresses, address)
 	}
-	return addrs
+	return addresses
 }
 
-func (w *BtcElectrumWallet) ListKeys() []btcec.PrivateKey {
-	keys := w.keyManager.GetKeys()
-	list := []btcec.PrivateKey{}
-	for _, k := range keys {
-		priv, err := k.ECPrivKey()
-		if err != nil {
-			continue
+func (w *BtcElectrumWallet) Balance() (int64, int64) {
+
+	//TODO: check if this works with the new logic
+
+	checkIfStxoIsConfirmed := func(utxo wallet.Utxo, stxos []wallet.Stxo) bool {
+		for _, stxo := range stxos {
+			if stxo.Utxo.WatchOnly {
+				continue
+			}
+			if stxo.SpendTxid.IsEqual(&utxo.Op.Hash) {
+				return stxo.SpendHeight > 0
+			} else if stxo.Utxo.IsEqual(&utxo) {
+				return stxo.Utxo.AtHeight > 0
+			}
 		}
-		list = append(list, *priv)
+		return false
 	}
-	return list
-}
 
-func (w *BtcElectrumWallet) Balance() (confirmed, unconfirmed int64) {
+	confirmed := int64(0)
+	unconfirmed := int64(0)
 	utxos, _ := w.txstore.Utxos().GetAll()
 	stxos, _ := w.txstore.Stxos().GetAll()
 	for _, utxo := range utxos {
-		if !utxo.WatchOnly {
-			if utxo.AtHeight > 0 {
+		if utxo.WatchOnly {
+			continue
+		}
+		if utxo.AtHeight > 0 {
+			confirmed += utxo.Value
+		} else {
+			if checkIfStxoIsConfirmed(utxo, stxos) {
 				confirmed += utxo.Value
 			} else {
-				if w.checkIfStxoIsConfirmed(utxo, stxos) {
-					confirmed += utxo.Value
-				} else {
-					unconfirmed += utxo.Value
-				}
+				unconfirmed += utxo.Value
 			}
 		}
 	}
@@ -413,38 +387,9 @@ func (w *BtcElectrumWallet) Balance() (confirmed, unconfirmed int64) {
 }
 
 func (w *BtcElectrumWallet) Transactions() ([]wallet.Txn, error) {
-	height := w.ChainTip()
-	txns, err := w.txstore.Txns().GetAll(false)
-	if err != nil {
-		return txns, err
-	}
-	for i, tx := range txns {
-		var confirmations int64
-		var status wallet.StatusCode
-		confs := height - tx.Height + 1
-		if tx.Height <= 0 {
-			confs = tx.Height
-		}
-		switch {
-		case confs < 0:
-			status = wallet.StatusDead
-		case confs == 0 && time.Since(tx.Timestamp) <= time.Hour*6:
-			status = wallet.StatusUnconfirmed
-		case confs == 0 && time.Since(tx.Timestamp) > time.Hour*6:
-			status = wallet.StatusDead
-		case confs > 0 && confs < 6:
-			status = wallet.StatusPending
-			confirmations = confs
-		case confs > 5:
-			status = wallet.StatusConfirmed
-			confirmations = confs
-		}
-		tx.Confirmations = confirmations
-		tx.Status = status
-		txns[i] = tx
-	}
-	return txns, nil
+	return w.txstore.Txns().GetAll(false)
 }
+
 func (w *BtcElectrumWallet) HasTransaction(txid chainhash.Hash) bool {
 	_, err := w.txstore.Txns().Get(txid)
 	// error only for 'no rows in rowset'
@@ -462,19 +407,19 @@ func (w *BtcElectrumWallet) GetTransaction(txid chainhash.Hash) (wallet.Txn, err
 		}
 		outs := []wallet.TransactionOutput{}
 		for i, out := range tx.TxOut {
-			var addr btcutil.Address
+			var address btcutil.Address
 			_, addrs, _, err := txscript.ExtractPkScriptAddrs(out.PkScript, w.params)
 			if err != nil {
 				fmt.Printf("error extracting address from txn pkscript: %v\n", err)
 				return txn, err
 			}
 			if len(addrs) == 0 {
-				addr = nil
+				address = nil
 			} else {
-				addr = addrs[0]
+				address = addrs[0]
 			}
 			tout := wallet.TransactionOutput{
-				Address: addr,
+				Address: address,
 				Value:   out.Value,
 				Index:   uint32(i),
 			}
@@ -485,78 +430,29 @@ func (w *BtcElectrumWallet) GetTransaction(txid chainhash.Hash) (wallet.Txn, err
 	return txn, err
 }
 
-func (w *BtcElectrumWallet) GetConfirmations(txid chainhash.Hash) (int64, int64, error) {
-	txn, err := w.txstore.Txns().Get(txid)
-	if err != nil {
-		return 0, 0, err
-	}
-	if txn.Height == 0 {
-		return 0, 0, nil
-	}
-	chainTip := w.ChainTip()
-	return chainTip - txn.Height + 1, txn.Height, nil
-}
+// Return the confirmed txids and heights for an address
+func (w *BtcElectrumWallet) GetAddressHistory(address btcutil.Address) ([]wallet.AddressHistory, error) {
+	var history []wallet.AddressHistory
 
-func (w *BtcElectrumWallet) checkIfStxoIsConfirmed(utxo wallet.Utxo, stxos []wallet.Stxo) bool {
-	for _, stxo := range stxos {
-		if !stxo.Utxo.WatchOnly {
-			if stxo.SpendTxid.IsEqual(&utxo.Op.Hash) {
-				if stxo.SpendHeight > 0 {
-					return true
-				} else {
-					return w.checkIfStxoIsConfirmed(stxo.Utxo, stxos)
-				}
-			} else if stxo.Utxo.IsEqual(&utxo) {
-				if stxo.Utxo.AtHeight > 0 {
-					return true
-				} else {
-					return false
-				}
-			}
-		}
-	}
-	return false
-}
+	//TODO:
 
-func (w *BtcElectrumWallet) Params() *chaincfg.Params {
-	return w.params
-}
-
-func (w *BtcElectrumWallet) ChainTip() int64 {
-	// not yet implemented - Get from ElectrumX
-	return 0
-}
-
-func (w *BtcElectrumWallet) ExchangeRates() wallet.ExchangeRates {
-	// not yet implemented
-	return nil
-}
-
-// Get the current fee per byte
-func (w *BtcElectrumWallet) GetFeePerByte(feeLevel wallet.FeeLevel) uint64 {
-	// not yet implemented
-	return 0
+	return history, nil
 }
 
 // Send bitcoins to an external wallet
-func (w *BtcElectrumWallet) Spend(amount int64, addr btcutil.Address, feeLevel wallet.FeeLevel) (*chainhash.Hash, error) {
+func (w *BtcElectrumWallet) Spend(amount int64, toAddress btcutil.Address, feeLevel wallet.FeeLevel) ([]byte, error) {
 	// not yet implemented
-	return nil, wallet.ErrWalletFnNotImplemented
-}
-
-// Bump the fee for the given transaction
-func (w *BtcElectrumWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error) {
 	return nil, wallet.ErrWalletFnNotImplemented
 }
 
 // Calculates the estimated size of the transaction and returns the total fee for the given feePerByte
-func (w *BtcElectrumWallet) EstimateFee(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, feePerByte uint64) uint64 {
+func (w *BtcElectrumWallet) EstimateFee(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, feePerByte uint64) int64 {
 	// not yet implemented
 	return 0
 }
 
-// Build and broadcast a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
-func (w *BtcElectrumWallet) SweepAddress(utxos []wallet.Utxo, address *btcutil.Address, key *hdkeychain.ExtendedKey, redeemScript *[]byte, feeLevel wallet.FeeLevel) (*chainhash.Hash, error) {
+// Build a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
+func (w *BtcElectrumWallet) SweepAddress(utxos []wallet.Utxo, address *btcutil.Address, key *hdkeychain.ExtendedKey, redeemScript *[]byte, feeLevel wallet.FeeLevel) ([]byte, error) {
 	// not yet implemented
 	return nil, wallet.ErrWalletFnNotImplemented
 }
@@ -574,66 +470,23 @@ func (w *BtcElectrumWallet) Multisign(ins []wallet.TransactionInput, outs []wall
 }
 
 // Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked escrow which releases using the timeoutKey.
-func (w *BtcElectrumWallet) GenerateMultisigScript(keys []hdkeychain.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hdkeychain.ExtendedKey) (addr btcutil.Address, redeemScript []byte, err error) {
+func (w *BtcElectrumWallet) GenerateMultisigScript(keys []hdkeychain.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hdkeychain.ExtendedKey) (address btcutil.Address, redeemScript []byte, err error) {
 	// not yet implemented
 	return nil, nil, wallet.ErrWalletFnNotImplemented
 
 }
 
-// Add a script to the wallet and get notifications back when coins are received or spent from it
-func (w *BtcElectrumWallet) AddWatchedScript(script []byte) error {
-	err := w.txstore.WatchedScripts().Put(script)
-	if err != nil {
-		return err
+func (w *BtcElectrumWallet) Close() {
+	if w.running {
+		// Any other tear down here .. long running threads, etc.
+		w.running = false
 	}
-	w.txstore.PopulateAdrs()
-	return nil
 }
 
-// AddTransactionListener
-func (w *BtcElectrumWallet) AddTransactionListener(listener func(wallet.TransactionCallback)) {
-	// not yet implemented
-}
-
-// NotifyTransactionListners
-func (w *BtcElectrumWallet) NotifyTransactionListners(cb wallet.TransactionCallback) {
-	// not yet implemented
-}
-
-func (w *BtcElectrumWallet) ReSyncBlockchain(fromHeight uint64) {
-	panic("ReSyncBlockchain: Not implemented - Non-SPV wallet")
-}
-
-func (w *BtcElectrumWallet) AddWatchedAddresses(addrs ...btcutil.Address) error {
-	var err error
-	var watchedScripts [][]byte
-
-	for _, addr := range addrs {
-		script, err := w.AddressToScript(addr)
-		if err != nil {
-			return err
-		}
-		watchedScripts = append(watchedScripts, script)
-	}
-
-	err = w.txstore.WatchedScripts().PutAll(watchedScripts)
-
-	// Update txstore object
-	w.txstore.PopulateAdrs()
-
-	// w.wireService.MsgChan() <- updateFiltersMsg{} // not SPV
-
-	return err
-}
+// end interface impl
+/////////////////////
 
 func (w *BtcElectrumWallet) DumpHeaders(writer io.Writer) {
 	// w.blockchain.db.Print(writer)
 	panic("DumpHeaders: Non-SPV wallet")
-}
-
-func (w *BtcElectrumWallet) Close() {
-	if w.running {
-		// Any other tear down here
-		w.running = false
-	}
 }

@@ -68,9 +68,9 @@ func Bip44Derivation(masterPrivKey *hd.ExtendedKey) (internal, external *hd.Exte
 }
 
 // GetUnusedKey gets the first unused key for 'purpose'. CAUTION: There may not
-// be any keys within the gap limit. In this a used key can be used until the
-// gap is updated with new key(s). This happens when a transaction newly gets
-// client.AGEDTX confirmations.
+// be any keys within the gap limit. In this case a used key can be utilized or
+// user can wait until the gap is updated with new key(s). This happens when a
+// transaction newly gets client.AGEDTX confirmations.
 func (km *KeyManager) GetUnusedKey(purpose wallet.KeyPurpose) (*hd.ExtendedKey, error) {
 	i, err := km.datastore.GetUnused(purpose)
 	if err != nil {

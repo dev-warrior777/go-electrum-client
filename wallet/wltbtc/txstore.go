@@ -27,8 +27,6 @@ type TxStore struct {
 
 	params *chaincfg.Params
 
-	listeners []func(wallet.TransactionCallback)
-
 	wallet.Datastore
 }
 
@@ -70,9 +68,8 @@ func (ts *TxStore) PopulateAdrs() {
 	ts.txidsMutex.Unlock()
 }
 
-// Ingest puts a tx into the DB atomically.  This can result in a
-// gain, a loss, or no result.  Gain or loss in satoshis is returned.
-func (ts *TxStore) Ingest(tx *wire.MsgTx, height int64, timestamp time.Time) (uint32, error) {
+// AddTransaction puts a tx into the DB atomically.
+func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.Time) (uint32, error) {
 	var hits uint32
 	var err error
 	// Tx has been OK'd by ElectrumX; check tx sanity
@@ -124,14 +121,11 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int64, timestamp time.Time) (ui
 
 	// Iterate through all outputs of this tx, see if we gain
 	cachedSha := tx.TxHash()
-	cb := wallet.TransactionCallback{Txid: cachedSha.String(), Height: height}
 	value := int64(0)
 	matchesWatchOnly := false
 	for i, txout := range tx.TxOut {
 		// Ignore the error here because the sender could have used and exotic script
 		// for his change and we don't want to fail in that case.
-		addr, _ := scriptToAddress(txout.PkScript, ts.params)
-		out := wallet.TransactionOutput{Address: addr, Value: txout.Value, Index: uint32(i)}
 		for _, script := range PKscripts {
 			if bytes.Equal(txout.PkScript, script) { // new utxo found
 				scriptAddress, _ := ts.extractScriptAddress(txout.PkScript)
@@ -171,7 +165,6 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int64, timestamp time.Time) (ui
 				matchesWatchOnly = true
 			}
 		}
-		cb.Outputs = append(cb.Outputs, out)
 	}
 	utxos, err := ts.Utxos().GetAll()
 	if err != nil {
@@ -194,18 +187,6 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int64, timestamp time.Time) (ui
 				} else {
 					matchesWatchOnly = true
 				}
-
-				// Ignore the error here because the sender could have used and exotic script
-				// for his input and we don't want to fail in that case.
-				addr, _ := scriptToAddress(u.ScriptPubkey, ts.params)
-
-				in := wallet.TransactionInput{
-					OutpointHash:  u.Op.Hash.CloneBytes(),
-					OutpointIndex: u.Op.Index,
-					LinkedAddress: addr,
-					Value:         u.Value,
-				}
-				cb.Inputs = append(cb.Inputs, in)
 				break
 			}
 		}
@@ -236,11 +217,8 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int64, timestamp time.Time) (ui
 		ts.cbMutex.Lock()
 		ts.txidsMutex.Lock()
 		txn, err := ts.Txns().Get(tx.TxHash())
-		shouldCallback := false
 		if err != nil {
-			cb.Value = value
 			txn.Timestamp = timestamp
-			shouldCallback = true
 			var buf bytes.Buffer
 			tx.BtcEncode(&buf, wire.ProtocolVersion, wire.WitnessEncoding)
 			ts.Txns().Put(buf.Bytes(), tx.TxHash().String(), value, int(height), txn.Timestamp, hits == 0)
@@ -251,19 +229,8 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int64, timestamp time.Time) (ui
 		if err == nil && txn.Height <= 0 {
 			ts.Txns().UpdateHeight(tx.TxHash(), int(height), txn.Timestamp)
 			ts.txids[tx.TxHash().String()] = height
-			if height > 0 {
-				cb.Value = txn.Value
-				shouldCallback = true
-			}
 		}
-		cb.BlockTime = timestamp
 		ts.txidsMutex.Unlock()
-		if shouldCallback {
-			// Callback on listeners
-			for _, listener := range ts.listeners {
-				listener(cb)
-			}
-		}
 		ts.cbMutex.Unlock()
 		ts.PopulateAdrs()
 		hits++

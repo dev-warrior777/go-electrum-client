@@ -21,7 +21,7 @@ import (
 //
 // It can get confusing! Here 'scripthash' is an electrum value. But the
 // ScriptHash from (btcutl.Address).SciptHash() is the normal RIPEMD160
-// hash -- except for SegwitScripthash addresses which are 32 bytes long.
+// hash.
 //
 // An electrum scripthash is the full output payment script which is then
 // sha256 hashed. The result has bytes reversed for network send. It is sent
@@ -41,11 +41,6 @@ import (
 // 	}
 // 	// history hash as returned from 'blockchain.scripthash.subscribe'
 // 	return string(chainhash.HashB([]byte(sb.String())))
-// }
-
-// type history struct {
-// 	height int32
-// 	txHash string
 // }
 
 // We need a mapping both ways

@@ -1,4 +1,7 @@
-///go:build harness
+///////////////
+//go:build live
+
+///////////////
 
 package elxbtc
 

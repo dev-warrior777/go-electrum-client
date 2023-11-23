@@ -122,19 +122,20 @@ func PrivKeyToWif() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(key.Serialize())
+	fmt.Println("made privkey")
 	wif, err := btcutil.NewWIF(key, &chaincfg.MainNetParams, false)
 	if err != nil {
 		return err
 	}
 	wifStr := wif.String()
-	fmt.Println(wifStr)
+	fmt.Println("WIF:", wifStr)
 
-	dec, _ := btcutil.DecodeWIF(wifStr)
-	fmt.Println(dec.PrivKey.Serialize())
+	_, err = btcutil.DecodeWIF(wifStr)
+	if err != nil {
+		return err
+	}
 
 	// Can also do this
-	ecKey := key.ToECDSA()
-	fmt.Println(ecKey)
+	key.ToECDSA()
 	return nil
 }
