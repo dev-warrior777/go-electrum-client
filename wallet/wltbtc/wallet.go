@@ -476,6 +476,12 @@ func (w *BtcElectrumWallet) GenerateMultisigScript(keys []hdkeychain.ExtendedKey
 
 }
 
+// Add a transaction to the database
+func (w *BtcElectrumWallet) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.Time) error {
+	_, err := w.txstore.AddTransaction(tx, height, timestamp)
+	return err
+}
+
 func (w *BtcElectrumWallet) Close() {
 	if w.running {
 		// Any other tear down here .. long running threads, etc.

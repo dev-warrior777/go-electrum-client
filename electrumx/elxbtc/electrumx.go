@@ -168,6 +168,14 @@ func (s *SingleNode) GetHistory(scripthash string) (electrumx.HistoryResult, err
 	return server.SvrConn.GetHistory(server.SvrCtx, scripthash)
 }
 
+func (s *SingleNode) GetTransaction(txid string) (*electrumx.GetTransactionResult, error) {
+	server := s.Server
+	if !server.Running {
+		return nil, ErrServerNotRunning
+	}
+	return server.SvrConn.GetTransaction(server.SvrCtx, txid)
+}
+
 func (s *SingleNode) Broadcast(rawTx string) (string, error) {
 	server := s.Server
 	if !server.Running {

@@ -8,6 +8,7 @@ import (
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 )
 
 type WalletConfig struct {
@@ -108,6 +109,9 @@ type ElectrumWallet interface {
 
 	// Return the confirmed txids and heights for an address
 	GetAddressHistory(address btcutil.Address) ([]AddressHistory, error)
+
+	// Add a transaction to the database
+	AddTransaction(tx *wire.MsgTx, height int64, timestamp time.Time) error
 
 	// Cleanly disconnect from the wallet
 	Close()

@@ -1,15 +1,19 @@
 package btc
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
+
 	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
@@ -266,12 +270,31 @@ func (ec *BtcElectrumClient) GetAddressHistory(address btcutil.Address) (electru
 	return res, nil
 }
 
+func (ec *BtcElectrumClient) GetTransaction(txid string) (*wire.MsgTx, time.Time, error) {
+	txres, err := ec.GetNode().GetTransaction(txid)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	if txres == nil {
+		fmt.Println("empty get transaction result for: ", txid)
+		return nil, time.Time{}, errors.New("empty get transaction result")
+	}
+	b, err := hex.DecodeString(txres.Hex)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	hexBuf := bytes.NewBuffer(b)
+	var msgTx wire.MsgTx = wire.MsgTx{Version: 1}
+	err = msgTx.BtcDecode(hexBuf, 1, wire.WitnessEncoding) // careful here witness!
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	txTime := time.Unix(txres.Time, 0)
+	return &msgTx, txTime, nil
+}
+
 func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResult) {
 	for _, h := range history {
-		// if h.Height <= 0 {
-		// 	// still in mempool
-		// 	continue
-		// }
 		txid, err := hex.DecodeString(h.TxHash)
 		if err != nil {
 			continue
@@ -285,6 +308,16 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResul
 		}
 		// add transaction
 		fmt.Println("adding transaction", h.TxHash)
+		msgTx, txtime, err := ec.GetTransaction(h.TxHash)
+		if err != nil {
+			continue
+		}
+		fmt.Println(msgTx.TxHash().String(), txtime)
+		err = ec.GetWallet().AddTransaction(msgTx, h.Height, txtime)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
 	}
 }
 
