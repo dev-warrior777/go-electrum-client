@@ -133,7 +133,7 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 	}
 
 	sm := NewStorageManager(config.DB.Enc(), config.Params)
-	sm.store.Version = "0,1"
+	sm.store.Version = "0.1"
 	sm.store.Xprv = mPrivKey.String()
 	sm.store.Xpub = mPubKey.String()
 	if config.StoreEncSeed {

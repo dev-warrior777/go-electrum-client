@@ -303,16 +303,17 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResul
 		if err != nil {
 			continue
 		}
-		if has := ec.GetWallet().HasTransaction(*txhash); has {
+		walletHasTx := ec.GetWallet().HasTransaction(*txhash)
+		if walletHasTx && h.Height > 0 {
 			continue
 		}
-		// add transaction
-		fmt.Println("adding transaction", h.TxHash)
+		// add or update the wallet transaction
 		msgTx, txtime, err := ec.GetTransaction(h.TxHash)
 		if err != nil {
 			continue
 		}
 		fmt.Println(msgTx.TxHash().String(), txtime)
+		fmt.Println("adding transaction", h.TxHash, h.Height, h.Fee)
 		err = ec.GetWallet().AddTransaction(msgTx, h.Height, txtime)
 		if err != nil {
 			fmt.Println(err)
