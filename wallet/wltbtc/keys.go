@@ -22,6 +22,7 @@ type KeyManager struct {
 
 func NewKeyManager(db wallet.Keys, params *chaincfg.Params, masterPrivKey *hd.ExtendedKey) (*KeyManager, error) {
 	internal, external, err := Bip44Derivation(masterPrivKey)
+	masterPrivKey.Zero()
 	if err != nil {
 		return nil, err
 	}
