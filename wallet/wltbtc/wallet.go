@@ -31,18 +31,15 @@ var _ = wallet.ElectrumWallet(&BtcElectrumWallet{})
 
 const WalletVersion = "0.1.0"
 
+var ErrEmptyPassword = errors.New("empty password")
+
 type BtcElectrumWallet struct {
 	params *chaincfg.Params
-
-	masterPrivateKey *hdkeychain.ExtendedKey
-	masterPublicKey  *hdkeychain.ExtendedKey
 
 	feeProvider *wallet.FeeProvider
 
 	repoPath string
 
-	// TODO: maybe a scaled down blockchain with headers of interest to wallet?
-	// blockchain  *Blockchain
 	storageManager *StorageManager
 	txstore        *TxStore
 	keyManager     *KeyManager
@@ -58,7 +55,7 @@ type BtcElectrumWallet struct {
 // be saved offline by the user.
 func NewBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrumWallet, error) {
 	if pw == "" {
-		return nil, errors.New("empty password")
+		return nil, ErrEmptyPassword
 	}
 
 	ent, err := bip39.NewEntropy(128)
@@ -81,7 +78,7 @@ func NewBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrumW
 // pw does not need to be the same as the old wallet
 func RecreateElectrumWallet(config *wallet.WalletConfig, pw, mnemonic string) (*BtcElectrumWallet, error) {
 	if pw == "" {
-		return nil, errors.New("empty password")
+		return nil, ErrEmptyPassword
 	}
 	seed, err := bip39.NewSeedWithErrorChecking(mnemonic, "")
 	if err != nil {
@@ -93,7 +90,7 @@ func RecreateElectrumWallet(config *wallet.WalletConfig, pw, mnemonic string) (*
 
 func LoadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrumWallet, error) {
 	if pw == "" {
-		return nil, errors.New("empty password")
+		return nil, ErrEmptyPassword
 	}
 
 	return loadBtcElectrumWallet(config, pw)
@@ -113,21 +110,16 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 		return nil, err
 	}
 	w := &BtcElectrumWallet{
-		repoPath:         config.DataDir,
-		masterPrivateKey: mPrivKey,
-		masterPublicKey:  mPubKey,
-		params:           config.Params,
-		creationDate:     time.Now(),
+		repoPath:     config.DataDir,
+		params:       config.Params,
+		creationDate: time.Now(),
 		feeProvider: wallet.NewFeeProvider(
 			config.MaxFee,
 			config.HighFee,
 			config.MediumFee,
 			config.LowFee,
-			// move to client
 			"",
 			nil,
-			// config.FeeAPI.String(),
-			// config.Proxy,
 		),
 		mutex: new(sync.RWMutex),
 	}
@@ -146,7 +138,9 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 	}
 	w.storageManager = sm
 
-	w.keyManager, err = NewKeyManager(config.DB.Keys(), w.params, w.masterPrivateKey)
+	w.keyManager, err = NewKeyManager(config.DB.Keys(), w.params, mPrivKey)
+	mPrivKey.Zero()
+	mPubKey.Zero()
 	if err != nil {
 		return nil, err
 	}
@@ -190,17 +184,11 @@ func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrum
 	if err != nil {
 		return nil, err
 	}
-	mPubKey, err := hdkeychain.NewKeyFromString(sm.store.Xpub)
-	if err != nil {
-		return nil, err
-	}
 
 	w := &BtcElectrumWallet{
-		repoPath:         config.DataDir,
-		masterPrivateKey: mPrivKey,
-		masterPublicKey:  mPubKey,
-		storageManager:   sm,
-		params:           config.Params,
+		repoPath:       config.DataDir,
+		storageManager: sm,
+		params:         config.Params,
 		feeProvider: wallet.NewFeeProvider(
 			config.MaxFee,
 			config.HighFee,
@@ -209,13 +197,12 @@ func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrum
 			// move to client
 			"",
 			nil,
-			// config.FeeAPI.String(),
-			// config.Proxy,
 		),
 		mutex: new(sync.RWMutex),
 	}
 
-	w.keyManager, err = NewKeyManager(config.DB.Keys(), w.params, w.masterPrivateKey)
+	w.keyManager, err = NewKeyManager(config.DB.Keys(), w.params, mPrivKey)
+	mPrivKey.Zero()
 	if err != nil {
 		return nil, err
 	}

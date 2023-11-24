@@ -22,23 +22,27 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 	if err != nil {
 		return err
 	}
+
+	// add the address's pay script to the db.
 	script, err := txscript.PayToAddrScript(address)
 	if err != nil {
 		// possibly non-standard: future
 		return err
 	}
-	// AddWatchedScript adds the pay script to db. If it already exists this
-	// is a no-op
 	err = ec.GetWallet().AddWatchedScript(script)
 	if err != nil {
 		return err
 	}
 
+	// grab all address history to date
 	history, err := ec.GetAddressHistory(address)
 	if err != nil {
 		return err
 	}
 	dumpHistory(address, history)
+
+	// update wallet txstore if needed
+	ec.addTxHistoryToWallet(history)
 
 	// start goroutine to listen for scripthash status change notifications arriving
 	err = ec.addressStatusNotify()
@@ -98,8 +102,8 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 //------------------------------------------
 
 //////////////////////////////////////////////////////////////////////////////
-// Python console
-/////////////////
+// Python console subset
+////////////////////////
 
 // Broadcast sends a transaction to the server for broadcast on the bitcoin
 // network

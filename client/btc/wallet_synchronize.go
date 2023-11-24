@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,21 +32,20 @@ import (
 // sha256 hashed. The result has bytes reversed for network send. It is sent
 // to ElectrumX as a string.
 
-// // historyToStatusHash hashes together the stored history list for a subscription
-// func historyToStatusHash(s *subscription) string {
-// 	if s == nil || len(s.historyList) == 0 {
-// 		return ""
-// 	}
-// 	sb := strings.Builder{}
-// 	for _, h := range s.historyList {
-// 		sb.WriteString(h.txHash)
-// 		sb.WriteString(":")
-// 		sb.WriteString(string(h.height))
-// 		sb.WriteString(":")
-// 	}
-// 	// history hash as returned from 'blockchain.scripthash.subscribe'
-// 	return string(chainhash.HashB([]byte(sb.String())))
-// }
+// historyToStatusHash hashes together the stored history list for a subscription
+func historyToStatusHash(history electrumx.HistoryResult) string {
+	if len(history) == 0 {
+		return ""
+	}
+	sb := strings.Builder{}
+	for _, h := range history {
+		sb.WriteString(h.TxHash)
+		sb.WriteString(":")
+		sb.WriteString(fmt.Sprintf("%d", h.Height))
+		sb.WriteString(":")
+	}
+	return hex.EncodeToString(chainhash.HashB([]byte(sb.String())))
+}
 
 // We need a mapping both ways
 type subscription struct {
@@ -143,8 +143,8 @@ func (as *AddressSynchronizer) addrToElectrumScripthash(addr string, network *ch
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// client wallet node
-/////////////////////
+// wallet <-> client <-> node
+/////////////////////////////
 
 // addressStatusNotify listens for address status change notifications
 func (ec *BtcElectrumClient) addressStatusNotify() error {
