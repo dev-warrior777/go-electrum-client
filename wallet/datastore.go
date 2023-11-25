@@ -6,8 +6,6 @@ import (
 	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 )
 
 type Coin interface {
@@ -136,16 +134,16 @@ type Txns interface {
 	Put(raw []byte, txid string, value int64, height int, timestamp time.Time, watchOnly bool) error
 
 	// Fetch a tx and it's metadata given a hash
-	Get(txid chainhash.Hash) (Txn, error)
+	Get(txid string) (Txn, error)
 
 	// Fetch all transactions from the db
 	GetAll(includeWatchOnly bool) ([]Txn, error)
 
 	// Update the height of a transaction
-	UpdateHeight(txid chainhash.Hash, height int, timestamp time.Time) error
+	UpdateHeight(txid string, height int, timestamp time.Time) error
 
 	// Delete a transaction from the db
-	Delete(txid *chainhash.Hash) error
+	Delete(txid string) error
 }
 
 var ErrKeyImportNotImplemented = errors.New("key import not yet implemented")
@@ -209,9 +207,15 @@ type WatchedScripts interface {
 	Delete(scriptPubKey []byte) error
 }
 
+type OutPoint struct {
+	TxHash string
+	Index  uint32
+}
+
 type Utxo struct {
 	// Previous txid and output index
-	Op wire.OutPoint
+	Op OutPoint
+	// Op wire.OutPoint
 
 	// Block height where this tx was confirmed, 0 for unconfirmed
 	AtHeight int64
@@ -233,7 +237,7 @@ func (utxo *Utxo) IsEqual(alt *Utxo) bool {
 		return utxo == nil
 	}
 
-	if !utxo.Op.Hash.IsEqual(&alt.Op.Hash) {
+	if utxo.Op.TxHash != alt.Op.TxHash {
 		return false
 	}
 
@@ -264,7 +268,7 @@ type Stxo struct {
 	SpendHeight int64
 
 	// The tx that consumed it
-	SpendTxid chainhash.Hash
+	SpendTxid string
 }
 
 func (stxo *Stxo) IsEqual(alt *Stxo) bool {
@@ -280,7 +284,7 @@ func (stxo *Stxo) IsEqual(alt *Stxo) bool {
 		return false
 	}
 
-	if !stxo.SpendTxid.IsEqual(&alt.SpendTxid) {
+	if stxo.SpendTxid != alt.SpendTxid {
 		return false
 	}
 

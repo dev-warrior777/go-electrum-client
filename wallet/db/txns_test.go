@@ -34,6 +34,9 @@ func TestTxnsPut(t *testing.T) {
 		t.Error(err)
 	}
 	stmt, err := txdb.db.Prepare("select tx, value, height, watchOnly from txns where txid=?")
+	if err != nil { // > 0 rows
+		t.Fatal(err)
+	}
 	defer stmt.Close()
 	var ret []byte
 	var val int
@@ -70,7 +73,7 @@ func TestTxnsGet(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	txn, err := txdb.Get(tx.TxHash())
+	txn, err := txdb.Get(tx.TxHash().String())
 	if err != nil {
 		t.Error(err)
 	}
@@ -119,8 +122,8 @@ func TestDeleteTxns(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	txid := tx.TxHash()
-	err = txdb.Delete(&txid)
+	txid := tx.TxHash().String()
+	err = txdb.Delete(txid)
 	if err != nil {
 		t.Error(err)
 	}
@@ -129,7 +132,7 @@ func TestDeleteTxns(t *testing.T) {
 		t.Error(err)
 	}
 	for _, txn := range txns {
-		if txn.Txid == txid.String() {
+		if txn.Txid == txid {
 			t.Error("Txns db delete failed")
 		}
 	}
@@ -146,11 +149,14 @@ func TestTxnsDB_UpdateHeight(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = txdb.UpdateHeight(tx.TxHash(), -1, time.Now())
+	err = txdb.UpdateHeight(tx.TxHash().String(), -1, time.Now())
 	if err != nil {
 		t.Error(err)
 	}
-	txn, err := txdb.Get(tx.TxHash())
+	txn, err := txdb.Get(tx.TxHash().String())
+	if err != nil {
+		t.Error(err)
+	}
 	if txn.Height != -1 {
 		t.Error("Txn db failed to update height")
 	}

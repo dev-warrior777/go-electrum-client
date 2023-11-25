@@ -8,8 +8,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -23,10 +21,13 @@ func init() {
 		db:   conn,
 		lock: new(sync.RWMutex),
 	}
-	sh1, _ := chainhash.NewHashFromStr("e941e1c32b3dd1a68edc3af9f7fe711f35aaca60f758c2dd49561e45ca2c41c0")
-	outpoint := wire.NewOutPoint(sh1, 0)
+	sh1 := "e941e1c32b3dd1a68edc3af9f7fe711f35aaca60f758c2dd49561e45ca2c41c0"
+	outpoint := wallet.OutPoint{
+		TxHash: sh1,
+		Index:  0,
+	}
 	utxo = wallet.Utxo{
-		Op:           *outpoint,
+		Op:           outpoint,
 		AtHeight:     300000,
 		Value:        100000000,
 		ScriptPubkey: []byte("scriptpubkey"),
@@ -46,7 +47,7 @@ func TestUtxoPut(t *testing.T) {
 	var value int
 	var height int
 	var scriptPubkey string
-	o := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	o := utxo.Op.TxHash + ":" + strconv.Itoa(int(utxo.Op.Index))
 	err = stmt.QueryRow(o).Scan(&outpoint, &value, &height, &scriptPubkey)
 	if err != nil {
 		t.Error(err)
@@ -74,7 +75,7 @@ func TestUtxoGetAll(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if utxos[0].Op.Hash.String() != utxo.Op.Hash.String() {
+	if utxos[0].Op.TxHash != utxo.Op.TxHash {
 		t.Error("Utxo db returned wrong outpoint hash")
 	}
 	if utxos[0].Op.Index != utxo.Op.Index {
@@ -104,7 +105,7 @@ func TestSetWatchOnlyUtxo(t *testing.T) {
 	defer stmt.Close()
 
 	var watchOnlyInt int
-	o := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	o := utxo.Op.TxHash + ":" + strconv.Itoa(int(utxo.Op.Index))
 	err = stmt.QueryRow(o).Scan(&watchOnlyInt)
 	if err != nil {
 		t.Error(err)

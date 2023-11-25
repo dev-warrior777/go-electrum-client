@@ -9,7 +9,6 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
@@ -100,7 +99,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 		} else {
 			// Mark any unconfirmed doubles as dead
 			for _, double := range doubleSpends {
-				ts.markAsDead(*double)
+				ts.markAsDead(double)
 			}
 		}
 	}
@@ -120,7 +119,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 	ts.addrMutex.Unlock()
 
 	// Iterate through all outputs of this tx, see if we gain
-	cachedSha := tx.TxHash()
+	cachedSha := tx.TxHash().String()
 	value := int64(0)
 	matchesWatchOnly := false
 	for i, txout := range tx.TxOut {
@@ -130,9 +129,9 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 			if bytes.Equal(txout.PkScript, script) { // new utxo found
 				scriptAddress, _ := ts.extractScriptAddress(txout.PkScript)
 				ts.keyManager.MarkKeyAsUsed(scriptAddress)
-				newop := wire.OutPoint{
-					Hash:  cachedSha,
-					Index: uint32(i),
+				newop := wallet.OutPoint{
+					TxHash: cachedSha,
+					Index:  uint32(i),
 				}
 				newu := wallet.Utxo{
 					AtHeight:     height,
@@ -150,9 +149,9 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 		// Now check watched scripts
 		for _, script := range ts.watchedScripts {
 			if bytes.Equal(txout.PkScript, script) {
-				newop := wire.OutPoint{
-					Hash:  cachedSha,
-					Index: uint32(i),
+				newop := wallet.OutPoint{
+					TxHash: cachedSha, /// here be dragons
+					Index:  uint32(i),
 				}
 				newu := wallet.Utxo{
 					AtHeight:     height,
@@ -170,6 +169,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 	if err != nil {
 		return 0, err
 	}
+
 	for _, txin := range tx.TxIn {
 		for i, u := range utxos {
 			if outPointsEqual(txin.PreviousOutPoint, u.Op) {
@@ -199,7 +199,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 			return 0, err
 		}
 		for _, stxo := range stxos {
-			if stxo.SpendTxid.IsEqual(&cachedSha) {
+			if stxo.SpendTxid == cachedSha {
 				stxo.SpendHeight = height
 				ts.Stxos().Put(stxo)
 				if !stxo.Utxo.WatchOnly {
@@ -216,7 +216,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 	if hits > 0 || matchesWatchOnly {
 		ts.cbMutex.Lock()
 		ts.txidsMutex.Lock()
-		txn, err := ts.Txns().Get(tx.TxHash())
+		txn, err := ts.Txns().Get(tx.TxHash().String())
 		if err != nil {
 			txn.Timestamp = timestamp
 			var buf bytes.Buffer
@@ -227,7 +227,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 		// Let's check the height before committing so we don't allow rogue electrumX servers to send us a lose
 		// tx that resets our height to zero.
 		if err == nil && txn.Height <= 0 {
-			ts.Txns().UpdateHeight(tx.TxHash(), int(height), txn.Timestamp)
+			ts.Txns().UpdateHeight(tx.TxHash().String(), int(height), txn.Timestamp)
 			ts.txids[tx.TxHash().String()] = height
 		}
 		ts.txidsMutex.Unlock()
@@ -238,7 +238,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 	return hits, err
 }
 
-func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
+func (ts *TxStore) markAsDead(txid string) error {
 	stxos, err := ts.Stxos().GetAll()
 	if err != nil {
 		return err
@@ -256,7 +256,7 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 	}
 	for _, s := range stxos {
 		// If an stxo is marked dead, move it back into the utxo table
-		if txid.IsEqual(&s.SpendTxid) {
+		if txid == s.SpendTxid {
 			if err := markStxoAsDead(s); err != nil {
 				return err
 			}
@@ -265,7 +265,7 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 			}
 		}
 		// If a dependency of the spend is dead then mark the spend as dead
-		if txid.IsEqual(&s.Utxo.Op.Hash) {
+		if txid == s.Utxo.Op.TxHash {
 			if err := markStxoAsDead(s); err != nil {
 				return err
 			}
@@ -280,7 +280,7 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 	}
 	// Dead utxos should just be deleted
 	for _, u := range utxos {
-		if txid.IsEqual(&u.Op.Hash) {
+		if txid == u.Op.TxHash {
 			err := ts.Utxos().Delete(u)
 			if err != nil {
 				return err
@@ -294,8 +294,8 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 // CheckDoubleSpends takes a transaction and compares it with
 // all transactions in the db.  It returns a slice of all txids in the db
 // which are double spent by the received tx.
-func (ts *TxStore) CheckDoubleSpends(argTx *wire.MsgTx) ([]*chainhash.Hash, error) {
-	var dubs []*chainhash.Hash // slice of all double-spent txs
+func (ts *TxStore) CheckDoubleSpends(argTx *wire.MsgTx) ([]string, error) {
+	var dubs []string // slice of all double-spent txids
 	argTxid := argTx.TxHash()
 	txs, err := ts.Txns().GetAll(true)
 	if err != nil {
@@ -312,9 +312,9 @@ func (ts *TxStore) CheckDoubleSpends(argTx *wire.MsgTx) ([]*chainhash.Hash, erro
 		for _, argIn := range argTx.TxIn {
 			// iterate through inputs of compTx
 			for _, compIn := range msgTx.TxIn {
-				if outPointsEqual(argIn.PreviousOutPoint, compIn.PreviousOutPoint) && !compTxid.IsEqual(&argTxid) {
+				if msgTxOutPointsEqual(argIn.PreviousOutPoint, compIn.PreviousOutPoint) && !compTxid.IsEqual(&argTxid) {
 					// found double spend
-					dubs = append(dubs, &compTxid)
+					dubs = append(dubs, compTxid.String())
 					break // back to argIn loop
 				}
 			}
@@ -334,7 +334,14 @@ func (ts *TxStore) extractScriptAddress(script []byte) ([]byte, error) {
 	return addrs[0].ScriptAddress(), nil
 }
 
-func outPointsEqual(a, b wire.OutPoint) bool {
+func outPointsEqual(a wire.OutPoint, b wallet.OutPoint) bool {
+	if a.Hash.String() != b.TxHash {
+		return false
+	}
+	return a.Index == b.Index
+}
+
+func msgTxOutPointsEqual(a, b wire.OutPoint) bool {
 	if !a.Hash.IsEqual(&b.Hash) {
 		return false
 	}

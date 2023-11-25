@@ -7,7 +7,6 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -85,6 +84,9 @@ type ElectrumWallet interface {
 	// when coins are received. If already stored this is a no-op.
 	AddWatchedScript(script []byte) error
 
+	// Returns all the watched scripts in db.
+	ListWatchedScripts() ([][]byte, error)
+
 	// Returns if the wallet has the HD key for the given address
 	HasAddress(address btcutil.Address) bool
 
@@ -102,10 +104,10 @@ type ElectrumWallet interface {
 	Transactions() ([]Txn, error)
 
 	// Does the wallet have a specific transaction?
-	HasTransaction(txid chainhash.Hash) bool
+	HasTransaction(txid string) bool
 
 	// Get info on a specific transaction
-	GetTransaction(txid chainhash.Hash) (Txn, error)
+	GetTransaction(txid string) (Txn, error)
 
 	// Return the confirmed txids and heights for an address
 	GetAddressHistory(address btcutil.Address) ([]AddressHistory, error)
@@ -181,7 +183,7 @@ const (
 
 type AddressHistory struct {
 	Height int64
-	TxHash chainhash.Hash
+	TxHash string
 }
 
 type TransactionOutput struct {

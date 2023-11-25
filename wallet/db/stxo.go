@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -22,17 +21,17 @@ func (s *StxoDB) Put(stxo wallet.Stxo) error {
 	defer s.lock.Unlock()
 	tx, _ := s.db.Begin()
 	stmt, err := tx.Prepare("insert or replace into stxos(outpoint, value, height, scriptPubKey, watchOnly, spendHeight, spendTxid) values(?,?,?,?,?,?,?)")
-	defer stmt.Close()
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
+	defer stmt.Close()
 	watchOnly := 0
 	if stxo.Utxo.WatchOnly {
 		watchOnly = 1
 	}
-	outpoint := stxo.Utxo.Op.Hash.String() + ":" + strconv.Itoa(int(stxo.Utxo.Op.Index))
-	_, err = stmt.Exec(outpoint, int(stxo.Utxo.Value), int(stxo.Utxo.AtHeight), hex.EncodeToString(stxo.Utxo.ScriptPubkey), watchOnly, int(stxo.SpendHeight), stxo.SpendTxid.String())
+	outpoint := stxo.Utxo.Op.TxHash + ":" + strconv.Itoa(int(stxo.Utxo.Op.Index))
+	_, err = stmt.Exec(outpoint, int(stxo.Utxo.Value), int(stxo.Utxo.AtHeight), hex.EncodeToString(stxo.Utxo.ScriptPubkey), watchOnly, int(stxo.SpendHeight), stxo.SpendTxid)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -47,10 +46,10 @@ func (s *StxoDB) GetAll() ([]wallet.Stxo, error) {
 	var ret []wallet.Stxo
 	stm := "select outpoint, value, height, scriptPubKey, watchOnly, spendHeight, spendTxid from stxos"
 	rows, err := s.db.Query(stm)
-	defer rows.Close()
 	if err != nil {
 		return ret, err
 	}
+	defer rows.Close()
 	for rows.Next() {
 		var outpoint string
 		var value int
@@ -66,10 +65,7 @@ func (s *StxoDB) GetAll() ([]wallet.Stxo, error) {
 		if err != nil {
 			continue
 		}
-		shaHash, err := chainhash.NewHashFromStr(s[0])
-		if err != nil {
-			continue
-		}
+		shaHash := s[0]
 		index, err := strconv.Atoi(s[1])
 		if err != nil {
 			continue
@@ -87,7 +83,10 @@ func (s *StxoDB) GetAll() ([]wallet.Stxo, error) {
 			continue
 		}
 		utxo := wallet.Utxo{
-			Op:           *wire.NewOutPoint(shaHash, uint32(index)),
+			Op: wallet.OutPoint{
+				TxHash: shaHash,
+				Index:  uint32(index),
+			},
 			AtHeight:     int64(height),
 			Value:        int64(value),
 			ScriptPubkey: scriptBytes,
@@ -96,7 +95,7 @@ func (s *StxoDB) GetAll() ([]wallet.Stxo, error) {
 		ret = append(ret, wallet.Stxo{
 			Utxo:        utxo,
 			SpendHeight: int64(spendHeight),
-			SpendTxid:   *spentHash,
+			SpendTxid:   spentHash.String(),
 		})
 	}
 	return ret, nil
@@ -105,7 +104,7 @@ func (s *StxoDB) GetAll() ([]wallet.Stxo, error) {
 func (s *StxoDB) Delete(stxo wallet.Stxo) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	outpoint := stxo.Utxo.Op.Hash.String() + ":" + strconv.Itoa(int(stxo.Utxo.Op.Index))
+	outpoint := stxo.Utxo.Op.TxHash + ":" + strconv.Itoa(int(stxo.Utxo.Op.Index))
 	_, err := s.db.Exec("delete from stxos where outpoint=?", outpoint)
 	if err != nil {
 		return err

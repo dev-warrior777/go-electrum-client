@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
@@ -24,11 +23,11 @@ func (t *TxnsDB) Put(txn []byte, txid string, value int64, height int, timestamp
 		return err
 	}
 	stmt, err := tx.Prepare("insert or replace into txns(txid, value, height, timestamp, watchOnly, tx) values(?,?,?,?,?,?)")
-	defer stmt.Close()
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
+	defer stmt.Close()
 	watchOnlyInt := 0
 	if watchOnly {
 		watchOnlyInt = 1
@@ -42,7 +41,7 @@ func (t *TxnsDB) Put(txn []byte, txid string, value int64, height int, timestamp
 	return nil
 }
 
-func (t *TxnsDB) Get(txid chainhash.Hash) (wallet.Txn, error) {
+func (t *TxnsDB) Get(txid string) (wallet.Txn, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	var txn wallet.Txn
@@ -56,7 +55,7 @@ func (t *TxnsDB) Get(txid chainhash.Hash) (wallet.Txn, error) {
 	var height int
 	var timestamp int
 	var watchOnlyInt int
-	err = stmt.QueryRow(txid.String()).Scan(&ret, &value, &height, &timestamp, &watchOnlyInt)
+	err = stmt.QueryRow(txid).Scan(&ret, &value, &height, &timestamp, &watchOnlyInt)
 	if err != nil {
 		return txn, err
 	}
@@ -121,17 +120,17 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 	return ret, nil
 }
 
-func (t *TxnsDB) Delete(txid *chainhash.Hash) error {
+func (t *TxnsDB) Delete(txid string) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	_, err := t.db.Exec("delete from txns where txid=?", txid.String())
+	_, err := t.db.Exec("delete from txns where txid=?", txid)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *TxnsDB) UpdateHeight(txid chainhash.Hash, height int, timestamp time.Time) error {
+func (t *TxnsDB) UpdateHeight(txid string, height int, timestamp time.Time) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	tx, err := t.db.Begin()
@@ -143,7 +142,7 @@ func (t *TxnsDB) UpdateHeight(txid chainhash.Hash, height int, timestamp time.Ti
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(height, int(timestamp.Unix()), txid.String())
+	_, err = stmt.Exec(height, int(timestamp.Unix()), txid)
 	if err != nil {
 		tx.Rollback()
 		return err

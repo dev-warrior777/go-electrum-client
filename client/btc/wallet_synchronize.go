@@ -205,25 +205,26 @@ func (ec *BtcElectrumClient) alreadySubscribed(address btcutil.Address) bool {
 	return ec.walletSynchronizer.isSubscribed(address)
 }
 
-// SubscribeAddressNotify subscribes to notifications for an address and retrieves
-// & stores address history known to the server
-func (ec *BtcElectrumClient) SubscribeAddressNotify(address btcutil.Address) error {
+// SubscribeAddressNotify subscribes to notifications for an address and returns
+// a subscribe status. Status is the hash of all address history known to the
+// and can be zero length string if the subscription is new and has no history.
+func (ec *BtcElectrumClient) SubscribeAddressNotify(address btcutil.Address) (string, error) {
 	if ec.alreadySubscribed(address) {
-		return errors.New("address already subscribed")
+		return "", errors.New("address already subscribed")
 	}
 
 	// subscribe
 	scripthash, err := ec.walletSynchronizer.addressToElectrumScripthash(
 		address, ec.GetConfig().Params)
 	if err != nil {
-		return err
+		return "", err
 	}
 	res, err := ec.GetNode().SubscribeScripthashNotify(scripthash)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if res == nil {
-		return errors.New("empty result")
+		return "", errors.New("empty result")
 	}
 	ec.walletSynchronizer.addSubscription(address, scripthash)
 
@@ -231,7 +232,7 @@ func (ec *BtcElectrumClient) SubscribeAddressNotify(address btcutil.Address) err
 	fmt.Println("Scripthash", res.Scripthash)
 	fmt.Println("Status", res.Status)
 
-	return nil
+	return res.Status, nil
 }
 
 // UnsubscribeAddressNotify unsubscribes from notifications for an address
@@ -322,9 +323,12 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResul
 		if err != nil {
 			continue
 		}
-		walletHasTx := ec.GetWallet().HasTransaction(*txhash)
+		txh := txhash.String()
+		fmt.Println(txh)
+		walletHasTx := ec.GetWallet().HasTransaction(h.TxHash)
+		fmt.Println("walletHasTx", walletHasTx)
 		if walletHasTx && h.Height > 0 {
-			fmt.Println("already got cpnfirmed tx", txid)
+			fmt.Println("** already got confirmed tx", txid)
 			continue
 		}
 		// add or update the wallet transaction

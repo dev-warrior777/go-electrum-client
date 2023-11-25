@@ -11,7 +11,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -201,7 +200,7 @@ type mockUtxoStore struct {
 }
 
 func (m *mockUtxoStore) Put(utxo wallet.Utxo) error {
-	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	key := utxo.Op.TxHash + ":" + strconv.Itoa(int(utxo.Op.Index))
 	m.utxos[key] = &utxo
 	return nil
 }
@@ -215,7 +214,7 @@ func (m *mockUtxoStore) GetAll() ([]wallet.Utxo, error) {
 }
 
 func (m *mockUtxoStore) SetWatchOnly(utxo wallet.Utxo) error {
-	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	key := utxo.Op.TxHash + ":" + strconv.Itoa(int(utxo.Op.Index))
 	u, ok := m.utxos[key]
 	if !ok {
 		return errors.New("not found")
@@ -225,7 +224,7 @@ func (m *mockUtxoStore) SetWatchOnly(utxo wallet.Utxo) error {
 }
 
 func (m *mockUtxoStore) Delete(utxo wallet.Utxo) error {
-	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	key := utxo.Op.TxHash + ":" + strconv.Itoa(int(utxo.Op.Index))
 	_, ok := m.utxos[key]
 	if !ok {
 		return errors.New("not found")
@@ -239,7 +238,7 @@ type mockStxoStore struct {
 }
 
 func (m *mockStxoStore) Put(stxo wallet.Stxo) error {
-	m.stxos[stxo.SpendTxid.String()] = &stxo
+	m.stxos[stxo.SpendTxid] = &stxo
 	return nil
 }
 
@@ -252,11 +251,11 @@ func (m *mockStxoStore) GetAll() ([]wallet.Stxo, error) {
 }
 
 func (m *mockStxoStore) Delete(stxo wallet.Stxo) error {
-	_, ok := m.stxos[stxo.SpendTxid.String()]
+	_, ok := m.stxos[stxo.SpendTxid]
 	if !ok {
 		return errors.New("not found")
 	}
-	delete(m.stxos, stxo.SpendTxid.String())
+	delete(m.stxos, stxo.SpendTxid)
 	return nil
 }
 
@@ -349,12 +348,12 @@ func (m *mockWatchedScriptsStore) Delete(scriptPubKey []byte) error {
 }
 
 func TestUtxo_IsEqual(t *testing.T) {
-	h, err := chainhash.NewHashFromStr("16bed6368b8b1542cd6eb87f5bc20dc830b41a2258dde40438a75fa701d24e9a")
-	if err != nil {
-		t.Error(err)
-	}
+	h := "16bed6368b8b1542cd6eb87f5bc20dc830b41a2258dde40438a75fa701d24e9a"
 	u := &wallet.Utxo{
-		Op:           *wire.NewOutPoint(h, 0),
+		Op: wallet.OutPoint{
+			TxHash: h,
+			Index:  0,
+		},
 		ScriptPubkey: make([]byte, 32),
 		AtHeight:     400000,
 		Value:        1000000,
@@ -378,11 +377,8 @@ func TestUtxo_IsEqual(t *testing.T) {
 		t.Error("Failed to return utxos as not equal")
 	}
 	testUtxo = *u
-	ch2, err := chainhash.NewHashFromStr("1f64249abbf2fcc83fc060a64f69a91391e9f5d98c5d3135fe9716838283aa4c")
-	if err != nil {
-		t.Error(err)
-	}
-	testUtxo.Op.Hash = *ch2
+	ch2 := "1f64249abbf2fcc83fc060a64f69a91391e9f5d98c5d3135fe9716838283aa4c"
+	testUtxo.Op.TxHash = ch2
 	if u.IsEqual(&testUtxo) {
 		t.Error("Failed to return utxos as not equal")
 	}
@@ -397,21 +393,21 @@ func TestUtxo_IsEqual(t *testing.T) {
 }
 
 func TestStxo_IsEqual(t *testing.T) {
-	h, err := chainhash.NewHashFromStr("16bed6368b8b1542cd6eb87f5bc20dc830b41a2258dde40438a75fa701d24e9a")
-	if err != nil {
-		t.Error(err)
-	}
-	u := &wallet.Utxo{
-		Op:           *wire.NewOutPoint(h, 0),
+	h := "16bed6368b8b1542cd6eb87f5bc20dc830b41a2258dde40438a75fa701d24e9a"
+	u := wallet.Utxo{
+		Op: wallet.OutPoint{
+			TxHash: h,
+			Index:  0,
+		},
 		ScriptPubkey: make([]byte, 32),
 		AtHeight:     400000,
 		Value:        1000000,
 	}
-	h2, err := chainhash.NewHashFromStr("1f64249abbf2fcc83fc060a64f69a91391e9f5d98c5d3135fe9716838283aa4c")
+	h2 := "1f64249abbf2fcc83fc060a64f69a91391e9f5d98c5d3135fe9716838283aa4c"
 	s := &wallet.Stxo{
-		Utxo:        *u,
+		Utxo:        u,
 		SpendHeight: 400001,
-		SpendTxid:   *h2,
+		SpendTxid:   h2,
 	}
 	if !s.IsEqual(s) {
 		t.Error("Failed to return stxos as equal")
@@ -422,9 +418,9 @@ func TestStxo_IsEqual(t *testing.T) {
 	if s.IsEqual(&testStxo) {
 		t.Error("Failed to return stxos as not equal")
 	}
-	h3, err := chainhash.NewHashFromStr("3c5cea030a432ba9c8cf138a93f7b2e5b28263ea416894ee0bdf91bc31bb04f2")
+	h3 := "3c5cea030a432ba9c8cf138a93f7b2e5b28263ea416894ee0bdf91bc31bb04f2"
 	testStxo = *s
-	testStxo.SpendTxid = *h3
+	testStxo.SpendTxid = h3
 	if s.IsEqual(&testStxo) {
 		t.Error("Failed to return stxos as not equal")
 	}

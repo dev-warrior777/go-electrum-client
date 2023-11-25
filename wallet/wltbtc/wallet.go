@@ -12,7 +12,6 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcwallet/wallet/txrules"
@@ -274,6 +273,7 @@ func (w *BtcElectrumWallet) GetUnusedAddress(purpose wallet.KeyPurpose) (btcutil
 		return nil, nil
 	}
 	addrPubKeyHash, _ := key.Address(w.params)
+	key.Zero()
 	if err != nil {
 		return nil, nil
 	}
@@ -316,6 +316,10 @@ func (w *BtcElectrumWallet) AddWatchedScript(script []byte) error {
 	return nil
 }
 
+func (w *BtcElectrumWallet) ListWatchedScripts() ([][]byte, error) {
+	return w.txstore.WatchedScripts().GetAll()
+}
+
 func (w *BtcElectrumWallet) HasAddress(address btcutil.Address) bool {
 	_, err := w.keyManager.GetKeyForScript(address.ScriptAddress())
 	return err == nil
@@ -343,7 +347,7 @@ func (w *BtcElectrumWallet) Balance() (int64, int64) {
 			if stxo.Utxo.WatchOnly {
 				continue
 			}
-			if stxo.SpendTxid.IsEqual(&utxo.Op.Hash) {
+			if stxo.SpendTxid == utxo.Op.TxHash {
 				return stxo.SpendHeight > 0
 			} else if stxo.Utxo.IsEqual(&utxo) {
 				return stxo.Utxo.AtHeight > 0
@@ -377,13 +381,14 @@ func (w *BtcElectrumWallet) Transactions() ([]wallet.Txn, error) {
 	return w.txstore.Txns().GetAll(false)
 }
 
-func (w *BtcElectrumWallet) HasTransaction(txid chainhash.Hash) bool {
-	_, err := w.txstore.Txns().Get(txid)
+func (w *BtcElectrumWallet) HasTransaction(txid string) bool {
+	t, err := w.txstore.Txns().Get(txid)
+	fmt.Println("has", t.Txid)
 	// error only for 'no rows in rowset'
 	return err == nil
 }
 
-func (w *BtcElectrumWallet) GetTransaction(txid chainhash.Hash) (wallet.Txn, error) {
+func (w *BtcElectrumWallet) GetTransaction(txid string) (wallet.Txn, error) {
 	txn, err := w.txstore.Txns().Get(txid)
 	if err == nil {
 		tx := wire.NewMsgTx(1)

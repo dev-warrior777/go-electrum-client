@@ -3,7 +3,7 @@ package btc
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcd/txscript"
+	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
 // Here is the client interface between the node & wallet for transaction
@@ -12,37 +12,54 @@ import (
 // devdbg: just one known wallet address
 func (ec *BtcElectrumClient) SyncWallet() error {
 
-	// just get 1st adddress in wallet
-	addresses := ec.GetWallet().ListAddresses()
-	address := addresses[0]
-
-	fmt.Println(address.String())
-
-	err := ec.SubscribeAddressNotify(address)
+	address, err := ec.GetWallet().GetUnusedAddress(wallet.RECEIVING)
 	if err != nil {
 		return err
 	}
 
-	// add the address's pay script to the db.
-	script, err := txscript.PayToAddrScript(address)
-	if err != nil {
-		// possibly non-standard: future
-		return err
-	}
-	err = ec.GetWallet().AddWatchedScript(script)
+	payToAddrScript, err := ec.GetWallet().AddressToScript(address)
 	if err != nil {
 		return err
 	}
 
-	// grab all address history to date
-	history, err := ec.GetAddressHistory(address)
+	err = ec.GetWallet().AddWatchedScript(payToAddrScript)
 	if err != nil {
 		return err
 	}
-	dumpHistory(address, history)
 
-	// update wallet txstore if needed
-	ec.addTxHistoryToWallet(history)
+	//..................
+
+	watchedScripts, err := ec.GetWallet().ListWatchedScripts()
+	if err != nil {
+		return err
+	}
+
+	for _, watchedScript := range watchedScripts {
+		address, err := ec.GetWallet().ScriptToAddress(watchedScript)
+		if err != nil {
+			return err
+		}
+		fmt.Println(address.String())
+
+		status, err := ec.SubscribeAddressNotify(address)
+		if err != nil {
+			return err
+		}
+		if status == "" {
+			fmt.Println("no history for this address .. yet")
+			continue
+		}
+
+		// grab all address history to date for this address
+		history, err := ec.GetAddressHistory(address)
+		if err != nil {
+			return err
+		}
+		// dumpHistory(address, history)
+
+		// update wallet txstore if needed
+		ec.addTxHistoryToWallet(history)
+	}
 
 	// start goroutine to listen for scripthash status change notifications arriving
 	err = ec.addressStatusNotify()
@@ -56,8 +73,7 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 //-------------------------------------------------
 // func (ec *BtcElectrumClient) SyncWallet() error {
 
-// 	// - get all receive addresses in wallet
-// 	addresses := ec.GetWallet().ListAddresses()
+// 	// - get all watched receive/our change addresses in wallet
 
 // 	// for each
 // 	//   - subscribe for scripthash notifications

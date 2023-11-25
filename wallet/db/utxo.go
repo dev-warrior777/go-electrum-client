@@ -7,8 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -22,12 +20,12 @@ func (u *UtxoDB) Put(utxo wallet.Utxo) error {
 	defer u.lock.Unlock()
 	tx, _ := u.db.Begin()
 	stmt, err := tx.Prepare("insert or replace into utxos(outpoint, value, height, scriptPubKey, watchOnly) values(?,?,?,?,?)")
-	defer stmt.Close()
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
-	outpoint := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	defer stmt.Close()
+	outpoint := utxo.Op.TxHash + ":" + strconv.Itoa(int(utxo.Op.Index))
 	watchOnly := 0
 	if utxo.WatchOnly {
 		watchOnly = 1
@@ -47,10 +45,10 @@ func (u *UtxoDB) GetAll() ([]wallet.Utxo, error) {
 	var ret []wallet.Utxo
 	stm := "select outpoint, value, height, scriptPubKey, watchOnly from utxos"
 	rows, err := u.db.Query(stm)
-	defer rows.Close()
 	if err != nil {
 		return ret, err
 	}
+	defer rows.Close()
 	for rows.Next() {
 		var outpoint string
 		var value int
@@ -64,10 +62,7 @@ func (u *UtxoDB) GetAll() ([]wallet.Utxo, error) {
 		if err != nil {
 			continue
 		}
-		shaHash, err := chainhash.NewHashFromStr(s[0])
-		if err != nil {
-			continue
-		}
+		shaHash := s[0]
 		index, err := strconv.Atoi(s[1])
 		if err != nil {
 			continue
@@ -81,7 +76,10 @@ func (u *UtxoDB) GetAll() ([]wallet.Utxo, error) {
 			watchOnly = true
 		}
 		ret = append(ret, wallet.Utxo{
-			Op:           *wire.NewOutPoint(shaHash, uint32(index)),
+			Op: wallet.OutPoint{
+				TxHash: shaHash,
+				Index:  uint32(index),
+			},
 			AtHeight:     int64(height),
 			Value:        int64(value),
 			ScriptPubkey: scriptBytes,
@@ -94,7 +92,7 @@ func (u *UtxoDB) GetAll() ([]wallet.Utxo, error) {
 func (u *UtxoDB) SetWatchOnly(utxo wallet.Utxo) error {
 	u.lock.Lock()
 	defer u.lock.Unlock()
-	outpoint := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	outpoint := utxo.Op.TxHash + ":" + strconv.Itoa(int(utxo.Op.Index))
 	_, err := u.db.Exec("update utxos set watchOnly=? where outpoint=?", 1, outpoint)
 	if err != nil {
 		return err
@@ -105,7 +103,7 @@ func (u *UtxoDB) SetWatchOnly(utxo wallet.Utxo) error {
 func (u *UtxoDB) Delete(utxo wallet.Utxo) error {
 	u.lock.Lock()
 	defer u.lock.Unlock()
-	outpoint := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	outpoint := utxo.Op.TxHash + ":" + strconv.Itoa(int(utxo.Op.Index))
 	_, err := u.db.Exec("delete from utxos where outpoint=?", outpoint)
 	if err != nil {
 		return err

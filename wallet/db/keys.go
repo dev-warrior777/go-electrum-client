@@ -83,6 +83,9 @@ func (k *KeysDB) GetLastKeyIndex(purpose wallet.KeyPurpose) (int, bool, error) {
 
 	stm := "select keyIndex, used from keys where purpose=" + strconv.Itoa(int(purpose)) + " order by rowid desc limit 1"
 	stmt, err := k.db.Prepare(stm)
+	if err != nil {
+		return 0, false, err
+	}
 	defer stmt.Close()
 	var index int
 	var usedInt int
@@ -104,12 +107,15 @@ func (k *KeysDB) GetPathForKey(scriptAddress []byte) (wallet.KeyPath, error) {
 	defer k.lock.RUnlock()
 
 	stmt, err := k.db.Prepare("select purpose, keyIndex from keys where scriptAddress=? and purpose!=-1")
+	if err != nil {
+		return wallet.KeyPath{}, err
+	}
 	defer stmt.Close()
 	var purpose int
 	var index int
 	err = stmt.QueryRow(hex.EncodeToString(scriptAddress)).Scan(&purpose, &index)
 	if err != nil {
-		return wallet.KeyPath{}, errors.New("Key not found")
+		return wallet.KeyPath{}, errors.New("key not found")
 	}
 	p := wallet.KeyPath{
 		Purpose: wallet.KeyPurpose(purpose),
@@ -123,11 +129,14 @@ func (k *KeysDB) GetKey(scriptAddress []byte) (*btcec.PrivateKey, error) {
 	defer k.lock.RUnlock()
 
 	stmt, err := k.db.Prepare("select key from keys where scriptAddress=? and purpose=-1")
+	if err != nil {
+		return nil, err
+	}
 	defer stmt.Close()
 	var keyHex string
 	err = stmt.QueryRow(hex.EncodeToString(scriptAddress)).Scan(&keyHex)
 	if err != nil {
-		return nil, errors.New("Key not found")
+		return nil, errors.New("key not found")
 	}
 	keyBytes, err := hex.DecodeString(keyHex)
 	if err != nil {
@@ -190,11 +199,11 @@ func (k *KeysDB) GetAll() ([]wallet.KeyPath, error) {
 	var ret []wallet.KeyPath
 	stm := "select purpose, keyIndex from keys"
 	rows, err := k.db.Query(stm)
-	defer rows.Close()
 	if err != nil {
 		fmt.Println(err)
 		return ret, err
 	}
+	defer rows.Close()
 	for rows.Next() {
 		var purpose int
 		var index int
