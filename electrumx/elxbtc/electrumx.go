@@ -176,6 +176,14 @@ func (s *SingleNode) GetTransaction(txid string) (*electrumx.GetTransactionResul
 	return server.SvrConn.GetTransaction(server.SvrCtx, txid)
 }
 
+func (s *SingleNode) GetRawTransaction(txid string) (string, error) {
+	server := s.Server
+	if !server.Running {
+		return "", ErrServerNotRunning
+	}
+	return server.SvrConn.GetRawTransaction(server.SvrCtx, txid)
+}
+
 func (s *SingleNode) Broadcast(rawTx string) (string, error) {
 	server := s.Server
 	if !server.Running {

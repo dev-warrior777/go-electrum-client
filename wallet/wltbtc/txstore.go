@@ -224,7 +224,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 			ts.Txns().Put(buf.Bytes(), tx.TxHash().String(), value, int(height), txn.Timestamp, hits == 0)
 			ts.txids[tx.TxHash().String()] = height
 		}
-		// Let's check the height before committing so we don't allow rogue peers to send us a lose
+		// Let's check the height before committing so we don't allow rogue electrumX servers to send us a lose
 		// tx that resets our height to zero.
 		if err == nil && txn.Height <= 0 {
 			ts.Txns().UpdateHeight(tx.TxHash(), int(height), txn.Timestamp)

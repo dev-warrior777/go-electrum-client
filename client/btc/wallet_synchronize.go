@@ -293,6 +293,25 @@ func (ec *BtcElectrumClient) GetTransaction(txid string) (*wire.MsgTx, time.Time
 	return &msgTx, txTime, nil
 }
 
+func (ec *BtcElectrumClient) GetRawTransaction(txid string) (*wire.MsgTx, time.Time, error) {
+	txres, err := ec.GetNode().GetRawTransaction(txid)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	b, err := hex.DecodeString(txres)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	hexBuf := bytes.NewBuffer(b)
+	var msgTx wire.MsgTx = wire.MsgTx{Version: 1}
+	err = msgTx.BtcDecode(hexBuf, 1, wire.WitnessEncoding) // careful here witness!
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	txTime := time.Now()
+	return &msgTx, txTime, nil
+}
+
 func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResult) {
 	for _, h := range history {
 		txid, err := hex.DecodeString(h.TxHash)
@@ -305,10 +324,11 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResul
 		}
 		walletHasTx := ec.GetWallet().HasTransaction(*txhash)
 		if walletHasTx && h.Height > 0 {
+			fmt.Println("already got cpnfirmed tx", txid)
 			continue
 		}
 		// add or update the wallet transaction
-		msgTx, txtime, err := ec.GetTransaction(h.TxHash)
+		msgTx, txtime, err := ec.GetRawTransaction(h.TxHash)
 		if err != nil {
 			continue
 		}

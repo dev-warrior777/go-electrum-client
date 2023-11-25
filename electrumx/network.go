@@ -651,12 +651,25 @@ type GetTransactionResult struct {
 
 // GetTransaction requests a transaction.
 func (sc *ServerConn) GetTransaction(ctx context.Context, txid string) (*GetTransactionResult, error) {
+	verbose := true
+	// verbose result
 	var resp GetTransactionResult
-	err := sc.Request(ctx, "blockchain.transaction.get", positional{txid, true}, &resp)
+	err := sc.Request(ctx, "blockchain.transaction.get", positional{txid, verbose}, &resp)
 	if err != nil {
 		return nil, err
 	}
 	return &resp, nil
+}
+
+// GetTransaction requests a transaction as raw byte.
+func (sc *ServerConn) GetRawTransaction(ctx context.Context, txid string) (string, error) {
+	// non verbose result as a hex string of the raw transaction
+	var resp string
+	err := sc.Request(ctx, "blockchain.transaction.get", positional{txid, false}, &resp)
+	if err != nil {
+		return "", err
+	}
+	return resp, nil
 }
 
 // ////////////////////////////////////////////////////////////////////////////
