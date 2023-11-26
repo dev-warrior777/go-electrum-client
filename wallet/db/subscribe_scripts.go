@@ -6,16 +6,16 @@ import (
 	"sync"
 )
 
-type WatchedScriptsDB struct {
+type SubscribeScriptsDB struct {
 	db   *sql.DB
 	lock *sync.RWMutex
 }
 
-func (w *WatchedScriptsDB) Put(scriptPubKey []byte) error {
+func (w *SubscribeScriptsDB) Put(scriptPubKey []byte) error {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 	tx, _ := w.db.Begin()
-	stmt, err := tx.Prepare("insert or replace into watchedScripts(scriptPubKey) values(?)")
+	stmt, err := tx.Prepare("insert or replace into subscribeScripts(scriptPubKey) values(?)")
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -30,7 +30,7 @@ func (w *WatchedScriptsDB) Put(scriptPubKey []byte) error {
 	return nil
 }
 
-func (w *WatchedScriptsDB) PutAll(scripts [][]byte) error {
+func (w *SubscribeScriptsDB) PutAll(scripts [][]byte) error {
 	for _, s := range scripts {
 		if err := w.Put(s); err != nil {
 			return err
@@ -39,11 +39,11 @@ func (w *WatchedScriptsDB) PutAll(scripts [][]byte) error {
 	return nil
 }
 
-func (w *WatchedScriptsDB) GetAll() ([][]byte, error) {
+func (w *SubscribeScriptsDB) GetAll() ([][]byte, error) {
 	w.lock.RLock()
 	defer w.lock.RUnlock()
 	var ret [][]byte
-	stm := "select scriptPubKey from watchedScripts"
+	stm := "select scriptPubKey from subscribeScripts"
 	rows, err := w.db.Query(stm)
 	if err != nil {
 		return ret, err
@@ -63,10 +63,10 @@ func (w *WatchedScriptsDB) GetAll() ([][]byte, error) {
 	return ret, nil
 }
 
-func (w *WatchedScriptsDB) Delete(scriptPubKey []byte) error {
+func (w *SubscribeScriptsDB) Delete(scriptPubKey []byte) error {
 	w.lock.Lock()
 	defer w.lock.Unlock()
-	_, err := w.db.Exec("delete from watchedScripts where scriptPubKey=?", hex.EncodeToString(scriptPubKey))
+	_, err := w.db.Exec("delete from subscribeScripts where scriptPubKey=?", hex.EncodeToString(scriptPubKey))
 	if err != nil {
 		return err
 	}

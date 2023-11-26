@@ -80,12 +80,13 @@ type ElectrumWallet interface {
 	// Turn the given address into an output script
 	AddressToScript(address btcutil.Address) ([]byte, error)
 
-	// Add a script to the wallet and get notifications back from ElectrumX
+	// Add a subscribe script to the wallet. These addresses will be used to
+	// subscribe to ElectrumX and get notifications back from ElectrumX
 	// when coins are received. If already stored this is a no-op.
-	AddWatchedScript(script []byte) error
+	AddSubscribeScript(script []byte) error
 
 	// Returns all the watched scripts in db.
-	ListWatchedScripts() ([][]byte, error)
+	ListSubscribeScripts() ([][]byte, error)
 
 	// Returns if the wallet has the HD key for the given address
 	HasAddress(address btcutil.Address) bool

@@ -91,7 +91,7 @@ type Datastore interface {
 	Stxos() Stxos
 	Txns() Txns
 	Keys() Keys
-	WatchedScripts() WatchedScripts
+	SubscribeScripts() SubscribeScripts
 }
 
 type Cfg interface {
@@ -192,18 +192,18 @@ type Keys interface {
 	GetLookaheadWindows() map[KeyPurpose]int
 }
 
-type WatchedScripts interface {
+type SubscribeScripts interface {
 
 	// Add scripts to watch
 	PutAll(scriptPubkeys [][]byte) error
 
-	// Add a script to watch
+	// Add a script to subscribe & watch
 	Put(scriptPubKey []byte) error
 
-	// Return all watched scripts
+	// Return all subscribe scripts
 	GetAll() ([][]byte, error)
 
-	// Delete a watched script
+	// Delete a subscribe script
 	Delete(scriptPubKey []byte) error
 }
 

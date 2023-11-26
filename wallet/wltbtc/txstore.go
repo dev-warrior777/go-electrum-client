@@ -15,12 +15,12 @@ import (
 )
 
 type TxStore struct {
-	adrs           []btcutil.Address
-	watchedScripts [][]byte
-	txids          map[string]int64
-	txidsMutex     *sync.RWMutex
-	addrMutex      *sync.Mutex
-	cbMutex        *sync.Mutex
+	adrs             []btcutil.Address
+	subscribeScripts [][]byte
+	txids            map[string]int64
+	txidsMutex       *sync.RWMutex
+	addrMutex        *sync.Mutex
+	cbMutex          *sync.Mutex
 
 	keyManager *KeyManager
 
@@ -58,7 +58,6 @@ func (ts *TxStore) PopulateAdrs() {
 	}
 	ts.addrMutex.Unlock()
 
-	ts.watchedScripts, _ = ts.WatchedScripts().GetAll()
 	txns, _ := ts.Txns().GetAll(true)
 	ts.txidsMutex.Lock()
 	for _, t := range txns {
@@ -146,24 +145,24 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 				break
 			}
 		}
-		// Now check watched scripts
-		for _, script := range ts.watchedScripts {
-			if bytes.Equal(txout.PkScript, script) {
-				newop := wallet.OutPoint{
-					TxHash: cachedSha, /// here be dragons
-					Index:  uint32(i),
-				}
-				newu := wallet.Utxo{
-					AtHeight:     height,
-					Value:        txout.Value,
-					ScriptPubkey: txout.PkScript,
-					Op:           newop,
-					WatchOnly:    true,
-				}
-				ts.Utxos().Put(newu)
-				matchesWatchOnly = true
-			}
-		}
+		// // Now check watched scripts
+		// for _, script := range ts.watchedScripts {
+		// 	if bytes.Equal(txout.PkScript, script) {
+		// 		newop := wallet.OutPoint{
+		// 			TxHash: cachedSha, /// here be dragons
+		// 			Index:  uint32(i),
+		// 		}
+		// 		newu := wallet.Utxo{
+		// 			AtHeight:     height,
+		// 			Value:        txout.Value,
+		// 			ScriptPubkey: txout.PkScript,
+		// 			Op:           newop,
+		// 			WatchOnly:    true,
+		// 		}
+		// 		ts.Utxos().Put(newu)
+		// 		matchesWatchOnly = true
+		// 	}
+		// }
 	}
 	utxos, err := ts.Utxos().GetAll()
 	if err != nil {

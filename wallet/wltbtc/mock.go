@@ -15,12 +15,12 @@ import (
 )
 
 type MockDatastore struct {
-	enc            wallet.Enc
-	keys           wallet.Keys
-	utxos          wallet.Utxos
-	stxos          wallet.Stxos
-	txns           wallet.Txns
-	watchedScripts wallet.WatchedScripts
+	enc              wallet.Enc
+	keys             wallet.Keys
+	utxos            wallet.Utxos
+	stxos            wallet.Stxos
+	txns             wallet.Txns
+	subscribeScripts wallet.SubscribeScripts
 }
 
 func (m *MockDatastore) Enc() wallet.Enc {
@@ -43,8 +43,8 @@ func (m *MockDatastore) Txns() wallet.Txns {
 	return m.txns
 }
 
-func (m *MockDatastore) WatchedScripts() wallet.WatchedScripts {
-	return m.watchedScripts
+func (m *MockDatastore) SubscribeScripts() wallet.SubscribeScripts {
+	return m.subscribeScripts
 }
 
 // encrypted blob

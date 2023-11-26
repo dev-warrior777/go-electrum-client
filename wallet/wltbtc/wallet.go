@@ -308,16 +308,16 @@ func (w *BtcElectrumWallet) AddressToScript(address btcutil.Address) ([]byte, er
 	return txscript.PayToAddrScript(address)
 }
 
-func (w *BtcElectrumWallet) AddWatchedScript(script []byte) error {
-	err := w.txstore.WatchedScripts().Put(script)
+func (w *BtcElectrumWallet) AddSubscribeScript(script []byte) error {
+	err := w.txstore.SubscribeScripts().Put(script)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (w *BtcElectrumWallet) ListWatchedScripts() ([][]byte, error) {
-	return w.txstore.WatchedScripts().GetAll()
+func (w *BtcElectrumWallet) ListSubscribeScripts() ([][]byte, error) {
+	return w.txstore.SubscribeScripts().GetAll()
 }
 
 func (w *BtcElectrumWallet) HasAddress(address btcutil.Address) bool {

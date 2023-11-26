@@ -22,14 +22,14 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		return err
 	}
 
-	err = ec.GetWallet().AddWatchedScript(payToAddrScript)
+	err = ec.GetWallet().AddSubscribeScript(payToAddrScript)
 	if err != nil {
 		return err
 	}
 
 	//..................
 
-	watchedScripts, err := ec.GetWallet().ListWatchedScripts()
+	watchedScripts, err := ec.GetWallet().ListSubscribeScripts()
 	if err != nil {
 		return err
 	}
