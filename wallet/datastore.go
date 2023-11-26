@@ -194,9 +194,6 @@ type Keys interface {
 
 type SubscribeScripts interface {
 
-	// Add scripts to watch
-	PutAll(scriptPubkeys [][]byte) error
-
 	// Add a script to subscribe & watch
 	Put(scriptPubKey []byte) error
 

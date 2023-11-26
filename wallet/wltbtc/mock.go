@@ -313,23 +313,23 @@ func (m *mockTxnStore) Delete(txid *chainhash.Hash) error {
 	return nil
 }
 
-type mockWatchedScriptsStore struct {
+type mockSubscribeScriptsStore struct {
 	scripts map[string][]byte
 }
 
-func (m *mockWatchedScriptsStore) Put(scriptPubKey []byte) error {
+func (m *mockSubscribeScriptsStore) Put(scriptPubKey []byte) error {
 	m.scripts[hex.EncodeToString(scriptPubKey)] = scriptPubKey
 	return nil
 }
 
-func (m *mockWatchedScriptsStore) PutAll(ss [][]byte) error {
+func (m *mockSubscribeScriptsStore) PutAll(ss [][]byte) error {
 	for _, s := range ss {
 		m.Put(s)
 	}
 	return nil
 }
 
-func (m *mockWatchedScriptsStore) GetAll() ([][]byte, error) {
+func (m *mockSubscribeScriptsStore) GetAll() ([][]byte, error) {
 	var ret [][]byte
 	for _, b := range m.scripts {
 		ret = append(ret, b)
@@ -337,7 +337,7 @@ func (m *mockWatchedScriptsStore) GetAll() ([][]byte, error) {
 	return ret, nil
 }
 
-func (m *mockWatchedScriptsStore) Delete(scriptPubKey []byte) error {
+func (m *mockSubscribeScriptsStore) Delete(scriptPubKey []byte) error {
 	enc := hex.EncodeToString(scriptPubKey)
 	_, ok := m.scripts[enc]
 	if !ok {

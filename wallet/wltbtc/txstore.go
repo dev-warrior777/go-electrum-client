@@ -15,12 +15,12 @@ import (
 )
 
 type TxStore struct {
-	adrs             []btcutil.Address
-	subscribeScripts [][]byte
-	txids            map[string]int64
-	txidsMutex       *sync.RWMutex
-	addrMutex        *sync.Mutex
-	cbMutex          *sync.Mutex
+	adrs []btcutil.Address
+	// subscribeScripts [][]byte
+	txids      map[string]int64
+	txidsMutex *sync.RWMutex
+	addrMutex  *sync.Mutex
+	cbMutex    *sync.Mutex
 
 	keyManager *KeyManager
 

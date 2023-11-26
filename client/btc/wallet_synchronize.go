@@ -205,8 +205,8 @@ func (ec *BtcElectrumClient) alreadySubscribed(address btcutil.Address) bool {
 	return ec.walletSynchronizer.isSubscribed(address)
 }
 
-// SubscribeAddressNotify subscribes to notifications for an address and returns
-// a subscribe status. Status is the hash of all address history known to the
+// SubscribeAddressNotify subscribes to notifications for an address from ElectrumX
+// It returns a subscribe statuswhich is the hash of all address history known to the
 // and can be zero length string if the subscription is new and has no history.
 func (ec *BtcElectrumClient) SubscribeAddressNotify(address btcutil.Address) (string, error) {
 	if ec.alreadySubscribed(address) {
@@ -228,9 +228,7 @@ func (ec *BtcElectrumClient) SubscribeAddressNotify(address btcutil.Address) (st
 	}
 	ec.walletSynchronizer.addSubscription(address, scripthash)
 
-	fmt.Println("Subscribed scripthash")
-	fmt.Println("Scripthash", res.Scripthash)
-	fmt.Println("Status", res.Status)
+	fmt.Println("Subscribed scripthash", res.Scripthash, " status:", res.Status)
 
 	return res.Status, nil
 }
@@ -269,29 +267,6 @@ func (ec *BtcElectrumClient) GetAddressHistory(address btcutil.Address) (electru
 	}
 
 	return res, nil
-}
-
-func (ec *BtcElectrumClient) GetTransaction(txid string) (*wire.MsgTx, time.Time, error) {
-	txres, err := ec.GetNode().GetTransaction(txid)
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-	if txres == nil {
-		fmt.Println("empty get transaction result for: ", txid)
-		return nil, time.Time{}, errors.New("empty get transaction result")
-	}
-	b, err := hex.DecodeString(txres.Hex)
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-	hexBuf := bytes.NewBuffer(b)
-	var msgTx wire.MsgTx = wire.MsgTx{Version: 1}
-	err = msgTx.BtcDecode(hexBuf, 1, wire.WitnessEncoding) // careful here witness!
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-	txTime := time.Unix(txres.Time, 0)
-	return &msgTx, txTime, nil
 }
 
 func (ec *BtcElectrumClient) GetRawTransaction(txid string) (*wire.MsgTx, time.Time, error) {
