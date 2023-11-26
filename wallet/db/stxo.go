@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -62,9 +61,6 @@ func (s *StxoDB) GetAll() ([]wallet.Stxo, error) {
 			continue
 		}
 		s := strings.Split(outpoint, ":")
-		if err != nil {
-			continue
-		}
 		shaHash := s[0]
 		index, err := strconv.Atoi(s[1])
 		if err != nil {
@@ -75,10 +71,6 @@ func (s *StxoDB) GetAll() ([]wallet.Stxo, error) {
 			watchOnly = true
 		}
 		scriptBytes, err := hex.DecodeString(scriptPubKey)
-		if err != nil {
-			continue
-		}
-		spentHash, err := chainhash.NewHashFromStr(spendTxid)
 		if err != nil {
 			continue
 		}
@@ -95,7 +87,7 @@ func (s *StxoDB) GetAll() ([]wallet.Stxo, error) {
 		ret = append(ret, wallet.Stxo{
 			Utxo:        utxo,
 			SpendHeight: int64(spendHeight),
-			SpendTxid:   spentHash.String(),
+			SpendTxid:   spendTxid,
 		})
 	}
 	return ret, nil

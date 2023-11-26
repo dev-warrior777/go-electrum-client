@@ -1,12 +1,10 @@
 package db
 
 import (
-	"bytes"
 	"database/sql"
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -59,15 +57,12 @@ func (t *TxnsDB) Get(txid string) (wallet.Txn, error) {
 	if err != nil {
 		return txn, err
 	}
-	r := bytes.NewReader(ret)
-	msgTx := wire.NewMsgTx(1)
-	msgTx.BtcDecode(r, 1, wire.WitnessEncoding)
 	watchOnly := false
 	if watchOnlyInt > 0 {
 		watchOnly = true
 	}
 	txn = wallet.Txn{
-		Txid:      msgTx.TxHash().String(),
+		Txid:      txid,
 		Value:     int64(value),
 		Height:    int64(height),
 		Timestamp: time.Unix(int64(timestamp), 0),
@@ -81,24 +76,22 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	var ret []wallet.Txn
-	stm := "select tx, value, height, timestamp, watchOnly from txns"
+	stm := "select txid, tx, value, height, timestamp, watchOnly from txns"
 	rows, err := t.db.Query(stm)
 	if err != nil {
 		return ret, err
 	}
 	defer rows.Close()
 	for rows.Next() {
+		var txid string
 		var tx []byte
 		var value int
 		var height int
 		var timestamp int
 		var watchOnlyInt int
-		if err := rows.Scan(&tx, &value, &height, &timestamp, &watchOnlyInt); err != nil {
+		if err := rows.Scan(&txid, &tx, &value, &height, &timestamp, &watchOnlyInt); err != nil {
 			continue
 		}
-		r := bytes.NewReader(tx)
-		msgTx := wire.NewMsgTx(1)
-		msgTx.BtcDecode(r, 1, wire.WitnessEncoding)
 		watchOnly := false
 		if watchOnlyInt > 0 {
 			if !includeWatchOnly {
@@ -108,7 +101,7 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 		}
 
 		txn := wallet.Txn{
-			Txid:      msgTx.TxHash().String(),
+			Txid:      txid,
 			Value:     int64(value),
 			Height:    int64(height),
 			Timestamp: time.Unix(int64(timestamp), 0),
