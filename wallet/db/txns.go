@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -13,7 +14,7 @@ type TxnsDB struct {
 	lock *sync.RWMutex
 }
 
-func (t *TxnsDB) Put(txn []byte, txid string, value int64, height int, timestamp time.Time, watchOnly bool) error {
+func (t *TxnsDB) Put(txn []byte, txid string, value int64, height int64, timestamp time.Time, watchOnly bool) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	tx, err := t.db.Begin()
@@ -39,7 +40,7 @@ func (t *TxnsDB) Put(txn []byte, txid string, value int64, height int, timestamp
 	return nil
 }
 
-func (t *TxnsDB) Get(txid string) (wallet.Txn, error) {
+func (t *TxnsDB) Get(txid chainhash.Hash) (wallet.Txn, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	var txn wallet.Txn
@@ -53,7 +54,7 @@ func (t *TxnsDB) Get(txid string) (wallet.Txn, error) {
 	var height int
 	var timestamp int
 	var watchOnlyInt int
-	err = stmt.QueryRow(txid).Scan(&ret, &value, &height, &timestamp, &watchOnlyInt)
+	err = stmt.QueryRow(txid.String()).Scan(&ret, &value, &height, &timestamp, &watchOnlyInt)
 	if err != nil {
 		return txn, err
 	}
@@ -92,6 +93,10 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 		if err := rows.Scan(&txid, &tx, &value, &height, &timestamp, &watchOnlyInt); err != nil {
 			continue
 		}
+		txHash, err := chainhash.NewHashFromStr(txid)
+		if err != nil {
+			continue
+		}
 		watchOnly := false
 		if watchOnlyInt > 0 {
 			if !includeWatchOnly {
@@ -101,7 +106,7 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 		}
 
 		txn := wallet.Txn{
-			Txid:      txid,
+			Txid:      *txHash,
 			Value:     int64(value),
 			Height:    int64(height),
 			Timestamp: time.Unix(int64(timestamp), 0),
@@ -113,17 +118,17 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 	return ret, nil
 }
 
-func (t *TxnsDB) Delete(txid string) error {
+func (t *TxnsDB) Delete(txid chainhash.Hash) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	_, err := t.db.Exec("delete from txns where txid=?", txid)
+	_, err := t.db.Exec("delete from txns where txid=?", txid.String())
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *TxnsDB) UpdateHeight(txid string, height int, timestamp time.Time) error {
+func (t *TxnsDB) UpdateHeight(txid chainhash.Hash, height int, timestamp time.Time) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	tx, err := t.db.Begin()
@@ -135,7 +140,7 @@ func (t *TxnsDB) UpdateHeight(txid string, height int, timestamp time.Time) erro
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(height, int(timestamp.Unix()), txid)
+	_, err = stmt.Exec(height, int(timestamp.Unix()), txid.String())
 	if err != nil {
 		tx.Rollback()
 		return err

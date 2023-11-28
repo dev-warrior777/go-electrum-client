@@ -185,7 +185,7 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 				sub.lastStatus = status.Status
 
 				// get scripthash history
-				history, err := ec.GetAddressHistory(sub.address)
+				history, err := ec.GetAddressHistoryFromNode(sub.address)
 				if err != nil {
 					continue
 				}
@@ -250,7 +250,7 @@ func (ec *BtcElectrumClient) UnsubscribeAddressNotify(address btcutil.Address) {
 	fmt.Println("unsubscribed scripthash")
 }
 
-func (ec *BtcElectrumClient) GetAddressHistory(address btcutil.Address) (electrumx.HistoryResult, error) {
+func (ec *BtcElectrumClient) GetAddressHistoryFromNode(address btcutil.Address) (electrumx.HistoryResult, error) {
 	scripthash, err := ec.walletSynchronizer.addressToElectrumScripthash(
 		address, ec.GetConfig().Params)
 	if err != nil {
@@ -269,7 +269,7 @@ func (ec *BtcElectrumClient) GetAddressHistory(address btcutil.Address) (electru
 	return res, nil
 }
 
-func (ec *BtcElectrumClient) GetRawTransaction(txid string) (*wire.MsgTx, time.Time, error) {
+func (ec *BtcElectrumClient) GetRawTransactionFromNode(txid string) (*wire.MsgTx, time.Time, error) {
 	txres, err := ec.GetNode().GetRawTransaction(txid)
 	if err != nil {
 		return nil, time.Time{}, err
@@ -298,16 +298,18 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResul
 		if err != nil {
 			continue
 		}
-		txh := txhash.String()
-		fmt.Println(txh)
-		walletHasTx := ec.GetWallet().HasTransaction(h.TxHash)
+		fmt.Println(txhash.String())
+
+		// does wallet already has a confirmed transaction?
+		walletHasTx := ec.GetWallet().HasTransaction(*txhash)
 		fmt.Println("walletHasTx", walletHasTx)
 		if walletHasTx && h.Height > 0 {
 			fmt.Println("** already got confirmed tx", txid)
 			continue
 		}
+
 		// add or update the wallet transaction
-		msgTx, txtime, err := ec.GetRawTransaction(h.TxHash)
+		msgTx, txtime, err := ec.GetRawTransactionFromNode(h.TxHash)
 		if err != nil {
 			continue
 		}

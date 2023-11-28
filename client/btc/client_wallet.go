@@ -51,7 +51,7 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		}
 
 		// grab all address history to date for this address
-		history, err := ec.GetAddressHistory(address)
+		history, err := ec.GetAddressHistoryFromNode(address)
 		if err != nil {
 			return err
 		}

@@ -7,6 +7,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -105,10 +106,10 @@ type ElectrumWallet interface {
 	Transactions() ([]Txn, error)
 
 	// Does the wallet have a specific transaction?
-	HasTransaction(txid string) bool
+	HasTransaction(txid chainhash.Hash) bool
 
 	// Get info on a specific transaction
-	GetTransaction(txid string) (Txn, error)
+	GetTransaction(txid chainhash.Hash) (Txn, error)
 
 	// Return the confirmed txids and heights for an address
 	GetAddressHistory(address btcutil.Address) ([]AddressHistory, error)
@@ -116,20 +117,14 @@ type ElectrumWallet interface {
 	// Add a transaction to the database
 	AddTransaction(tx *wire.MsgTx, height int64, timestamp time.Time) error
 
-	// Cleanly disconnect from the wallet
-	Close()
-
-	//TODO: below are unimplemented
-	///////////////////////////////
-
 	// Make a new spending transaction
-	Spend(amount int64, toAddress btcutil.Address, feeLevel FeeLevel) ([]byte, error)
+	Spend(amount int64, toAddress btcutil.Address, feeLevel FeeLevel, referenceID string, spendAll bool) (*chainhash.Hash, error)
 
 	// Calculates the estimated size of the transaction and returns the total fee for the given feePerByte
-	EstimateFee(ins []TransactionInput, outs []TransactionOutput, feePerByte uint64) int64
+	EstimateFee(ins []TransactionInput, outs []TransactionOutput, feePerByte uint64) uint64
 
 	// Build a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
-	SweepAddress(utxos []Utxo, address *btcutil.Address, key *hd.ExtendedKey, redeemScript *[]byte, feeLevel FeeLevel) ([]byte, error)
+	SweepAddress(ins []TransactionInput, address btcutil.Address, key *hd.ExtendedKey, redeemScript []byte, feeLevel FeeLevel) (*chainhash.Hash, error)
 
 	// Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked
 	// escrow which releases using the timeoutKey.
@@ -143,6 +138,12 @@ type ElectrumWallet interface {
 
 	// Combine signatures and optionally broadcast
 	Multisign(ins []TransactionInput, outs []TransactionOutput, sigs1 []Signature, sigs2 []Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error)
+
+	// Update the height of the tip of the headers chain
+	UpdateTip(newTip int64)
+
+	// Cleanly disconnect from the wallet
+	Close()
 }
 
 // Errors
@@ -184,7 +185,7 @@ const (
 
 type AddressHistory struct {
 	Height int64
-	TxHash string
+	TxHash chainhash.Hash
 }
 
 type TransactionOutput struct {

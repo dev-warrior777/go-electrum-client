@@ -6,6 +6,8 @@ import (
 	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 )
 
 type Coin interface {
@@ -131,19 +133,19 @@ type Stxos interface {
 
 type Txns interface {
 	// Put a new transaction to the database
-	Put(raw []byte, txid string, value int64, height int, timestamp time.Time, watchOnly bool) error
+	Put(raw []byte, txid string, value int64, height int64, timestamp time.Time, watchOnly bool) error
 
 	// Fetch a tx and it's metadata given a hash
-	Get(txid string) (Txn, error)
+	Get(txid chainhash.Hash) (Txn, error)
 
 	// Fetch all transactions from the db
 	GetAll(includeWatchOnly bool) ([]Txn, error)
 
 	// Update the height of a transaction
-	UpdateHeight(txid string, height int, timestamp time.Time) error
+	UpdateHeight(txid chainhash.Hash, height int, timestamp time.Time) error
 
 	// Delete a transaction from the db
-	Delete(txid string) error
+	Delete(txid chainhash.Hash) error
 }
 
 var ErrKeyImportNotImplemented = errors.New("key import not yet implemented")
@@ -204,15 +206,9 @@ type SubscribeScripts interface {
 	Delete(scriptPubKey []byte) error
 }
 
-type OutPoint struct {
-	TxHash string
-	Index  uint32
-}
-
 type Utxo struct {
 	// Previous txid and output index
-	Op OutPoint
-	// Op wire.OutPoint
+	Op wire.OutPoint
 
 	// Block height where this tx was confirmed, 0 for unconfirmed
 	AtHeight int64
@@ -234,7 +230,7 @@ func (utxo *Utxo) IsEqual(alt *Utxo) bool {
 		return utxo == nil
 	}
 
-	if utxo.Op.TxHash != alt.Op.TxHash {
+	if !utxo.Op.Hash.IsEqual(&alt.Op.Hash) {
 		return false
 	}
 
@@ -265,7 +261,7 @@ type Stxo struct {
 	SpendHeight int64
 
 	// The tx that consumed it
-	SpendTxid string
+	SpendTxid chainhash.Hash
 }
 
 func (stxo *Stxo) IsEqual(alt *Stxo) bool {
@@ -281,7 +277,7 @@ func (stxo *Stxo) IsEqual(alt *Stxo) bool {
 		return false
 	}
 
-	if stxo.SpendTxid != alt.SpendTxid {
+	if !stxo.SpendTxid.IsEqual(&alt.SpendTxid) {
 		return false
 	}
 
@@ -290,7 +286,7 @@ func (stxo *Stxo) IsEqual(alt *Stxo) bool {
 
 type Txn struct {
 	// Transaction ID
-	Txid string
+	Txid chainhash.Hash
 
 	// The value relevant to the wallet
 	Value int64

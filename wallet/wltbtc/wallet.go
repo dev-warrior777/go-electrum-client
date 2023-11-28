@@ -5,13 +5,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcwallet/wallet/txrules"
@@ -47,6 +47,8 @@ type BtcElectrumWallet struct {
 	mutex *sync.RWMutex
 
 	creationDate time.Time
+
+	blockchainTip int64
 
 	running bool
 }
@@ -277,7 +279,7 @@ func (w *BtcElectrumWallet) GetUnusedAddress(purpose wallet.KeyPurpose) (btcutil
 	if err != nil {
 		return nil, nil
 	}
-	addrPubKeyHash, _ := key.Address(w.params)
+	addrPubKeyHash, err := key.Address(w.params)
 	key.Zero()
 	if err != nil {
 		return nil, nil
@@ -345,14 +347,14 @@ func (w *BtcElectrumWallet) ListAddresses() []btcutil.Address {
 
 func (w *BtcElectrumWallet) Balance() (int64, int64) {
 
-	//TODO: check if this works with the new logic
+	//TODO: check if this works with the newly rewritten logic
 
 	checkIfStxoIsConfirmed := func(utxo wallet.Utxo, stxos []wallet.Stxo) bool {
 		for _, stxo := range stxos {
 			if stxo.Utxo.WatchOnly {
 				continue
 			}
-			if stxo.SpendTxid == utxo.Op.TxHash {
+			if stxo.SpendTxid.IsEqual(&utxo.Op.Hash) {
 				return stxo.SpendHeight > 0
 			} else if stxo.Utxo.IsEqual(&utxo) {
 				return stxo.Utxo.AtHeight > 0
@@ -386,14 +388,13 @@ func (w *BtcElectrumWallet) Transactions() ([]wallet.Txn, error) {
 	return w.txstore.Txns().GetAll(false)
 }
 
-func (w *BtcElectrumWallet) HasTransaction(txid string) bool {
-	t, err := w.txstore.Txns().Get(txid)
-	fmt.Println("has", t.Txid)
-	// error only for 'no rows in rowset'
+func (w *BtcElectrumWallet) HasTransaction(txid chainhash.Hash) bool {
+	_, err := w.txstore.Txns().Get(txid)
+	// errors only for 'no rows in rowset'
 	return err == nil
 }
 
-func (w *BtcElectrumWallet) GetTransaction(txid string) (wallet.Txn, error) {
+func (w *BtcElectrumWallet) GetTransaction(txid chainhash.Hash) (wallet.Txn, error) {
 	txn, err := w.txstore.Txns().Get(txid)
 	if err == nil {
 		tx := wire.NewMsgTx(1)
@@ -427,7 +428,8 @@ func (w *BtcElectrumWallet) GetTransaction(txid string) (wallet.Txn, error) {
 	return txn, err
 }
 
-// Return the confirmed txids and heights for an address
+// Return the confirmed txids and heights for an address in client wallet. We
+// can also get this info from the Node.
 func (w *BtcElectrumWallet) GetAddressHistory(address btcutil.Address) ([]wallet.AddressHistory, error) {
 	var history []wallet.AddressHistory
 
@@ -436,60 +438,47 @@ func (w *BtcElectrumWallet) GetAddressHistory(address btcutil.Address) ([]wallet
 	return history, nil
 }
 
-// Send bitcoins to an external wallet
-func (w *BtcElectrumWallet) Spend(amount int64, toAddress btcutil.Address, feeLevel wallet.FeeLevel) ([]byte, error) {
-	// not yet implemented
-	return nil, wallet.ErrWalletFnNotImplemented
-}
-
-// Calculates the estimated size of the transaction and returns the total fee for the given feePerByte
-func (w *BtcElectrumWallet) EstimateFee(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, feePerByte uint64) int64 {
-	// not yet implemented
-	return 0
-}
-
-// Build a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
-func (w *BtcElectrumWallet) SweepAddress(utxos []wallet.Utxo, address *btcutil.Address, key *hdkeychain.ExtendedKey, redeemScript *[]byte, feeLevel wallet.FeeLevel) ([]byte, error) {
-	// not yet implemented
-	return nil, wallet.ErrWalletFnNotImplemented
-}
-
-// Create a signature for a multisig transaction
-func (w *BtcElectrumWallet) CreateMultisigSignature(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, key *hdkeychain.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]wallet.Signature, error) {
-	// not yet implemented
-	return nil, wallet.ErrWalletFnNotImplemented
-}
-
-// Combine signatures and optionally broadcast
-func (w *BtcElectrumWallet) Multisign(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, sigs1 []wallet.Signature, sigs2 []wallet.Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error) {
-	// not yet implemented
-	return nil, wallet.ErrWalletFnNotImplemented
-}
-
-// Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked escrow which releases using the timeoutKey.
-func (w *BtcElectrumWallet) GenerateMultisigScript(keys []hdkeychain.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hdkeychain.ExtendedKey) (address btcutil.Address, redeemScript []byte, err error) {
-	// not yet implemented
-	return nil, nil, wallet.ErrWalletFnNotImplemented
-
-}
-
 // Add a transaction to the database
 func (w *BtcElectrumWallet) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.Time) error {
 	_, err := w.txstore.AddTransaction(tx, height, timestamp)
 	return err
 }
 
+func (w *BtcElectrumWallet) UpdateTip(newTip int64) {
+	w.blockchainTip = newTip
+}
+
 func (w *BtcElectrumWallet) Close() {
 	if w.running {
-		// Any other tear down here .. long running threads, etc.
+		// Any other teardown here .. long running threads, etc.
 		w.running = false
 	}
+
+	/////////////////////////////////////
+	// implementations in sortsignsend.go
+
+	// // Send bitcoins to an external wallet
+	// Spend(amount int64, toAddress btcutil.Address, feeLevel wallet.FeeLevel) ([]byte, error) {
+
+	// // Calculates the estimated size of the transaction and returns the total fee
+	// // for the given feePerByte
+	// EstimateFee(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, feePerByte uint64) int64
+
+	// // Build a transaction that sweeps all coins from an address. If it is a p2sh
+	// // multisig then the redeemScript must be included.
+	// SweepAddress(utxos []wallet.Utxo, address btcutil.Address, key *hdkeychain.ExtendedKey, redeemScript *[]byte, feeLevel wallet.FeeLevel) ([]byte, error)
+
+	// // Create a signature for a multisig transaction
+	// CreateMultisigSignature(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, key *hdkeychain.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]wallet.Signature, error)
+
+	// // Combine signatures and optionally broadcast
+	// Multisign(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, sigs1 []wallet.Signature, sigs2 []wallet.Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error)
+
+	// // Generate a multisig script from public keys. If a timeout is included the
+	// // returned script should be a timelocked escrow which releases using the
+	// // timeoutKey.
+	// GenerateMultisigScript(keys []hdkeychain.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hdkeychain.ExtendedKey) (address btcutil.Address, redeemScript []byte, err error) {
 }
 
 // end interface impl
 /////////////////////
-
-func (w *BtcElectrumWallet) DumpHeaders(writer io.Writer) {
-	// w.blockchain.db.Print(writer)
-	panic("DumpHeaders: Non-SPV wallet")
-}

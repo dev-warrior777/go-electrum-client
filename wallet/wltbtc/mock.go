@@ -11,16 +11,22 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
 type MockDatastore struct {
+	cfg              wallet.Cfg
 	enc              wallet.Enc
 	keys             wallet.Keys
 	utxos            wallet.Utxos
 	stxos            wallet.Stxos
 	txns             wallet.Txns
 	subscribeScripts wallet.SubscribeScripts
+}
+
+func (m *MockDatastore) Cfg() wallet.Cfg {
+	return m.cfg
 }
 
 func (m *MockDatastore) Enc() wallet.Enc {
@@ -45,6 +51,19 @@ func (m *MockDatastore) Txns() wallet.Txns {
 
 func (m *MockDatastore) SubscribeScripts() wallet.SubscribeScripts {
 	return m.subscribeScripts
+}
+
+type mockConfig struct {
+	creationDate time.Time
+}
+
+func (mc *mockConfig) PutCreationDate(date time.Time) error {
+	mc.creationDate = date
+	return nil
+}
+
+func (mc *mockConfig) GetCreationDate() (time.Time, error) {
+	return mc.creationDate, nil
 }
 
 // encrypted blob
@@ -200,7 +219,7 @@ type mockUtxoStore struct {
 }
 
 func (m *mockUtxoStore) Put(utxo wallet.Utxo) error {
-	key := utxo.Op.TxHash + ":" + strconv.Itoa(int(utxo.Op.Index))
+	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
 	m.utxos[key] = &utxo
 	return nil
 }
@@ -214,7 +233,7 @@ func (m *mockUtxoStore) GetAll() ([]wallet.Utxo, error) {
 }
 
 func (m *mockUtxoStore) SetWatchOnly(utxo wallet.Utxo) error {
-	key := utxo.Op.TxHash + ":" + strconv.Itoa(int(utxo.Op.Index))
+	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
 	u, ok := m.utxos[key]
 	if !ok {
 		return errors.New("not found")
@@ -224,7 +243,7 @@ func (m *mockUtxoStore) SetWatchOnly(utxo wallet.Utxo) error {
 }
 
 func (m *mockUtxoStore) Delete(utxo wallet.Utxo) error {
-	key := utxo.Op.TxHash + ":" + strconv.Itoa(int(utxo.Op.Index))
+	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
 	_, ok := m.utxos[key]
 	if !ok {
 		return errors.New("not found")
@@ -238,7 +257,7 @@ type mockStxoStore struct {
 }
 
 func (m *mockStxoStore) Put(stxo wallet.Stxo) error {
-	m.stxos[stxo.SpendTxid] = &stxo
+	m.stxos[stxo.SpendTxid.String()] = &stxo
 	return nil
 }
 
@@ -251,11 +270,11 @@ func (m *mockStxoStore) GetAll() ([]wallet.Stxo, error) {
 }
 
 func (m *mockStxoStore) Delete(stxo wallet.Stxo) error {
-	_, ok := m.stxos[stxo.SpendTxid]
+	_, ok := m.stxos[stxo.SpendTxid.String()]
 	if !ok {
 		return errors.New("not found")
 	}
-	delete(m.stxos, stxo.SpendTxid)
+	delete(m.stxos, stxo.SpendTxid.String())
 	return nil
 }
 
@@ -263,11 +282,15 @@ type mockTxnStore struct {
 	txns map[string]*wallet.Txn
 }
 
-func (m *mockTxnStore) Put(raw []byte, txid string, value, height int, timestamp time.Time, watchOnly bool) error {
+func (m *mockTxnStore) Put(raw []byte, txid string, value int64, height int64, timestamp time.Time, watchOnly bool) error {
+	txHash, err := chainhash.NewHashFromStr(txid)
+	if err != nil {
+		return err
+	}
 	m.txns[txid] = &wallet.Txn{
-		Txid:      txid,
-		Value:     int64(value),
-		Height:    int64(height),
+		Txid:      *txHash,
+		Value:     value,
+		Height:    height,
 		Timestamp: timestamp,
 		WatchOnly: watchOnly,
 		Bytes:     raw,
@@ -275,8 +298,8 @@ func (m *mockTxnStore) Put(raw []byte, txid string, value, height int, timestamp
 	return nil
 }
 
-func (m *mockTxnStore) Get(txid chainhash.Hash) (wallet.Txn, error) {
-	t, ok := m.txns[txid.String()]
+func (m *mockTxnStore) Get(txid string) (wallet.Txn, error) {
+	t, ok := m.txns[txid]
 	if !ok {
 		return wallet.Txn{}, errors.New("not found")
 	}
@@ -294,8 +317,8 @@ func (m *mockTxnStore) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 	return txns, nil
 }
 
-func (m *mockTxnStore) UpdateHeight(txid chainhash.Hash, height int, timestamp time.Time) error {
-	txn, ok := m.txns[txid.String()]
+func (m *mockTxnStore) UpdateHeight(txid string, height int, timestamp time.Time) error {
+	txn, ok := m.txns[txid]
 	if !ok {
 		return errors.New("not found")
 	}
@@ -304,12 +327,12 @@ func (m *mockTxnStore) UpdateHeight(txid chainhash.Hash, height int, timestamp t
 	return nil
 }
 
-func (m *mockTxnStore) Delete(txid *chainhash.Hash) error {
-	_, ok := m.txns[txid.String()]
+func (m *mockTxnStore) Delete(txid string) error {
+	_, ok := m.txns[txid]
 	if !ok {
 		return errors.New("not found")
 	}
-	delete(m.txns, txid.String())
+	delete(m.txns, txid)
 	return nil
 }
 
@@ -319,13 +342,6 @@ type mockSubscribeScriptsStore struct {
 
 func (m *mockSubscribeScriptsStore) Put(scriptPubKey []byte) error {
 	m.scripts[hex.EncodeToString(scriptPubKey)] = scriptPubKey
-	return nil
-}
-
-func (m *mockSubscribeScriptsStore) PutAll(ss [][]byte) error {
-	for _, s := range ss {
-		m.Put(s)
-	}
 	return nil
 }
 
@@ -348,12 +364,12 @@ func (m *mockSubscribeScriptsStore) Delete(scriptPubKey []byte) error {
 }
 
 func TestUtxo_IsEqual(t *testing.T) {
-	h := "16bed6368b8b1542cd6eb87f5bc20dc830b41a2258dde40438a75fa701d24e9a"
+	h, err := chainhash.NewHashFromStr("16bed6368b8b1542cd6eb87f5bc20dc830b41a2258dde40438a75fa701d24e9a")
+	if err != nil {
+		t.Error(err)
+	}
 	u := &wallet.Utxo{
-		Op: wallet.OutPoint{
-			TxHash: h,
-			Index:  0,
-		},
+		Op:           *wire.NewOutPoint(h, 0),
 		ScriptPubkey: make([]byte, 32),
 		AtHeight:     400000,
 		Value:        1000000,
@@ -377,8 +393,11 @@ func TestUtxo_IsEqual(t *testing.T) {
 		t.Error("Failed to return utxos as not equal")
 	}
 	testUtxo = *u
-	ch2 := "1f64249abbf2fcc83fc060a64f69a91391e9f5d98c5d3135fe9716838283aa4c"
-	testUtxo.Op.TxHash = ch2
+	ch2, err := chainhash.NewHashFromStr("1f64249abbf2fcc83fc060a64f69a91391e9f5d98c5d3135fe9716838283aa4c")
+	if err != nil {
+		t.Error(err)
+	}
+	testUtxo.Op.Hash = *ch2
 	if u.IsEqual(&testUtxo) {
 		t.Error("Failed to return utxos as not equal")
 	}
@@ -393,21 +412,21 @@ func TestUtxo_IsEqual(t *testing.T) {
 }
 
 func TestStxo_IsEqual(t *testing.T) {
-	h := "16bed6368b8b1542cd6eb87f5bc20dc830b41a2258dde40438a75fa701d24e9a"
-	u := wallet.Utxo{
-		Op: wallet.OutPoint{
-			TxHash: h,
-			Index:  0,
-		},
+	h, err := chainhash.NewHashFromStr("16bed6368b8b1542cd6eb87f5bc20dc830b41a2258dde40438a75fa701d24e9a")
+	if err != nil {
+		t.Error(err)
+	}
+	u := &wallet.Utxo{
+		Op:           *wire.NewOutPoint(h, 0),
 		ScriptPubkey: make([]byte, 32),
 		AtHeight:     400000,
 		Value:        1000000,
 	}
-	h2 := "1f64249abbf2fcc83fc060a64f69a91391e9f5d98c5d3135fe9716838283aa4c"
+	h2, err := chainhash.NewHashFromStr("1f64249abbf2fcc83fc060a64f69a91391e9f5d98c5d3135fe9716838283aa4c")
 	s := &wallet.Stxo{
-		Utxo:        u,
+		Utxo:        *u,
 		SpendHeight: 400001,
-		SpendTxid:   h2,
+		SpendTxid:   *h2,
 	}
 	if !s.IsEqual(s) {
 		t.Error("Failed to return stxos as equal")
@@ -418,9 +437,9 @@ func TestStxo_IsEqual(t *testing.T) {
 	if s.IsEqual(&testStxo) {
 		t.Error("Failed to return stxos as not equal")
 	}
-	h3 := "3c5cea030a432ba9c8cf138a93f7b2e5b28263ea416894ee0bdf91bc31bb04f2"
+	h3, err := chainhash.NewHashFromStr("3c5cea030a432ba9c8cf138a93f7b2e5b28263ea416894ee0bdf91bc31bb04f2")
 	testStxo = *s
-	testStxo.SpendTxid = h3
+	testStxo.SpendTxid = *h3
 	if s.IsEqual(&testStxo) {
 		t.Error("Failed to return stxos as not equal")
 	}
