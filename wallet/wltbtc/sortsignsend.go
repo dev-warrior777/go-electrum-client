@@ -3,14 +3,11 @@
 package wltbtc
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/coinset"
@@ -75,8 +72,7 @@ func (w *BtcElectrumWallet) gatherCoins() map[coinset.Coin]*hdkeychain.ExtendedK
 		if u.AtHeight > 0 {
 			confirmations = tip - u.AtHeight
 		}
-		hash, _ := txidToChainhash(u.Op.TxHash)
-		c := NewCoin(hash, u.Op.Index, btcutil.Amount(u.Value), confirmations, u.ScriptPubkey)
+		c := NewCoin(&u.Op.Hash, u.Op.Index, btcutil.Amount(u.Value), confirmations, u.ScriptPubkey)
 		addr, err := w.ScriptToAddress(u.ScriptPubkey)
 		if err != nil {
 			continue
@@ -119,7 +115,7 @@ var BumpFeeTransactionDeadError = errors.New("Cannot bump fee of dead transactio
 var BumpFeeNotFoundError = errors.New("Transaction either doesn't exist or has already been spent")
 
 func (w *BtcElectrumWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error) {
-	txn, err := w.txstore.Txns().Get(txid.String())
+	txn, err := w.txstore.Txns().Get(txid)
 	if err != nil {
 		return nil, err
 	}
@@ -130,10 +126,12 @@ func (w *BtcElectrumWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error
 		return nil, BumpFeeTransactionDeadError
 	}
 
+	// As a policy this wallet will never do RBF.
+
 	// Check utxos for CPFP
 	utxos, _ := w.txstore.Utxos().GetAll()
 	for _, u := range utxos {
-		if u.Op.TxHash == txid.String() && u.AtHeight == 0 {
+		if u.Op.Hash.IsEqual(&txid) && u.AtHeight == 0 {
 			addr, err := w.ScriptToAddress(u.ScriptPubkey)
 			if err != nil {
 				return nil, err
@@ -142,14 +140,10 @@ func (w *BtcElectrumWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error
 			if err != nil {
 				return nil, err
 			}
-			h, err := hex.DecodeString(u.Op.TxHash)
-			if err != nil {
-				return nil, err
-			}
 			in := wallet.TransactionInput{
 				LinkedAddress: addr,
 				OutpointIndex: u.Op.Index,
-				OutpointHash:  h,
+				OutpointHash:  u.Op.Hash.CloneBytes(),
 				Value:         u.Value,
 			}
 
@@ -202,7 +196,7 @@ func (w *BtcElectrumWallet) EstimateSpendFee(amount int64, feeLevel wallet.FeeLe
 	}
 	for _, input := range tx.TxIn {
 		for _, utxo := range utxos {
-			if utxo.Op.TxHash == input.PreviousOutPoint.Hash.String() && utxo.Op.Index == input.PreviousOutPoint.Index {
+			if utxo.Op.Hash.IsEqual(&input.PreviousOutPoint.Hash) && utxo.Op.Index == input.PreviousOutPoint.Index {
 				inval += utxo.Value
 				break
 			}
@@ -215,201 +209,210 @@ func (w *BtcElectrumWallet) EstimateSpendFee(amount int64, feeLevel wallet.FeeLe
 }
 
 func (w *BtcElectrumWallet) GenerateMultisigScript(keys []hdkeychain.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hdkeychain.ExtendedKey) (addr btcutil.Address, redeemScript []byte, err error) {
-	if uint32(timeout.Hours()) > 0 && timeoutKey == nil {
-		return nil, nil, errors.New("Timeout key must be non nil when using an escrow timeout")
-	}
 
-	if len(keys) < threshold {
-		return nil, nil, fmt.Errorf("unable to generate multisig script with "+
-			"%d required signatures when there are only %d public "+
-			"keys available", threshold, len(keys))
-	}
+	return nil, nil, wallet.ErrWalletFnNotImplemented
 
-	var ecKeys []*btcec.PublicKey
-	for _, key := range keys {
-		ecKey, err := key.ECPubKey()
-		if err != nil {
-			return nil, nil, err
-		}
-		ecKeys = append(ecKeys, ecKey)
-	}
+	// if uint32(timeout.Hours()) > 0 && timeoutKey == nil {
+	// 	return nil, nil, errors.New("Timeout key must be non nil when using an escrow timeout")
+	// }
 
-	builder := txscript.NewScriptBuilder()
-	if uint32(timeout.Hours()) == 0 {
+	// if len(keys) < threshold {
+	// 	return nil, nil, fmt.Errorf("unable to generate multisig script with "+
+	// 		"%d required signatures when there are only %d public "+
+	// 		"keys available", threshold, len(keys))
+	// }
 
-		builder.AddInt64(int64(threshold))
-		for _, key := range ecKeys {
-			builder.AddData(key.SerializeCompressed())
-		}
-		builder.AddInt64(int64(len(ecKeys)))
-		builder.AddOp(txscript.OP_CHECKMULTISIG)
+	// var ecKeys []*btcec.PublicKey
+	// for _, key := range keys {
+	// 	ecKey, err := key.ECPubKey()
+	// 	if err != nil {
+	// 		return nil, nil, err
+	// 	}
+	// 	ecKeys = append(ecKeys, ecKey)
+	// }
 
-	} else {
-		ecKey, err := timeoutKey.ECPubKey()
-		if err != nil {
-			return nil, nil, err
-		}
-		sequenceLock := blockchain.LockTimeToSequence(false, uint32(timeout.Hours()*6))
-		builder.AddOp(txscript.OP_IF)
-		builder.AddInt64(int64(threshold))
-		for _, key := range ecKeys {
-			builder.AddData(key.SerializeCompressed())
-		}
-		builder.AddInt64(int64(len(ecKeys)))
-		builder.AddOp(txscript.OP_CHECKMULTISIG)
-		builder.AddOp(txscript.OP_ELSE).
-			AddInt64(int64(sequenceLock)).
-			AddOp(txscript.OP_CHECKSEQUENCEVERIFY).
-			AddOp(txscript.OP_DROP).
-			AddData(ecKey.SerializeCompressed()).
-			AddOp(txscript.OP_CHECKSIG).
-			AddOp(txscript.OP_ENDIF)
-	}
-	redeemScript, err = builder.Script()
-	if err != nil {
-		return nil, nil, err
-	}
+	// builder := txscript.NewScriptBuilder()
+	// if uint32(timeout.Hours()) == 0 {
 
-	witnessProgram := sha256.Sum256(redeemScript)
+	// 	builder.AddInt64(int64(threshold))
+	// 	for _, key := range ecKeys {
+	// 		builder.AddData(key.SerializeCompressed())
+	// 	}
+	// 	builder.AddInt64(int64(len(ecKeys)))
+	// 	builder.AddOp(txscript.OP_CHECKMULTISIG)
 
-	addr, err = btcutil.NewAddressWitnessScriptHash(witnessProgram[:], w.params)
-	if err != nil {
-		return nil, nil, err
-	}
-	return addr, redeemScript, nil
+	// } else {
+	// 	ecKey, err := timeoutKey.ECPubKey()
+	// 	if err != nil {
+	// 		return nil, nil, err
+	// 	}
+	// 	sequenceLock := blockchain.LockTimeToSequence(false, uint32(timeout.Hours()*6))
+	// 	builder.AddOp(txscript.OP_IF)
+	// 	builder.AddInt64(int64(threshold))
+	// 	for _, key := range ecKeys {
+	// 		builder.AddData(key.SerializeCompressed())
+	// 	}
+	// 	builder.AddInt64(int64(len(ecKeys)))
+	// 	builder.AddOp(txscript.OP_CHECKMULTISIG)
+	// 	builder.AddOp(txscript.OP_ELSE).
+	// 		AddInt64(int64(sequenceLock)).
+	// 		AddOp(txscript.OP_CHECKSEQUENCEVERIFY).
+	// 		AddOp(txscript.OP_DROP).
+	// 		AddData(ecKey.SerializeCompressed()).
+	// 		AddOp(txscript.OP_CHECKSIG).
+	// 		AddOp(txscript.OP_ENDIF)
+	// }
+	// redeemScript, err = builder.Script()
+	// if err != nil {
+	// 	return nil, nil, err
+	// }
+
+	// witnessProgram := sha256.Sum256(redeemScript)
+
+	// addr, err = btcutil.NewAddressWitnessScriptHash(witnessProgram[:], w.params)
+	// if err != nil {
+	// 	return nil, nil, err
+	// }
+	// return addr, redeemScript, nil
 }
 
 func (w *BtcElectrumWallet) CreateMultisigSignature(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, key *hdkeychain.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]wallet.Signature, error) {
-	var sigs []wallet.Signature
-	tx := wire.NewMsgTx(1)
-	for _, in := range ins {
-		ch, err := chainhash.NewHashFromStr(hex.EncodeToString(in.OutpointHash))
-		if err != nil {
-			return sigs, err
-		}
-		outpoint := wire.NewOutPoint(ch, in.OutpointIndex)
-		input := wire.NewTxIn(outpoint, []byte{}, [][]byte{})
-		tx.TxIn = append(tx.TxIn, input)
-	}
-	for _, out := range outs {
-		scriptPubKey, err := txscript.PayToAddrScript(out.Address)
-		if err != nil {
-			return sigs, err
-		}
-		output := wire.NewTxOut(out.Value, scriptPubKey)
-		tx.TxOut = append(tx.TxOut, output)
-	}
 
-	// Subtract fee
-	txType := P2SH_2of3_Multisig
-	_, err := LockTimeFromRedeemScript(redeemScript)
-	if err == nil {
-		txType = P2SH_Multisig_Timelock_2Sigs
-	}
-	estimatedSize := EstimateSerializeSize(len(ins), tx.TxOut, false, txType)
-	fee := estimatedSize * int(feePerByte)
-	if len(tx.TxOut) > 0 {
-		feePerOutput := fee / len(tx.TxOut)
-		for _, output := range tx.TxOut {
-			output.Value -= int64(feePerOutput)
-		}
-	}
+	return nil, wallet.ErrWalletFnNotImplemented
 
-	// BIP 69 sorting
-	txsort.InPlaceSort(tx)
+	// var sigs []wallet.Signature
+	// tx := wire.NewMsgTx(1)
+	// for _, in := range ins {
+	// 	ch, err := chainhash.NewHashFromStr(hex.EncodeToString(in.OutpointHash))
+	// 	if err != nil {
+	// 		return sigs, err
+	// 	}
+	// 	outpoint := wire.NewOutPoint(ch, in.OutpointIndex)
+	// 	input := wire.NewTxIn(outpoint, []byte{}, [][]byte{})
+	// 	tx.TxIn = append(tx.TxIn, input)
+	// }
+	// for _, out := range outs {
+	// 	scriptPubKey, err := txscript.PayToAddrScript(out.Address)
+	// 	if err != nil {
+	// 		return sigs, err
+	// 	}
+	// 	output := wire.NewTxOut(out.Value, scriptPubKey)
+	// 	tx.TxOut = append(tx.TxOut, output)
+	// }
 
-	signingKey, err := key.ECPrivKey()
-	if err != nil {
-		return sigs, err
-	}
+	// // Subtract fee
+	// txType := P2SH_2of3_Multisig
+	// _, err := LockTimeFromRedeemScript(redeemScript)
+	// if err == nil {
+	// 	txType = P2SH_Multisig_Timelock_2Sigs
+	// }
+	// estimatedSize := EstimateSerializeSize(len(ins), tx.TxOut, false, txType)
+	// fee := estimatedSize * int(feePerByte)
+	// if len(tx.TxOut) > 0 {
+	// 	feePerOutput := fee / len(tx.TxOut)
+	// 	for _, output := range tx.TxOut {
+	// 		output.Value -= int64(feePerOutput)
+	// 	}
+	// }
 
-	hashes := txscript.NewTxSigHashes(tx, nil)
-	for i := range tx.TxIn {
-		sig, err := txscript.RawTxInWitnessSignature(tx, hashes, i, ins[i].Value, redeemScript, txscript.SigHashAll, signingKey)
-		if err != nil {
-			continue
-		}
-		bs := wallet.Signature{InputIndex: uint32(i), Signature: sig}
-		sigs = append(sigs, bs)
-	}
-	return sigs, nil
+	// // BIP 69 sorting
+	// txsort.InPlaceSort(tx)
+
+	// signingKey, err := key.ECPrivKey()
+	// if err != nil {
+	// 	return sigs, err
+	// }
+
+	// hashes := txscript.NewTxSigHashes(tx, nil)
+	// for i := range tx.TxIn {
+	// 	sig, err := txscript.RawTxInWitnessSignature(tx, hashes, i, ins[i].Value, redeemScript, txscript.SigHashAll, signingKey)
+	// 	if err != nil {
+	// 		continue
+	// 	}
+	// 	bs := wallet.Signature{InputIndex: uint32(i), Signature: sig}
+	// 	sigs = append(sigs, bs)
+	// }
+	// return sigs, nil
 }
 
 func (w *BtcElectrumWallet) Multisign(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, sigs1 []wallet.Signature, sigs2 []wallet.Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error) {
-	tx := wire.NewMsgTx(1)
-	for _, in := range ins {
-		ch, err := chainhash.NewHashFromStr(hex.EncodeToString(in.OutpointHash))
-		if err != nil {
-			return nil, err
-		}
-		outpoint := wire.NewOutPoint(ch, in.OutpointIndex)
-		input := wire.NewTxIn(outpoint, []byte{}, [][]byte{})
-		tx.TxIn = append(tx.TxIn, input)
-	}
-	for _, out := range outs {
-		scriptPubKey, err := txscript.PayToAddrScript(out.Address)
-		if err != nil {
-			return nil, err
-		}
-		output := wire.NewTxOut(out.Value, scriptPubKey)
-		tx.TxOut = append(tx.TxOut, output)
-	}
 
-	// Subtract fee
-	txType := P2SH_2of3_Multisig
-	_, err := LockTimeFromRedeemScript(redeemScript)
-	if err == nil {
-		txType = P2SH_Multisig_Timelock_2Sigs
-	}
-	estimatedSize := EstimateSerializeSize(len(ins), tx.TxOut, false, txType)
-	fee := estimatedSize * int(feePerByte)
-	if len(tx.TxOut) > 0 {
-		feePerOutput := fee / len(tx.TxOut)
-		for _, output := range tx.TxOut {
-			output.Value -= int64(feePerOutput)
-		}
-	}
+	return nil, wallet.ErrWalletFnNotImplemented
 
-	// BIP 69 sorting
-	txsort.InPlaceSort(tx)
+	// tx := wire.NewMsgTx(1)
+	// for _, in := range ins {
+	// 	ch, err := chainhash.NewHashFromStr(hex.EncodeToString(in.OutpointHash))
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	outpoint := wire.NewOutPoint(ch, in.OutpointIndex)
+	// 	input := wire.NewTxIn(outpoint, []byte{}, [][]byte{})
+	// 	tx.TxIn = append(tx.TxIn, input)
+	// }
+	// for _, out := range outs {
+	// 	scriptPubKey, err := txscript.PayToAddrScript(out.Address)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	output := wire.NewTxOut(out.Value, scriptPubKey)
+	// 	tx.TxOut = append(tx.TxOut, output)
+	// }
 
-	// Check if time locked
-	var timeLocked bool
-	if redeemScript[0] == txscript.OP_IF {
-		timeLocked = true
-	}
+	// // Subtract fee
+	// txType := P2SH_2of3_Multisig
+	// _, err := LockTimeFromRedeemScript(redeemScript)
+	// if err == nil {
+	// 	txType = P2SH_Multisig_Timelock_2Sigs
+	// }
+	// estimatedSize := EstimateSerializeSize(len(ins), tx.TxOut, false, txType)
+	// fee := estimatedSize * int(feePerByte)
+	// if len(tx.TxOut) > 0 {
+	// 	feePerOutput := fee / len(tx.TxOut)
+	// 	for _, output := range tx.TxOut {
+	// 		output.Value -= int64(feePerOutput)
+	// 	}
+	// }
 
-	for i, input := range tx.TxIn {
-		var sig1 []byte
-		var sig2 []byte
-		for _, sig := range sigs1 {
-			if int(sig.InputIndex) == i {
-				sig1 = sig.Signature
-				break
-			}
-		}
-		for _, sig := range sigs2 {
-			if int(sig.InputIndex) == i {
-				sig2 = sig.Signature
-				break
-			}
-		}
+	// // BIP 69 sorting
+	// txsort.InPlaceSort(tx)
 
-		witness := wire.TxWitness{[]byte{}, sig1, sig2}
+	// // Check if time locked
+	// var timeLocked bool
+	// if redeemScript[0] == txscript.OP_IF {
+	// 	timeLocked = true
+	// }
 
-		if timeLocked {
-			witness = append(witness, []byte{0x01})
-		}
-		witness = append(witness, redeemScript)
-		input.Witness = witness
-	}
-	// broadcast
-	if broadcast {
-		w.Broadcast(tx)
-	}
-	var buf bytes.Buffer
-	tx.BtcEncode(&buf, wire.ProtocolVersion, wire.WitnessEncoding)
-	return buf.Bytes(), nil
+	// for i, input := range tx.TxIn {
+	// 	var sig1 []byte
+	// 	var sig2 []byte
+	// 	for _, sig := range sigs1 {
+	// 		if int(sig.InputIndex) == i {
+	// 			sig1 = sig.Signature
+	// 			break
+	// 		}
+	// 	}
+	// 	for _, sig := range sigs2 {
+	// 		if int(sig.InputIndex) == i {
+	// 			sig2 = sig.Signature
+	// 			break
+	// 		}
+	// 	}
+
+	// 	witness := wire.TxWitness{[]byte{}, sig1, sig2}
+
+	// 	if timeLocked {
+	// 		witness = append(witness, []byte{0x01})
+	// 	}
+	// 	witness = append(witness, redeemScript)
+	// 	input.Witness = witness
+	// }
+	// // broadcast
+	// if broadcast {
+	// 	w.Broadcast(tx)
+	// }
+	// var buf bytes.Buffer
+	// tx.BtcEncode(&buf, wire.ProtocolVersion, wire.WitnessEncoding)
+	// return buf.Bytes(), nil
 }
 
 func (w *BtcElectrumWallet) SweepAddress(ins []wallet.TransactionInput, address btcutil.Address, key *hdkeychain.ExtendedKey, redeemScript []byte, feeLevel wallet.FeeLevel) (*chainhash.Hash, error) {
@@ -514,7 +517,8 @@ func (w *BtcElectrumWallet) SweepAddress(ins []wallet.TransactionInput, address 
 		}
 	}
 
-	hashes := txscript.NewTxSigHashes(tx)
+	//FIXME:
+	hashes := txscript.NewTxSigHashes(tx, nil)
 	for i, txIn := range tx.TxIn {
 		if redeemScript == nil {
 			prevOutScript := additionalPrevScripts[txIn.PreviousOutPoint]

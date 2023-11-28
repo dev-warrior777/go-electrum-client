@@ -10,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -59,9 +60,9 @@ func Test_gatherCoins(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	op := wallet.OutPoint{
-		TxHash: txid,
-		Index:  0,
+	op := wire.OutPoint{
+		Hash:  *h1,
+		Index: 0,
 	}
 	err = w.txstore.Utxos().Put(wallet.Utxo{Op: op, ScriptPubkey: script1, AtHeight: 5, Value: 10000})
 	if err != nil {

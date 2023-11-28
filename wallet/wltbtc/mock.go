@@ -298,8 +298,8 @@ func (m *mockTxnStore) Put(raw []byte, txid string, value int64, height int64, t
 	return nil
 }
 
-func (m *mockTxnStore) Get(txid string) (wallet.Txn, error) {
-	t, ok := m.txns[txid]
+func (m *mockTxnStore) Get(txid chainhash.Hash) (wallet.Txn, error) {
+	t, ok := m.txns[txid.String()]
 	if !ok {
 		return wallet.Txn{}, errors.New("not found")
 	}
@@ -317,8 +317,8 @@ func (m *mockTxnStore) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 	return txns, nil
 }
 
-func (m *mockTxnStore) UpdateHeight(txid string, height int, timestamp time.Time) error {
-	txn, ok := m.txns[txid]
+func (m *mockTxnStore) UpdateHeight(txid chainhash.Hash, height int, timestamp time.Time) error {
+	txn, ok := m.txns[txid.String()]
 	if !ok {
 		return errors.New("not found")
 	}
@@ -327,12 +327,12 @@ func (m *mockTxnStore) UpdateHeight(txid string, height int, timestamp time.Time
 	return nil
 }
 
-func (m *mockTxnStore) Delete(txid string) error {
-	_, ok := m.txns[txid]
+func (m *mockTxnStore) Delete(txid chainhash.Hash) error {
+	_, ok := m.txns[txid.String()]
 	if !ok {
 		return errors.New("not found")
 	}
-	delete(m.txns, txid)
+	delete(m.txns, txid.String())
 	return nil
 }
 
