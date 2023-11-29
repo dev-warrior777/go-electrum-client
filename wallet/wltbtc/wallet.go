@@ -115,15 +115,8 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 		repoPath:     config.DataDir,
 		params:       config.Params,
 		creationDate: time.Now(),
-		feeProvider: wallet.NewFeeProvider(
-			config.MaxFee,
-			config.HighFee,
-			config.MediumFee,
-			config.LowFee,
-			"",
-			nil,
-		),
-		mutex: new(sync.RWMutex),
+		feeProvider:  wallet.DefaultFeeProvider(),
+		mutex:        new(sync.RWMutex),
 	}
 
 	sm := NewStorageManager(config.DB.Enc(), config.Params)
@@ -193,16 +186,8 @@ func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrum
 		repoPath:       config.DataDir,
 		storageManager: sm,
 		params:         config.Params,
-		feeProvider: wallet.NewFeeProvider(
-			config.MaxFee,
-			config.HighFee,
-			config.MediumFee,
-			config.LowFee,
-			// move to client
-			"",
-			nil,
-		),
-		mutex: new(sync.RWMutex),
+		feeProvider:    wallet.DefaultFeeProvider(),
+		mutex:          new(sync.RWMutex),
 	}
 
 	w.keyManager, err = NewKeyManager(config.DB.Keys(), w.params, mPrivKey)
@@ -454,8 +439,8 @@ func (w *BtcElectrumWallet) Close() {
 		w.running = false
 	}
 
-	/////////////////////////////////////
-	// implementations in sortsignsend.go
+	/////////////////////////////
+	// implementations in send.go
 
 	// // Send bitcoins to an external wallet
 	// Spend(amount int64, toAddress btcutil.Address, feeLevel wallet.FeeLevel) ([]byte, error) {
@@ -464,20 +449,32 @@ func (w *BtcElectrumWallet) Close() {
 	// // for the given feePerByte
 	// EstimateFee(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, feePerByte uint64) int64
 
+	//////////////////////////////
+	// implementations in sweep.go
+
 	// // Build a transaction that sweeps all coins from an address. If it is a p2sh
 	// // multisig then the redeemScript must be included.
 	// SweepAddress(utxos []wallet.Utxo, address btcutil.Address, key *hdkeychain.ExtendedKey, redeemScript *[]byte, feeLevel wallet.FeeLevel) ([]byte, error)
+
+	////////////////////////////////
+	// implementations in bumpfee.go
+
+	// CPFP logic - No rbf and never will be here!
+	// func (w *BtcElectrumWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error)
+
+	//////////////////////////////////
+	// implementations in multisend.go
+
+	// // Generate a multisig script from public keys. If a timeout is included the
+	// // returned script should be a timelocked escrow which releases using the
+	// // timeoutKey.
+	// GenerateMultisigScript(keys []hdkeychain.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hdkeychain.ExtendedKey) (address btcutil.Address, redeemScript []byte, err error) {
 
 	// // Create a signature for a multisig transaction
 	// CreateMultisigSignature(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, key *hdkeychain.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]wallet.Signature, error)
 
 	// // Combine signatures and optionally broadcast
 	// Multisign(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, sigs1 []wallet.Signature, sigs2 []wallet.Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error)
-
-	// // Generate a multisig script from public keys. If a timeout is included the
-	// // returned script should be a timelocked escrow which releases using the
-	// // timeoutKey.
-	// GenerateMultisigScript(keys []hdkeychain.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hdkeychain.ExtendedKey) (address btcutil.Address, redeemScript []byte, err error) {
 }
 
 // end interface impl

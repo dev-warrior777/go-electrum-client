@@ -28,12 +28,12 @@ type WalletConfig struct {
 	DB Datastore
 
 	// The default fee-per-byte for each level
-	LowFee    uint64
-	MediumFee uint64
-	HighFee   uint64
+	LowFee    int64
+	MediumFee int64
+	HighFee   int64
 
 	// The highest allowable fee-per-byte
-	MaxFee uint64
+	MaxFee int64
 
 	// If not testing do not overwrite existing wallet files
 	Testing bool
@@ -118,13 +118,16 @@ type ElectrumWallet interface {
 	AddTransaction(tx *wire.MsgTx, height int64, timestamp time.Time) error
 
 	// Make a new spending transaction
-	Spend(amount int64, toAddress btcutil.Address, feeLevel FeeLevel, referenceID string, spendAll bool) (*chainhash.Hash, error)
+	Spend(amount int64, toAddress btcutil.Address, feeLevel FeeLevel, referenceID string, spendAll bool) (*wire.MsgTx, error)
 
 	// Calculates the estimated size of the transaction and returns the total fee for the given feePerByte
-	EstimateFee(ins []TransactionInput, outs []TransactionOutput, feePerByte uint64) uint64
+	EstimateFee(ins []TransactionInput, outs []TransactionOutput, feePerByte int64) int64
 
 	// Build a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
-	SweepAddress(ins []TransactionInput, address btcutil.Address, key *hd.ExtendedKey, redeemScript []byte, feeLevel FeeLevel) (*chainhash.Hash, error)
+	SweepAddress(ins []TransactionInput, address btcutil.Address, key *hd.ExtendedKey, redeemScript []byte, feeLevel FeeLevel) (*wire.MsgTx, error)
+
+	// CPFP logic
+	BumpFee(txid chainhash.Hash) (*wire.MsgTx, error)
 
 	// Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked
 	// escrow which releases using the timeoutKey.
@@ -134,10 +137,10 @@ type ElectrumWallet interface {
 	GenerateMultisigScript(keys []hd.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hd.ExtendedKey) (addr btcutil.Address, redeemScript []byte, err error)
 
 	// Create a signature for a multisig transaction
-	CreateMultisigSignature(ins []TransactionInput, outs []TransactionOutput, key *hd.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]Signature, error)
+	CreateMultisigSignature(ins []TransactionInput, outs []TransactionOutput, key *hd.ExtendedKey, redeemScript []byte, feePerByte int64) ([]Signature, error)
 
 	// Combine signatures and optionally broadcast
-	Multisign(ins []TransactionInput, outs []TransactionOutput, sigs1 []Signature, sigs2 []Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error)
+	Multisign(ins []TransactionInput, outs []TransactionOutput, sigs1 []Signature, sigs2 []Signature, redeemScript []byte, feePerByte int64, broadcast bool) ([]byte, error)
 
 	// Update the height of the tip of the headers chain
 	UpdateTip(newTip int64)
@@ -162,7 +165,7 @@ var (
 type FeeLevel int
 
 const (
-	PRIOIRTY       FeeLevel = 0
+	PRIORITY       FeeLevel = 0
 	NORMAL         FeeLevel = 1
 	ECONOMIC       FeeLevel = 2
 	FEE_BUMP       FeeLevel = 3

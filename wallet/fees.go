@@ -19,16 +19,16 @@ type feeCache struct {
 }
 
 type Fees struct {
-	Priority uint64 `json:"priority"`
-	Normal   uint64 `json:"normal"`
-	Economic uint64 `json:"economic"`
+	Priority int64 `json:"priority"`
+	Normal   int64 `json:"normal"`
+	Economic int64 `json:"economic"`
 }
 
 type FeeProvider struct {
-	MaxFee      uint64
-	PriorityFee uint64
-	NormalFee   uint64
-	EconomicFee uint64
+	MaxFee      int64
+	PriorityFee int64
+	NormalFee   int64
+	EconomicFee int64
 	FeeAPI      string
 
 	HttpClient HttpClient
@@ -36,7 +36,7 @@ type FeeProvider struct {
 	cache *feeCache
 }
 
-func NewFeeProvider(maxFee, priorityFee, normalFee, economicFee uint64, feeAPI string, proxy proxy.Dialer) *FeeProvider {
+func NewFeeProvider(maxFee, priorityFee, normalFee, economicFee int64, feeAPI string, proxy proxy.Dialer) *FeeProvider {
 	fp := FeeProvider{
 		MaxFee:      maxFee,
 		PriorityFee: priorityFee,
@@ -55,7 +55,7 @@ func NewFeeProvider(maxFee, priorityFee, normalFee, economicFee uint64, feeAPI s
 	return &fp
 }
 
-func (fp *FeeProvider) GetFeePerByte(feeLevel FeeLevel) uint64 {
+func (fp *FeeProvider) GetFeePerByte(feeLevel FeeLevel) int64 {
 	if fp.FeeAPI == "" {
 		return fp.defaultFee(feeLevel)
 	}
@@ -78,20 +78,20 @@ func (fp *FeeProvider) GetFeePerByte(feeLevel FeeLevel) uint64 {
 		fees = fp.cache.fees
 	}
 	switch feeLevel {
-	case PRIOIRTY:
-		return fp.selectFee(fees.Priority, PRIOIRTY)
+	case PRIORITY:
+		return fp.selectFee(fees.Priority, PRIORITY)
 	case NORMAL:
-		return fp.selectFee(fees.Normal, PRIOIRTY)
+		return fp.selectFee(fees.Normal, PRIORITY)
 	case ECONOMIC:
-		return fp.selectFee(fees.Economic, PRIOIRTY)
+		return fp.selectFee(fees.Economic, PRIORITY)
 	case FEE_BUMP:
-		return fp.selectFee(fees.Priority, PRIOIRTY)
+		return fp.selectFee(fees.Priority, PRIORITY)
 	default:
 		return fp.NormalFee
 	}
 }
 
-func (fp *FeeProvider) selectFee(fee uint64, feeLevel FeeLevel) uint64 {
+func (fp *FeeProvider) selectFee(fee int64, feeLevel FeeLevel) int64 {
 	if fee > fp.MaxFee {
 		return fp.MaxFee
 	} else if fee == 0 {
@@ -101,9 +101,9 @@ func (fp *FeeProvider) selectFee(fee uint64, feeLevel FeeLevel) uint64 {
 	}
 }
 
-func (fp *FeeProvider) defaultFee(feeLevel FeeLevel) uint64 {
+func (fp *FeeProvider) defaultFee(feeLevel FeeLevel) int64 {
 	switch feeLevel {
-	case PRIOIRTY:
+	case PRIORITY:
 		return fp.PriorityFee
 	case NORMAL:
 		return fp.NormalFee
@@ -114,4 +114,9 @@ func (fp *FeeProvider) defaultFee(feeLevel FeeLevel) uint64 {
 	default:
 		return fp.NormalFee
 	}
+}
+
+// December 2023
+func DefaultFeeProvider() *FeeProvider {
+	return NewFeeProvider(int64(1000), int64(50), int64(30), int64(20), "", nil)
 }

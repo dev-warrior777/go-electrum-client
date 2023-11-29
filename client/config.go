@@ -45,12 +45,12 @@ type ClientConfig struct {
 	Proxy proxy.Dialer
 
 	// The default fee-per-byte for each level
-	LowFee    uint64
-	MediumFee uint64
-	HighFee   uint64
+	LowFee    int64
+	MediumFee int64
+	HighFee   int64
 
 	// The highest allowable fee-per-byte
-	MaxFee uint64
+	MaxFee int64
 
 	// External API to query to look up fees. If this field is nil then the default fees will be used.
 	// If the API is unreachable then the default fees will likewise be used. If the API returns a fee

@@ -32,7 +32,7 @@ func TestFeeProvider_GetFeePerByte(t *testing.T) {
 	fp.HttpClient = new(mockHttpClient)
 
 	// Test fetch from API
-	if fp.GetFeePerByte(wallet.PRIOIRTY) != 450 {
+	if fp.GetFeePerByte(wallet.PRIORITY) != 450 {
 		t.Error("Returned incorrect fee per byte")
 	}
 	if fp.GetFeePerByte(wallet.NORMAL) != 420 {
@@ -47,7 +47,7 @@ func TestFeeProvider_GetFeePerByte(t *testing.T) {
 
 	// Test return over max
 	fp.MaxFee = 100
-	if fp.GetFeePerByte(wallet.PRIOIRTY) != 100 {
+	if fp.GetFeePerByte(wallet.PRIORITY) != 100 {
 		t.Error("Returned incorrect fee per byte")
 	}
 	if fp.GetFeePerByte(wallet.NORMAL) != 100 {
@@ -62,7 +62,7 @@ func TestFeeProvider_GetFeePerByte(t *testing.T) {
 
 	// Test no API provided
 	fp.FeeAPI = ""
-	if fp.GetFeePerByte(wallet.PRIOIRTY) != 360 {
+	if fp.GetFeePerByte(wallet.PRIORITY) != 360 {
 		t.Error("Returned incorrect fee per byte")
 	}
 	if fp.GetFeePerByte(wallet.NORMAL) != 320 {
