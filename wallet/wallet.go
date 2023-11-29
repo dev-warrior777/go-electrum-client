@@ -148,7 +148,7 @@ type ElectrumWallet interface {
 
 // Errors
 var (
-	ErrorDustAmount error = errors.New("amount is below network dust treshold")
+	ErrDustAmount error = errors.New("amount is below network dust treshold")
 	// ErrInsufficientFunds is returned when the wallet is unable to send the
 	// amount specified due to the balance being too low
 	ErrInsufficientFunds = errors.New("ERROR_INSUFFICIENT_FUNDS")
