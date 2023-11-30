@@ -146,7 +146,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 
 	h.synced = true
 	fmt.Println("headers synced up to tip ", h.hdrsTip)
-	ec.GetWallet().UpdateTip(h.hdrsTip)
+	ec.updateWalletTip()
 	return nil
 }
 
@@ -222,7 +222,7 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 							// update tip / local tip / wallet tip
 							h.hdrsTip = x.Height
 							maybeTip = x.Height
-							ec.GetWallet().UpdateTip(x.Height)
+							ec.updateWalletTip()
 
 							// verify added header back from new tip
 							h.VerifyFromTip(2, false)
@@ -264,7 +264,7 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 								// update tip / local tip
 								h.hdrsTip = x.Height
 								maybeTip = x.Height
-								ec.GetWallet().UpdateTip(x.Height)
+								ec.updateWalletTip()
 
 								// verify added headers back from new tip
 								h.VerifyFromTip(int64(count+1), false)

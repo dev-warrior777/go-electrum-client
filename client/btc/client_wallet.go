@@ -122,7 +122,7 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 ////////////////////////
 
 // Broadcast sends a transaction to the server for broadcast on the bitcoin
-// network
+// network. It returns txid as a string.
 func (ec *BtcElectrumClient) Broadcast(rawTx string) (string, error) {
 	return ec.GetNode().Broadcast(rawTx)
 }

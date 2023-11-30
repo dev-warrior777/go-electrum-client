@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -16,8 +17,9 @@ type Storage struct {
 	Version  string   `json:"version"`
 	Xprv     string   `json:"xprv"`
 	Xpub     string   `json:"xpub"`
+	ShaPw    []byte   `json:"shapw"`
 	Seed     []byte   `json:"seed,omitempty"`
-	Imported []string `json:"imported,omitempty"`
+	Imported [][]byte `json:"imported,omitempty"`
 }
 
 // String returns the string representation of the Storage but only of the
@@ -26,6 +28,24 @@ func (s *Storage) String() string {
 	b := new(bytes.Buffer)
 	fmt.Fprintf(b, "{\n%s\n%s\n%s\n}\n", s.Version, s.Xprv, s.Xpub)
 	return b.String()
+}
+
+func (s *Storage) blank() {
+	zero := func(b []byte) {
+		blen := len(b)
+		for i := 0; i < blen; i++ {
+			b[i] = 0
+		}
+	}
+	// This could be better with unsafe
+	s.Xprv = ""
+	s.Xpub = ""
+	zero(s.ShaPw)
+	zero(s.Seed)
+	for _, imp := range s.Imported {
+		zero(imp)
+	}
+	// runtime.GC()
 }
 
 type StorageManager struct {
@@ -73,4 +93,24 @@ func (sm *StorageManager) Get(pw string) error {
 	}
 
 	return json.Unmarshal(b, sm.store)
+}
+
+func (sm *StorageManager) ValidPw(pw string) bool {
+	if len(pw) == 0 {
+		return false
+	}
+
+	b, err := sm.datastore.GetDecrypted(pw)
+	if err != nil {
+		return false
+	}
+	defer sm.store.blank()
+
+	err = json.Unmarshal(b, sm.store)
+	if err != nil {
+		return false
+	}
+
+	shaPw := chainhash.HashB([]byte(pw))
+	return !bytes.Equal(sm.store.ShaPw, shaPw)
 }

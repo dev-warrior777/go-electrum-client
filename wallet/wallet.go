@@ -143,7 +143,7 @@ type ElectrumWallet interface {
 	Multisign(ins []TransactionInput, outs []TransactionOutput, sigs1 []Signature, sigs2 []Signature, redeemScript []byte, feePerByte int64, broadcast bool) ([]byte, error)
 
 	// Update the height of the tip of the headers chain
-	UpdateTip(newTip int64)
+	UpdateTip(newTip int64, synced bool)
 
 	// Cleanly disconnect from the wallet
 	Close()

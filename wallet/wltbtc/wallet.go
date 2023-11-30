@@ -48,7 +48,8 @@ type BtcElectrumWallet struct {
 
 	creationDate time.Time
 
-	blockchainTip int64
+	blockchainSynced bool
+	blockchainTip    int64
 
 	running bool
 }
@@ -123,6 +124,7 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 	sm.store.Version = "0.1"
 	sm.store.Xprv = mPrivKey.String()
 	sm.store.Xpub = mPubKey.String()
+	sm.store.ShaPw = chainhash.HashB([]byte(pw))
 	if config.StoreEncSeed {
 		sm.store.Seed = make([]byte, len(seed))
 		copy(sm.store.Seed, seed)
@@ -429,8 +431,9 @@ func (w *BtcElectrumWallet) AddTransaction(tx *wire.MsgTx, height int64, timesta
 	return err
 }
 
-func (w *BtcElectrumWallet) UpdateTip(newTip int64) {
+func (w *BtcElectrumWallet) UpdateTip(newTip int64, synced bool) {
 	w.blockchainTip = newTip
+	w.blockchainSynced = synced
 }
 
 func (w *BtcElectrumWallet) Close() {

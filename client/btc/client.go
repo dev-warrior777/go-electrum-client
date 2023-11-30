@@ -37,8 +37,8 @@ func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// Interface
-////////////
+// Interface impl
+/////////////////
 
 func (ec *BtcElectrumClient) GetConfig() *client.ClientConfig {
 	return ec.ClientConfig
@@ -73,6 +73,7 @@ func (ec *BtcElectrumClient) CreateWallet(pw string) error {
 	cfg.DB = sqliteDatastore
 
 	walletCfg := cfg.MakeWalletConfig()
+
 	ec.Wallet, err = wltbtc.NewBtcElectrumWallet(walletCfg, pw)
 	if err != nil {
 		return err

@@ -323,6 +323,13 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResul
 	}
 }
 
+func (ec *BtcElectrumClient) updateWalletTip() {
+	w := ec.GetWallet()
+	if w != nil {
+		w.UpdateTip(ec.clientHeaders.hdrsTip, ec.clientHeaders.synced)
+	}
+}
+
 func dumpHistory(address btcutil.Address, history electrumx.HistoryResult) {
 	fmt.Println("History for address ", address.String())
 	for _, h := range history {
