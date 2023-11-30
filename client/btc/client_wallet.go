@@ -1,8 +1,12 @@
 package btc
 
 import (
+	"bytes"
+	"encoding/hex"
+	"errors"
 	"fmt"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -29,13 +33,13 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 
 	//..................
 
-	watchedScripts, err := ec.GetWallet().ListSubscribeScripts()
+	subscribeScripts, err := ec.GetWallet().ListSubscribeScripts()
 	if err != nil {
 		return err
 	}
 
-	for _, watchedScript := range watchedScripts {
-		address, err := ec.GetWallet().ScriptToAddress(watchedScript)
+	for _, subscribeScript := range subscribeScripts {
+		address, err := ec.GetWallet().ScriptToAddress(subscribeScript)
 		if err != nil {
 			return err
 		}
@@ -118,8 +122,58 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 //------------------------------------------
 
 //////////////////////////////////////////////////////////////////////////////
-// Python console subset
-////////////////////////
+// Python console-like subset
+/////////////////////////////
+
+// Spend tries to create a new transaction to pay amount from the wallet to
+// toAddress. It returns Tx & Txid as hex strings. Optionally it broadcasts
+// to the network via electrumX.
+func (ec *BtcElectrumClient) Spend(
+	amount int64,
+	toAddress string,
+	feeLevel wallet.FeeLevel,
+	broadcast bool) (string, string, error) {
+
+	w := ec.GetWallet()
+	if w == nil {
+		return "", "", errors.New("no wallet")
+	}
+
+	address, err := btcutil.DecodeAddress(toAddress, ec.ClientConfig.Params)
+	if err != nil {
+		return "", "", err
+	}
+
+	wireTx, err := w.Spend(amount, address, feeLevel, false)
+	if err != nil {
+		return "", "", err
+	}
+
+	txidHex := wireTx.TxHash().String()
+
+	b := make([]byte, wireTx.SerializeSize())
+	buf := bytes.NewBuffer(b)
+	err = wireTx.Serialize(buf)
+	if err != nil {
+		return "", "", err
+	}
+	rawTxHex := hex.EncodeToString(buf.Bytes())
+
+	if !broadcast {
+		return rawTxHex, txidHex, nil
+	}
+
+	txidHexBroadcast, err := ec.Broadcast(rawTxHex)
+	if err != nil {
+		return "", "", err
+	}
+
+	if txidHex != txidHexBroadcast {
+		return "", "", errors.New("broadcast return error - txids inconsistent")
+	}
+
+	return rawTxHex, txidHex, nil
+}
 
 // Broadcast sends a transaction to the server for broadcast on the bitcoin
 // network. It returns txid as a string.

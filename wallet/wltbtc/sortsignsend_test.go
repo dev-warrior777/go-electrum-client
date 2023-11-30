@@ -141,7 +141,6 @@ func Test_newTransaction(t *testing.T) {
 		int64(100000),
 		address,
 		wallet.NORMAL,
-		"",
 		false,
 	)
 	if err != nil {

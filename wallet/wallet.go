@@ -118,7 +118,7 @@ type ElectrumWallet interface {
 	AddTransaction(tx *wire.MsgTx, height int64, timestamp time.Time) error
 
 	// Make a new spending transaction
-	Spend(amount int64, toAddress btcutil.Address, feeLevel FeeLevel, referenceID string, spendAll bool) (*wire.MsgTx, error)
+	Spend(amount int64, toAddress btcutil.Address, feeLevel FeeLevel, spendAll bool) (*wire.MsgTx, error)
 
 	// Calculates the estimated size of the transaction and returns the total fee for the given feePerByte
 	EstimateFee(ins []TransactionInput, outs []TransactionOutput, feePerByte int64) int64
@@ -142,7 +142,7 @@ type ElectrumWallet interface {
 	// Combine signatures and optionally broadcast
 	Multisign(ins []TransactionInput, outs []TransactionOutput, sigs1 []Signature, sigs2 []Signature, redeemScript []byte, feePerByte int64, broadcast bool) ([]byte, error)
 
-	// Update the height of the tip of the headers chain
+	// Update the height of the tip of the headers chain & the blockchain sync status.
 	UpdateTip(newTip int64, synced bool)
 
 	// Cleanly disconnect from the wallet

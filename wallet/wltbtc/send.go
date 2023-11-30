@@ -85,7 +85,7 @@ func (w *BtcElectrumWallet) gatherCoins() map[coinset.Coin]*hdkeychain.ExtendedK
 	return m
 }
 
-func (w *BtcElectrumWallet) Spend(amount int64, addr btcutil.Address, feeLevel wallet.FeeLevel, referenceID string, spendAll bool) (*wire.MsgTx, error) {
+func (w *BtcElectrumWallet) Spend(amount int64, addr btcutil.Address, feeLevel wallet.FeeLevel, spendAll bool) (*wire.MsgTx, error) {
 	var (
 		tx  *wire.MsgTx
 		err error

@@ -52,7 +52,8 @@ type ElectrumClient interface {
 	//
 	SyncWallet() error
 	//
-	// Small subset of electrum python console methods
+	// Small subset of electrum python console-like methods
+	Spend(amount int64, toAddress string, feeLevel wallet.FeeLevel, broadcast bool) (string, string, error)
 	Broadcast(rawTx string) (string, error)
 	//...
 }
