@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -151,9 +152,10 @@ func (ec *BtcElectrumClient) Spend(
 
 	txidHex := wireTx.TxHash().String()
 
-	b := make([]byte, wireTx.SerializeSize())
+	// len 0, cap >= serial size
+	b := make([]byte, 0, wireTx.SerializeSize())
 	buf := bytes.NewBuffer(b)
-	err = wireTx.Serialize(buf)
+	err = wireTx.BtcEncode(buf, 0, wire.WitnessEncoding)
 	if err != nil {
 		return "", "", err
 	}

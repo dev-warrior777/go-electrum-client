@@ -31,6 +31,7 @@ func init() {
 		Value:        100000000,
 		ScriptPubkey: []byte("scriptpubkey"),
 		WatchOnly:    false,
+		Frozen:       false,
 	}
 }
 
@@ -113,6 +114,43 @@ func TestSetWatchOnlyUtxo(t *testing.T) {
 		t.Error("Utxo freeze failed")
 	}
 
+}
+
+func TestFreezeUnFreezeUtxo(t *testing.T) {
+	err := uxdb.Put(utxo)
+	if err != nil {
+		t.Error(err)
+	}
+	err = uxdb.Freeze(utxo)
+	if err != nil {
+		t.Error(err)
+	}
+	stmt, _ := uxdb.db.Prepare("select frozen from utxos where outpoint=?")
+	defer stmt.Close()
+
+	var frozenInt int
+	o := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	err = stmt.QueryRow(o).Scan(&frozenInt)
+	if err != nil {
+		t.Error(err)
+	}
+	if frozenInt != 1 {
+		t.Error("Utxo freeze failed")
+	}
+	err = uxdb.UnFreeze(utxo)
+	if err != nil {
+		t.Error(err)
+	}
+	stmt1, _ := uxdb.db.Prepare("select frozen from utxos where outpoint=?")
+	defer stmt1.Close()
+
+	err = stmt.QueryRow(o).Scan(&frozenInt)
+	if err != nil {
+		t.Error(err)
+	}
+	if frozenInt != 0 {
+		t.Error("Utxo freeze failed")
+	}
 }
 
 func TestDeleteUtxo(t *testing.T) {

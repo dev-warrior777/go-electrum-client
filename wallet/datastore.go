@@ -203,7 +203,7 @@ type Keys interface {
 
 type SubscribeScripts interface {
 
-	// Add a script to subscribe & watch
+	// Add a script to subscribe & have ElectrumX watch for status changes
 	Put(scriptPubKey []byte) error
 
 	// Return all subscribe scripts
@@ -228,8 +228,15 @@ type Utxo struct {
 
 	// If true this utxo will not be selected for spending. The primary
 	// purpose is track multisig UTXOs which must have separate handling
-	// to spend.
+	// to spend. [Multisig is currently only partially implemented]
 	WatchOnly bool
+
+	// If true this utxo has been used in a new input by software outside the
+	// wallet; in an HTLC contract perhaps. It will not be selected for a new
+	// wallet transaction while frozen.
+	//
+	// It is the outside software's responsibility to set this.
+	Frozen bool
 }
 
 func (utxo *Utxo) IsEqual(alt *Utxo) bool {

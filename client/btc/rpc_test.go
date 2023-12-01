@@ -15,7 +15,7 @@ func init() {
 	cfg.Testing = true
 	cfg.Params = &chaincfg.RegressionNetParams
 
-	rpcServe(NewBtcElectrumClient(cfg))
+	NewBtcElectrumClient(cfg).RPCServe()
 }
 
 func TestRpc(t *testing.T) {

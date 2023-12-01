@@ -1,4 +1,4 @@
-module github.com/go-electrum-client/client/btc/testrpc
+module github.com/dev-warrior777/go-electrum-client/client/btc/testrpc
 
 go 1.20
 

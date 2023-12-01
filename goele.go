@@ -140,7 +140,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	//TODO:
+	// for testing only
+	ec.RPCServe()
 
 	sc := ec.GetNode().GetServerConn().SvrConn
 	<-sc.Done()

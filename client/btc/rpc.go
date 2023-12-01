@@ -4,7 +4,6 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	"github.com/go-zoox/jsonrpc"
 	"github.com/go-zoox/jsonrpc/server"
@@ -14,7 +13,7 @@ import (
 
 // For testing only
 
-func rpcServe(ec client.ElectrumClient) {
+func (ec *BtcElectrumClient) RPCServe() {
 	s := server.New()
 
 	s.Register("gettip", func(ctx context.Context, params jsonrpc.Params) (jsonrpc.Result, error) {
@@ -64,5 +63,7 @@ func rpcServe(ec client.ElectrumClient) {
 		}, nil
 	})
 
+	//////////////////
+	// run http server
 	s.Run()
 }

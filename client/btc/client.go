@@ -142,6 +142,8 @@ func (ec *BtcElectrumClient) CreateNode(_ client.NodeType) {
 // SyncHeaders() error
 // Tip() (int64, bool)
 
+// Interface method in rpc.go
+//
 // Interface methods in client_wallet.go
 //
 // SyncWallet() error
