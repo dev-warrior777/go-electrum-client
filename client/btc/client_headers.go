@@ -281,3 +281,8 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 
 	return nil
 }
+
+func (ec *BtcElectrumClient) Tip() (int64, bool) {
+	h := ec.clientHeaders
+	return h.hdrsTip, h.synced
+}

@@ -140,10 +140,12 @@ func (ec *BtcElectrumClient) CreateNode(_ client.NodeType) {
 // Interface methods in client_headers.go
 //
 // SyncHeaders() error
+// Tip() (int64, bool)
 
 // Interface methods in client_wallet.go
 //
 // SyncWallet() error
+// Spend(amount int64, toAddress string, feeLevel wallet.FeeLevel, broadcast bool) (string, string, error)
 // Broadcast(rawTx string) (string, error)
 
 //////////////////////////////////////////////////////////////////////////////

@@ -113,8 +113,15 @@ type Utxos interface {
 	// Fetch all utxos from the db
 	GetAll() ([]Utxo, error)
 
-	// Make a utxo unspendable
+	// Make a utxo watch-only because we have no key for it but want to watch
+	// it's status. [Implemented in DB. Not used by the wallet at this time]
 	SetWatchOnly(utxo Utxo) error
+
+	// Make a utxo unspendable - we do have the key
+	Freeze(utxo Utxo) error
+
+	// Make a frozen utxo spendable again - we do have the key
+	UnFreeze(utxo Utxo) error
 
 	// Delete a utxo from the db
 	Delete(utxo Utxo) error
