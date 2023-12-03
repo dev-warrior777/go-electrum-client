@@ -117,6 +117,9 @@ type ElectrumWallet interface {
 	// Add a transaction to the database
 	AddTransaction(tx *wire.MsgTx, height int64, timestamp time.Time) error
 
+	// List all unspent outputs in the wallet
+	ListUnspent() ([]Utxo, error)
+
 	// Make a new spending transaction
 	Spend(amount int64, toAddress btcutil.Address, feeLevel FeeLevel, spendAll bool) (*wire.MsgTx, error)
 

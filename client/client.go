@@ -58,5 +58,6 @@ type ElectrumClient interface {
 	Tip() (int64, bool)
 	Spend(amount int64, toAddress string, feeLevel wallet.FeeLevel, broadcast bool) (string, string, error)
 	Broadcast(rawTx string) (string, error)
+	ListUnspent() ([]wallet.Utxo, error)
 	//...
 }

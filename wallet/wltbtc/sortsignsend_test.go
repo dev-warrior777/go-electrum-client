@@ -68,7 +68,8 @@ func Test_gatherCoins(t *testing.T) {
 		Hash:  *h1,
 		Index: 0,
 	}
-	err = w.txstore.Utxos().Put(wallet.Utxo{Op: op, ScriptPubkey: script1, AtHeight: 5, Value: 10000})
+	utxo := wallet.Utxo{Op: op, ScriptPubkey: script1, AtHeight: 5, Value: 10000}
+	err = w.txstore.Utxos().Put(utxo)
 	if err != nil {
 		t.Error(err)
 	}
@@ -97,6 +98,15 @@ func Test_gatherCoins(t *testing.T) {
 			t.Error("Returned incorrect key")
 		}
 		key.Zero()
+	}
+	// test freeze
+	err = w.txstore.Utxos().Freeze(utxo)
+	if err != nil {
+		t.Error(err)
+	}
+	coinmap = w.gatherCoins()
+	if len(coinmap) > 0 {
+		t.Fatal("should be no unfrozen coin in map")
 	}
 	os.Remove("headers.bin")
 }

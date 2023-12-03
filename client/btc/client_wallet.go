@@ -11,6 +11,8 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
+var ErrNoWallet error = errors.New("no wallet")
+
 // Here is the client interface between the node & wallet for transaction
 // broadcast and wallet synchronize
 
@@ -137,7 +139,7 @@ func (ec *BtcElectrumClient) Spend(
 
 	w := ec.GetWallet()
 	if w == nil {
-		return "", "", errors.New("no wallet")
+		return "", "", ErrNoWallet
 	}
 
 	address, err := btcutil.DecodeAddress(toAddress, ec.ClientConfig.Params)
@@ -181,4 +183,13 @@ func (ec *BtcElectrumClient) Spend(
 // network. It returns txid as a string.
 func (ec *BtcElectrumClient) Broadcast(rawTx string) (string, error) {
 	return ec.GetNode().Broadcast(rawTx)
+}
+
+// ListUnspent
+func (ec *BtcElectrumClient) ListUnspent() ([]wallet.Utxo, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		return nil, ErrNoWallet
+	}
+	return w.ListUnspent()
 }

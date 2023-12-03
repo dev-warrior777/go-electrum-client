@@ -242,6 +242,26 @@ func (m *mockUtxoStore) SetWatchOnly(utxo wallet.Utxo) error {
 	return nil
 }
 
+func (m *mockUtxoStore) Freeze(utxo wallet.Utxo) error {
+	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	u, ok := m.utxos[key]
+	if !ok {
+		return errors.New("not found")
+	}
+	u.Frozen = true
+	return nil
+}
+
+func (m *mockUtxoStore) UnFreeze(utxo wallet.Utxo) error {
+	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	u, ok := m.utxos[key]
+	if !ok {
+		return errors.New("not found")
+	}
+	u.WatchOnly = false
+	return nil
+}
+
 func (m *mockUtxoStore) Delete(utxo wallet.Utxo) error {
 	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
 	_, ok := m.utxos[key]
