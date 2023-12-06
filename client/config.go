@@ -63,6 +63,9 @@ type ClientConfig struct {
 
 	// If not testing do not overwrite existing wallet files
 	Testing bool
+
+	// Test RPC server
+	RPCTestPort int
 }
 
 func NewDefaultConfig() *ClientConfig {
@@ -73,6 +76,7 @@ func NewDefaultConfig() *ClientConfig {
 		DataDir:              btcutil.AppDataDir(appName, false),
 		DB:                   nil, // concrete impl
 		DisableExchangeRates: true,
+		RPCTestPort:          8888,
 	}
 }
 func (cc *ClientConfig) MakeWalletConfig() *wallet.WalletConfig {

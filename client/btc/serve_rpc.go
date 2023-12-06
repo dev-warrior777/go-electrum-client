@@ -86,8 +86,18 @@ func (e *Ec) RPCListUnspent(request map[string]string, response *map[string]stri
 // /////////////////////////////////////////////
 // RPC Server
 // ///////////
+const (
+	RpcDefaultIP   = "127.0.0.1"
+	RpcDefaultPort = 8888
+)
+
 func (ec *BtcElectrumClient) RPCServe() error {
-	bind_addr := "127.0.0.1:8888"
+	rpc_ip := RpcDefaultIP
+	rpc_port := ec.GetConfig().RPCTestPort
+	if rpc_port == 0 {
+		rpc_port = RpcDefaultPort
+	}
+	bind_addr := fmt.Sprintf("%s:%d", rpc_ip, rpc_port)
 	addr, err := net.ResolveTCPAddr("tcp", bind_addr)
 	if err != nil {
 		return err
@@ -96,8 +106,11 @@ func (ec *BtcElectrumClient) RPCServe() error {
 	if err != nil {
 		return err
 	}
-	// register Ec methods with correct signature
-	// Method(request map[string]string, response *map[string]string) error
+
+	// register Ec methods with correct signature:
+	//
+	// 	func (e *Ec) RPCMethod(request map[string]string, response *map[string]string) error
+	//
 	rpcservice := &Ec{
 		EleClient: ec,
 	}
@@ -105,7 +118,7 @@ func (ec *BtcElectrumClient) RPCServe() error {
 	if err != nil {
 		return err
 	}
-	// set up rpc handlers
+	// set up http handlers for rpc
 	rpc.HandleHTTP()
 
 	// Http Server

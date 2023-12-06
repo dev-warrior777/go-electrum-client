@@ -24,7 +24,7 @@ go.work
 testdata/
 
 #test bin
-electrumx/btc/cmd/main
+electrumx/elxbtc/cmd/main
 goele
 
 #vscode
@@ -33,3 +33,6 @@ __debug_bin*
 
 #kept spv related versions of files being changed
 *.spv
+
+#rpc test
+client/btc/rpc_test/client

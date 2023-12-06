@@ -76,46 +76,6 @@ func main() {
 ////////////////////////////////////
 // Old
 //////
-// // Tip
-// //===
-// r, err := c.Call(context.Background(), "gettip", jsonrpc.Params{})
-// if err != nil {
-// 	logger.Errorf("failed to call: %s", err)
-// 	return
-// }
-
-// logger.Info("tip: %d", cast.ToInt64(r.Get("tip")))
-// logger.Info("txid: %v", cast.ToBool(r.Get("synced")))
-
-// // ===========
-// // ListUnspent
-// // ===========
-// r, err := c.Call(context.Background(), "listunspent", jsonrpc.Params{})
-// if err != nil {
-// 	logger.Errorf("failed to call: %s", err)
-// 	return
-// }
-// allUnspents := cast.ToString(r.Get("unspents"))
-// logger.Info("unspents: %s", allUnspents)
-
-// unspents := strings.Split(allUnspents, "\n")
-
-// var us []string
-// fmt.Println("[")
-// for _, unspent := range unspents {
-// 	us = strings.Split(unspent, ":")
-// 	fmt.Println(" {")
-// 	fmt.Println("   txid:", us[0])
-// 	fmt.Println("   vout:", us[1])
-// 	fmt.Println("   value:", us[2])
-// 	fmt.Println("   spendheight:", us[3])
-// 	fmt.Println("   script:", us[4])
-// 	fmt.Println("   watch only:", us[5])
-// 	fmt.Println("   frozen:", us[6])
-// 	fmt.Println(" }")
-// }
-// fmt.Println("]")
-
 // // =====
 // // Spend
 // // =====
