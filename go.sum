@@ -53,19 +53,6 @@ github.com/decred/go-socks v1.1.0/go.mod h1:sDhHqkZH0X4JjSa02oYOGhcGHYp12FsY1jQ/
 github.com/frankban/quicktest v1.14.4 h1:g2rn0vABPOOXmZUj+vbmUp0lPoXEMuhTpIluN0XL9UY=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/fsnotify/fsnotify v1.4.9/go.mod h1:znqG4EE+3YCdAaPaxE2ZRY/06pZUdp0tY4IgpuI1SZQ=
-github.com/go-zoox/chalk v1.0.1 h1:9s4i74InfcBosCexWixz3eh6DdBkl3McIcLkTI1HjTo=
-github.com/go-zoox/chalk v1.0.1/go.mod h1:z5+qvE9nEJI5uT4px2tyoFa/xxkqf3CUo22KmXLKbNI=
-github.com/go-zoox/core-utils v1.2.13 h1:rcTDGrf7FECVOCgVDXCNRUyu1Nny4h6pCTq1t+i4LPM=
-github.com/go-zoox/core-utils v1.2.13/go.mod h1:raOOwr2l2sJQyjR0Dg33sg0ry4U1/L2eNTuLFRpUXWs=
-github.com/go-zoox/datetime v1.1.0 h1:L37HNXrlAjTJuEvNytqoUEs0QZ2CpglM3mqfbqxA+Hg=
-github.com/go-zoox/datetime v1.1.0/go.mod h1:os6lYW/GXNpCIseFrBr8DNcOiPuwl5Ttc/kxo4JnMjw=
-github.com/go-zoox/jsonrpc v1.2.2 h1:asaoJgJkfyH5eblLQ1WzrZDe8ERL6v9GT4pKR/LJ3IE=
-github.com/go-zoox/jsonrpc v1.2.2/go.mod h1:HdxJW/T0hkVHlfm+ULRnNEqvTtvZ7o4qxdQGQW76khM=
-github.com/go-zoox/logger v1.4.6 h1:zHUaB6KQ9rD/N3hM0JJ3/JCNdgtedf4mVBBNNSyWCOg=
-github.com/go-zoox/logger v1.4.6/go.mod h1:o7ddvv/gMoMa0TomPhHoIz11ZWRbQ92pF6rwYbOY3iQ=
-github.com/go-zoox/tag v1.2.3 h1:HDQpRu8rA1xSJt6c+v0O7TfzTjPq5aDtyzW/15aTh94=
-github.com/go-zoox/tag v1.2.3/go.mod h1:z9z4iZb/XPE4HwTXJgPIdwgH90c2NysGxIMq9tW+GuU=
-github.com/go-zoox/testify v1.0.2 h1:G5sQ3xm0uwCuytnMhgnqZ5BItCt2DN3n2wLBqlIJEWA=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.4.0-rc.1/go.mod h1:ceaxUfeHdC40wWswd/P6IGgMaK3YpKi5j83Wpe3EHw8=
 github.com/golang/protobuf v1.4.0-rc.1.0.20200221234624-67d41d38c208/go.mod h1:xKAWHe0F5eneWXFV3EuXVDTCmh+JuBKY0li0aMyXATA=
@@ -111,7 +98,6 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PKk=
 github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 h1:epCh84lMvA70Z7CTTCmYQn2CKbY8j86K7/FAIr141uY=
 github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7/go.mod h1:q4W45IWZaF22tdD+VEXcAWRA037jwmWEB5VWYORlTpc=
-github.com/ttacon/chalk v0.0.0-20160626202418-22c06c80ed31 h1:OXcKh35JaYsGMRzpvFkLv/MEyPuL49CThT1pZ8aSml4=
 github.com/tyler-smith/go-bip39 v1.1.0 h1:5eUemwrMargf3BSLRRCalXT93Ns6pQJIjYQN2nyfOP8=
 github.com/tyler-smith/go-bip39 v1.1.0/go.mod h1:gUYDtqQw1JS3ZJ8UWVcGTGqqr6YIN3CWg+kkNaLt55U=
 golang.org/x/crypto v0.0.0-20170930174604-9419663f5a44/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=

@@ -9,9 +9,8 @@ require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/btcsuite/btcwallet/wallet/txauthor v1.3.3
 	github.com/decred/go-socks v1.1.0
-	github.com/go-zoox/jsonrpc v1.2.2
-	github.com/go-zoox/logger v1.4.6
 	github.com/mattn/go-sqlite3 v1.14.17
+	github.com/spf13/cast v1.5.1
 	github.com/tyler-smith/go-bip39 v1.1.0
 	golang.org/x/net v0.15.0
 )
@@ -19,12 +18,7 @@ require (
 require (
 	github.com/aead/siphash v1.0.1 // indirect
 	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.3 // indirect
-	github.com/go-zoox/chalk v1.0.1 // indirect
-	github.com/go-zoox/core-utils v1.2.13 // indirect
-	github.com/go-zoox/datetime v1.1.0 // indirect
-	github.com/go-zoox/tag v1.2.3 // indirect
 	github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23 // indirect
-	github.com/spf13/cast v1.5.1 // indirect
 )
 
 require (
