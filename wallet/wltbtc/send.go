@@ -67,6 +67,9 @@ func (w *BtcElectrumWallet) gatherCoins() map[coinset.Coin]*hdkeychain.ExtendedK
 		if u.WatchOnly {
 			continue
 		}
+		if u.Frozen {
+			continue
+		}
 		var confirmations int64
 		if u.AtHeight > 0 {
 			confirmations = tip - u.AtHeight

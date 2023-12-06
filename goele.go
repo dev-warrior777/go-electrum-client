@@ -140,7 +140,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	//TODO:
+	// for testing only
+	err = ec.RPCServe()
+	if err != nil {
+		ec.GetNode().Stop()
+		fmt.Println(err, " - exiting")
+		os.Exit(1)
+	}
 
 	sc := ec.GetNode().GetServerConn().SvrConn
 	<-sc.Done()

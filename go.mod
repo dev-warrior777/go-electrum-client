@@ -10,6 +10,7 @@ require (
 	github.com/btcsuite/btcwallet/wallet/txauthor v1.3.3
 	github.com/decred/go-socks v1.1.0
 	github.com/mattn/go-sqlite3 v1.14.17
+	github.com/spf13/cast v1.5.1
 	github.com/tyler-smith/go-bip39 v1.1.0
 	golang.org/x/net v0.15.0
 )

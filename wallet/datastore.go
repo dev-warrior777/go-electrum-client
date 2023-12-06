@@ -113,8 +113,15 @@ type Utxos interface {
 	// Fetch all utxos from the db
 	GetAll() ([]Utxo, error)
 
-	// Make a utxo unspendable
+	// Make a utxo watch-only because we have no key for it but want to watch
+	// it's status. [Implemented in DB. Not used by the wallet at this time]
 	SetWatchOnly(utxo Utxo) error
+
+	// Make a utxo unspendable - we do have the key
+	Freeze(utxo Utxo) error
+
+	// Make a frozen utxo spendable again - we do have the key
+	UnFreeze(utxo Utxo) error
 
 	// Delete a utxo from the db
 	Delete(utxo Utxo) error
@@ -196,7 +203,7 @@ type Keys interface {
 
 type SubscribeScripts interface {
 
-	// Add a script to subscribe & watch
+	// Add a script to subscribe & have ElectrumX watch for status changes
 	Put(scriptPubKey []byte) error
 
 	// Return all subscribe scripts
@@ -221,8 +228,15 @@ type Utxo struct {
 
 	// If true this utxo will not be selected for spending. The primary
 	// purpose is track multisig UTXOs which must have separate handling
-	// to spend.
+	// to spend. [Multisig is currently only partially implemented]
 	WatchOnly bool
+
+	// If true this utxo has been used in a new input by software outside the
+	// wallet; in an HTLC contract perhaps. It will not be selected for a new
+	// wallet transaction while frozen.
+	//
+	// It is the outside software's responsibility to set this.
+	Frozen bool
 }
 
 func (utxo *Utxo) IsEqual(alt *Utxo) bool {

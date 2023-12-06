@@ -52,8 +52,12 @@ type ElectrumClient interface {
 	//
 	SyncWallet() error
 	//
+	// Simple RPC server for test only; not production
+	RPCServe() error
 	// Small subset of electrum python console-like methods
+	Tip() (int64, bool)
 	Spend(amount int64, toAddress string, feeLevel wallet.FeeLevel, broadcast bool) (string, string, error)
 	Broadcast(rawTx string) (string, error)
+	ListUnspent() ([]wallet.Utxo, error)
 	//...
 }

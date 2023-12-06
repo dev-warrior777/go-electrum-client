@@ -431,6 +431,12 @@ func (w *BtcElectrumWallet) AddTransaction(tx *wire.MsgTx, height int64, timesta
 	return err
 }
 
+// List all unspent outputs in the wallet
+func (w *BtcElectrumWallet) ListUnspent() ([]wallet.Utxo, error) {
+	return w.txstore.Utxos().GetAll()
+}
+
+// Update the wallet's view of the blockchain
 func (w *BtcElectrumWallet) UpdateTip(newTip int64, synced bool) {
 	w.blockchainTip = newTip
 	w.blockchainSynced = synced
