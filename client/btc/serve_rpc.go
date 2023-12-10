@@ -12,10 +12,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dev-warrior777/go-electrum-client/wallet"
 	"github.com/spf13/cast"
 )
 
-// RPC Server For testing only. Goele is golang code iintended to be used
+// RPC Server For testing only. Goele is golang code intended to be used
 // directly by other golang projects; for example a lite trading wallet.
 
 // RPC Service methods
@@ -32,6 +33,7 @@ func (e *Ec) RPCEcho(request map[string]string, response *map[string]string) err
 	return nil
 }
 
+// Get the blockchain tip and sync status
 func (e *Ec) Tip() (int64, bool) {
 	h := e.EleClient.clientHeaders
 	return h.hdrsTip, h.synced
@@ -46,6 +48,7 @@ func (e *Ec) RPCTip(request map[string]string, response *map[string]string) erro
 	return nil
 }
 
+// List unspent outputs in the wallet including frozen utxos
 func (e *Ec) ListUnspent() (string, error) {
 	utxos, err := e.EleClient.ListUnspent()
 
@@ -80,6 +83,47 @@ func (e *Ec) RPCListUnspent(request map[string]string, response *map[string]stri
 		return err
 	}
 	r["unspents"] = unspents
+	return nil
+}
+
+func (e *Ec) RPCSpend(request map[string]string, response *map[string]string) error {
+	r := *response
+	pw := cast.ToString(request["pw"])
+	amt := cast.ToInt64(request["amount"])
+	addr := cast.ToString(request["address"])
+	feeType := cast.ToString(request["feeType"])
+	var feeLvl wallet.FeeLevel
+	switch feeType {
+	case "PRIORITY":
+		feeLvl = wallet.PRIORITY
+	case "NORMAL":
+		feeLvl = wallet.NORMAL
+	case "ECONOMIC":
+		feeLvl = wallet.ECONOMIC
+	default:
+		feeLvl = wallet.NORMAL
+	}
+
+	changeIndex, tx, txid, err := e.EleClient.Spend(pw, amt, addr, feeLvl)
+	if err != nil {
+		return err
+	}
+	r["tx"] = tx
+	r["txid"] = txid
+	r["changeIndex"] = cast.ToString(changeIndex)
+	return nil
+}
+
+func (e *Ec) RPCBroadcast(request map[string]string, response *map[string]string) error {
+	r := *response
+	rawTx := cast.ToString(request["rawTx"])
+	fmt.Println("rpc:", rawTx)
+	txid, err := e.EleClient.Broadcast(rawTx)
+	fmt.Println("rpc err:", err)
+	if err != nil {
+		return err
+	}
+	r["txid"] = txid
 	return nil
 }
 
@@ -153,74 +197,6 @@ func (ec *BtcElectrumClient) RPCServe() error {
 /////////////////////////////////////////
 // Old
 // ///
-// s.Register("listunspent", func(ctx context.Context, params jsonrpc.Params) (jsonrpc.Result, error) {
-
-// 	utxos, err := ec.ListUnspent()
-
-// 	if err != nil {
-// 		return jsonrpc.Result{
-// 			"unspents": "",
-// 		}, err
-// 	}
-
-// 	var sb strings.Builder
-// 	var last = len(utxos) - 1
-// 	for i, utxo := range utxos {
-// 		sb.WriteString(utxo.Op.String())
-// 		sb.WriteString(":")
-// 		sb.WriteString(strconv.Itoa(int(utxo.Value)))
-// 		sb.WriteString(":")
-// 		sb.WriteString(strconv.Itoa(int(utxo.AtHeight)))
-// 		sb.WriteString(":")
-// 		sb.WriteString(hex.EncodeToString(utxo.ScriptPubkey))
-// 		sb.WriteString(":")
-// 		sb.WriteString(strconv.FormatBool(utxo.WatchOnly))
-// 		sb.WriteString(":")
-// 		sb.WriteString(strconv.FormatBool(utxo.Frozen))
-// 		if i != last {
-// 			sb.WriteString("\n")
-// 		}
-// 	}
-
-// 	return jsonrpc.Result{
-// 		"unspents": sb.String(),
-// 	}, nil
-// })
-
-// s.Register("spend", func(ctx context.Context, params jsonrpc.Params) (jsonrpc.Result, error) {
-// 	logger.Info("params: %v", params)
-
-// 	amt := cast.ToInt64(params.Get("amount"))
-// 	addr := cast.ToString(params.Get("address"))
-// 	feeType := cast.ToString(params.Get("feeType"))
-// 	var feeLvl wallet.FeeLevel
-// 	switch feeType {
-// 	case "PRIORITY":
-// 		feeLvl = wallet.PRIORITY
-// 	case "NORMAL":
-// 		feeLvl = wallet.NORMAL
-// 	case "ECONOMIC":
-// 		feeLvl = wallet.ECONOMIC
-// 	default:
-// 		feeLvl = wallet.NORMAL
-// 	}
-
-// 	// tx, txid, err := ec.Spend(amt, addr, feeLvl, true)
-// 	tx, txid, err := ec.Spend(amt, addr, feeLvl, false)
-
-// 	if err != nil {
-// 		return jsonrpc.Result{
-// 			"tx":   "",
-// 			"txid": "",
-// 		}, err
-// 	}
-
-// 	return jsonrpc.Result{
-// 		"tx":   tx,
-// 		"txid": txid,
-// 	}, nil
-// })
-
 // s.Register("broadcast", func(ctx context.Context, params jsonrpc.Params) (jsonrpc.Result, error) {
 // 	logger.Info("params: %v", params)
 

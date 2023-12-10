@@ -169,9 +169,14 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 			case status := <-scripthashNotifyCh:
 				fmt.Println("<-scripthashNotifyCh - # items left in buffer", len(scripthashNotifyCh))
 				fmt.Println("scripthash notify")
+				if status == nil {
+					fmt.Println("status is nil, ignoring...", status)
+					continue
+				}
 				fmt.Println("Scripthash", status.Scripthash)
 				fmt.Println("Status", status.Status)
 				if status.Status == "" {
+					fmt.Println("status.Status is null", status.Status, " no history yet; ignoring...")
 					continue
 				}
 				// is status same as last status?

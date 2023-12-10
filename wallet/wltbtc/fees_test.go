@@ -28,7 +28,8 @@ func (m *mockHttpClient) Get(url string) (*http.Response, error) {
 }
 
 func TestFeeProvider_GetFeePerByte(t *testing.T) {
-	fp := wallet.NewFeeProvider(2000, 360, 320, 280, "https://btc.fees.openbazaar.org", nil)
+	fp := wallet.NewFeeProvider(2000, 360, 320, 280, "https://mempool.space/api/v1/fees/recommended", nil)
+	// fp := wallet.NewFeeProvider(2000, 360, 320, 280, "https://mempool.space/testnet/api/v1/fees/recommended", nil)
 	fp.HttpClient = new(mockHttpClient)
 
 	// Test fetch from API

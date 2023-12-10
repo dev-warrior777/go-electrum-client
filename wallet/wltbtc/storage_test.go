@@ -10,7 +10,25 @@ import (
 )
 
 func createStorageManager() *StorageManager {
-	return NewStorageManager(&mockStorage{}, &chaincfg.MainNetParams)
+	return NewStorageManager(&mockStorage{}, &chaincfg.RegressionNetParams)
+}
+
+var pw = "abc" // tested
+var xprv = "tprv8ZgxMBicQKsPfJU6JyiVdmFAtAzmWmTeEv85nTAHjLQyL35tdP2fAPWDSBBnFqGhhfTHVQMcnZhZDFkzFmCjm1bgf5UDwMAeFUWhJ9Dr8c4"
+var xpub = "tpubD6NzVbkrYhZ4YmVtCdP63AuHTCWhg6eYpDis4yCb9cDNAXLfFmrFLt85cLFTwHiDJ9855NiE7cgQdiTGt5mb2RS9RfaxgVDkwBybJWm54Gh"
+var shaPw = chainhash.HashB([]byte(pw))
+var seed = []byte{0x01, 0x02, 0x03}
+var imported = [][]byte{{0x01, 0x01, 0x01}, {0x02, 0x02, 0x02}, {0x03, 0x03, 0x03}}
+
+func populateStorage(sm *StorageManager) {
+	sm.store = &Storage{
+		Version:  "0.1",
+		Xprv:     xprv,
+		Xpub:     xpub,
+		ShaPw:    shaPw,
+		Seed:     seed,
+		Imported: imported,
+	}
 }
 
 func TestStoreRetreiveBlob(t *testing.T) {
@@ -29,24 +47,9 @@ func TestStoreRetreiveBlob(t *testing.T) {
 	fmt.Println(string(ret))
 }
 
-var pw = "abc" // tested
-var xprv = "tprv8ZgxMBicQKsPfJU6JyiVdmFAtAzmWmTeEv85nTAHjLQyL35tdP2fAPWDSBBnFqGhhfTHVQMcnZhZDFkzFmCjm1bgf5UDwMAeFUWhJ9Dr8c4"
-var xpub = "tpubD6NzVbkrYhZ4YmVtCdP63AuHTCWhg6eYpDis4yCb9cDNAXLfFmrFLt85cLFTwHiDJ9855NiE7cgQdiTGt5mb2RS9RfaxgVDkwBybJWm54Gh"
-var shaPw = chainhash.HashB([]byte(pw))
-var seed = []byte{0x01, 0x02, 0x03}
-var imported = [][]byte{{0x01, 0x01, 0x01}, {0x02, 0x02, 0x02}, {0x03, 0x03, 0x03}}
-
 func TestStoreRetrieveEncryptedStore(t *testing.T) {
 	sm := createStorageManager()
-
-	sm.store = &Storage{
-		Version:  "0.1",
-		Xprv:     xprv,
-		Xpub:     xpub,
-		ShaPw:    shaPw,
-		Seed:     seed,
-		Imported: imported,
-	}
+	populateStorage(sm)
 
 	before := sm.store.String()
 	fmt.Print("req: ", before)
@@ -85,15 +88,7 @@ func TestStoreRetrieveEncryptedStore(t *testing.T) {
 
 func TestValidPw(t *testing.T) {
 	sm := createStorageManager()
-
-	sm.store = &Storage{
-		Version:  "0.1",
-		Xprv:     xprv,
-		Xpub:     xpub,
-		ShaPw:    shaPw,
-		Seed:     seed,
-		Imported: imported,
-	}
+	populateStorage(sm)
 
 	err := sm.Put(pw)
 	if err != nil {
@@ -101,11 +96,10 @@ func TestValidPw(t *testing.T) {
 	}
 
 	sm.store.blank()
+	sm.Get(pw)
 
-	valid := sm.ValidPw("abc")
-	if !valid {
+	if !sm.IsValidPw("abc") {
 		t.Fatal("invalid pw")
 	}
 	fmt.Println("valid pw")
-	fmt.Println(sm.store.String())
 }

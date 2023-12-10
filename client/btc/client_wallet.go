@@ -129,27 +129,29 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 /////////////////////////////
 
 // Spend tries to create a new transaction to pay amount from the wallet to
-// toAddress. It returns Tx & Txid as hex strings. Optionally it broadcasts
+// toAddress. It returns Tx & Txid as hex strings. The client needs to know
+// the change address so it can set up notify from ElectrumX.
 // to the network via electrumX.
 func (ec *BtcElectrumClient) Spend(
+	pw string,
 	amount int64,
 	toAddress string,
-	feeLevel wallet.FeeLevel,
-	broadcast bool) (string, string, error) {
+	feeLevel wallet.FeeLevel) (int, string, string, error) {
 
 	w := ec.GetWallet()
 	if w == nil {
-		return "", "", ErrNoWallet
+		return -1, "", "", ErrNoWallet
 	}
+	w.UpdateTip(ec.Tip())
 
 	address, err := btcutil.DecodeAddress(toAddress, ec.ClientConfig.Params)
 	if err != nil {
-		return "", "", err
+		return -1, "", "", err
 	}
 
-	wireTx, err := w.Spend(amount, address, feeLevel, false)
+	changeIndex, wireTx, err := w.Spend(pw, amount, address, feeLevel, false)
 	if err != nil {
-		return "", "", err
+		return -1, "", "", err
 	}
 
 	txidHex := wireTx.TxHash().String()
@@ -159,30 +161,23 @@ func (ec *BtcElectrumClient) Spend(
 	buf := bytes.NewBuffer(b)
 	err = wireTx.BtcEncode(buf, 0, wire.WitnessEncoding)
 	if err != nil {
-		return "", "", err
+		return -1, "", "", err
 	}
 	rawTxHex := hex.EncodeToString(buf.Bytes())
 
-	if !broadcast {
-		return rawTxHex, txidHex, nil
-	}
-
-	txidHexBroadcast, err := ec.Broadcast(rawTxHex)
-	if err != nil {
-		return "", "", err
-	}
-
-	if txidHex != txidHexBroadcast {
-		return "", "", errors.New("broadcast return error - txids inconsistent")
-	}
-
-	return rawTxHex, txidHex, nil
+	return changeIndex, rawTxHex, txidHex, nil
 }
 
 // Broadcast sends a transaction to the server for broadcast on the bitcoin
 // network. It returns txid as a string.
 func (ec *BtcElectrumClient) Broadcast(rawTx string) (string, error) {
-	return ec.GetNode().Broadcast(rawTx)
+
+	txid, err := ec.GetNode().Broadcast(rawTx)
+	if err != nil {
+		return "", err
+	}
+
+	return txid, nil
 }
 
 // ListUnspent

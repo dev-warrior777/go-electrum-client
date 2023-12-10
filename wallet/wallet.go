@@ -121,7 +121,7 @@ type ElectrumWallet interface {
 	ListUnspent() ([]Utxo, error)
 
 	// Make a new spending transaction
-	Spend(amount int64, toAddress btcutil.Address, feeLevel FeeLevel, spendAll bool) (*wire.MsgTx, error)
+	Spend(pw string, amount int64, toAddress btcutil.Address, feeLevel FeeLevel, spendAll bool) (int, *wire.MsgTx, error)
 
 	// Calculates the estimated size of the transaction and returns the total fee for the given feePerByte
 	EstimateFee(ins []TransactionInput, outs []TransactionOutput, feePerByte int64) int64

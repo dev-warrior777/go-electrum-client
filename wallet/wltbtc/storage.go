@@ -95,22 +95,10 @@ func (sm *StorageManager) Get(pw string) error {
 	return json.Unmarshal(b, sm.store)
 }
 
-func (sm *StorageManager) ValidPw(pw string) bool {
+func (sm *StorageManager) IsValidPw(pw string) bool {
 	if len(pw) == 0 {
 		return false
 	}
-
-	b, err := sm.datastore.GetDecrypted(pw)
-	if err != nil {
-		return false
-	}
-	defer sm.store.blank()
-
-	err = json.Unmarshal(b, sm.store)
-	if err != nil {
-		return false
-	}
-
 	shaPw := chainhash.HashB([]byte(pw))
-	return !bytes.Equal(sm.store.ShaPw, shaPw)
+	return bytes.Equal(sm.store.ShaPw, shaPw)
 }

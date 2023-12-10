@@ -16,7 +16,7 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-func createTxStore() (*TxStore, error) {
+func createTxStore() (*TxStore, *StorageManager) {
 	mockDb := MockDatastore{
 		&mockConfig{creationDate: time.Now()},
 		&mockStorage{blob: make([]byte, 10)},
@@ -30,17 +30,26 @@ func createTxStore() (*TxStore, error) {
 	rand.Read(seed)
 	key, _ := hdkeychain.NewMaster(seed, &chaincfg.RegressionNetParams)
 	km, _ := NewKeyManager(mockDb.Keys(), &chaincfg.RegressionNetParams, key)
-	return NewTxStore(&chaincfg.TestNet3Params, &mockDb, km)
+	sm := NewStorageManager(mockDb.Enc(), &chaincfg.RegressionNetParams)
+	txStore, _ := NewTxStore(&chaincfg.RegressionNetParams, &mockDb, km)
+	return txStore, sm
 }
 
 func MockWallet() *BtcElectrumWallet {
-	txstore, _ := createTxStore()
+	txstore, storageMgr := createTxStore()
+
+	storageMgr.store.Xprv = "tprv8ZgxMBicQKsPfJU6JyiVdmFAtAzmWmTeEv85nTAHjLQyL35tdP2fAPWDSBBnFqGhhfTHVQMcnZhZDFkzFmCjm1bgf5UDwMAeFUWhJ9Dr8c4"
+	storageMgr.store.Xpub = "tpubD6NzVbkrYhZ4YmVtCdP63AuHTCWhg6eYpDis4yCb9cDNAXLfFmrFLt85cLFTwHiDJ9855NiE7cgQdiTGt5mb2RS9RfaxgVDkwBybJWm54Gh"
+	storageMgr.store.ShaPw = chainhash.HashB([]byte(pw))
+	storageMgr.store.Seed = []byte{0x01, 0x02, 0x03}
+	storageMgr.store.Imported = [][]byte{{0x01, 0x01, 0x01}, {0x02, 0x02, 0x02}, {0x03, 0x03, 0x03}}
 
 	return &BtcElectrumWallet{
-		txstore:     txstore,
-		keyManager:  txstore.keyManager,
-		params:      &chaincfg.RegressionNetParams,
-		feeProvider: wallet.DefaultFeeProvider(),
+		txstore:        txstore,
+		keyManager:     txstore.keyManager,
+		storageManager: storageMgr,
+		params:         &chaincfg.RegressionNetParams,
+		feeProvider:    wallet.DefaultFeeProvider(),
 	}
 }
 
@@ -147,7 +156,8 @@ func Test_newTransaction(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	tx, err := w.Spend(
+	changeIndex, tx, err := w.Spend(
+		"abc",
 		int64(100000),
 		address,
 		wallet.NORMAL,
@@ -156,5 +166,5 @@ func Test_newTransaction(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	fmt.Println(tx.TxHash().String())
+	fmt.Println(tx.TxHash().String(), changeIndex)
 }

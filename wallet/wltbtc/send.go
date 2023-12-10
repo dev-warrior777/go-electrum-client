@@ -88,24 +88,29 @@ func (w *BtcElectrumWallet) gatherCoins() map[coinset.Coin]*hdkeychain.ExtendedK
 	return m
 }
 
-func (w *BtcElectrumWallet) Spend(amount int64, addr btcutil.Address, feeLevel wallet.FeeLevel, spendAll bool) (*wire.MsgTx, error) {
+func (w *BtcElectrumWallet) Spend(pw string, amount int64, addr btcutil.Address, feeLevel wallet.FeeLevel, spendAll bool) (int, *wire.MsgTx, error) {
+	if ok := w.storageManager.IsValidPw(pw); !ok {
+		return -1, nil, errors.New("invalid password")
+	}
 	var (
-		tx  *wire.MsgTx
-		err error
+		changeIndex int
+		tx          *wire.MsgTx
+		err         error
 	)
+	changeIndex = -1
 	if spendAll {
 		tx, err = w.buildSpendAllTx(addr, feeLevel)
 		if err != nil {
-			return nil, err
+			return -1, nil, err
 		}
 	} else {
-		tx, err = w.buildTx(amount, addr, feeLevel, nil)
+		changeIndex, tx, err = w.buildTx(amount, addr, feeLevel, nil)
 		if err != nil {
-			return nil, err
+			return -1, nil, err
 		}
 	}
 
-	return tx, nil
+	return changeIndex, tx, nil
 }
 
 func (w *BtcElectrumWallet) EstimateFee(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, feePerByte int64) int64 {
@@ -127,7 +132,7 @@ func (w *BtcElectrumWallet) EstimateSpendFee(amount int64, feeLevel wallet.FeeLe
 	if err != nil {
 		return 0, err
 	}
-	tx, err := w.buildTx(amount, addr, feeLevel, nil)
+	_, tx, err := w.buildTx(amount, addr, feeLevel, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -154,11 +159,11 @@ func (w *BtcElectrumWallet) EstimateSpendFee(amount int64, feeLevel wallet.FeeLe
 	return uint64(inval - outval), err
 }
 
-func (w *BtcElectrumWallet) buildTx(amount int64, addr btcutil.Address, feeLevel wallet.FeeLevel, optionalOutput *wire.TxOut) (*wire.MsgTx, error) {
+func (w *BtcElectrumWallet) buildTx(amount int64, addr btcutil.Address, feeLevel wallet.FeeLevel, optionalOutput *wire.TxOut) (int, *wire.MsgTx, error) {
 	// Check for dust
 	script, _ := txscript.PayToAddrScript(addr)
 	if w.IsDust(amount) {
-		return nil, wallet.ErrDustAmount
+		return -1, nil, wallet.ErrDustAmount
 	}
 
 	var additionalPrevScripts map[wire.OutPoint][]byte
@@ -231,7 +236,7 @@ func (w *BtcElectrumWallet) buildTx(amount int64, addr btcutil.Address, feeLevel
 	}
 	authoredTx, err := NewUnsignedTransaction(outputs, btcutil.Amount(feePerKB), inputSource, changeOutputsSource)
 	if err != nil {
-		return nil, err
+		return -1, nil, err
 	}
 
 	// BIP 69 sorting
@@ -253,11 +258,11 @@ func (w *BtcElectrumWallet) buildTx(amount int64, addr btcutil.Address, feeLevel
 			authoredTx.Tx, i, prevOutScript, txscript.SigHashAll, getKey,
 			getScript, txIn.SignatureScript)
 		if err != nil {
-			return nil, errors.New("failed to sign transaction")
+			return -1, nil, errors.New("failed to sign transaction")
 		}
 		txIn.SignatureScript = script
 	}
-	return authoredTx.Tx, nil
+	return authoredTx.ChangeIndex, authoredTx.Tx, nil
 }
 
 func (w *BtcElectrumWallet) buildSpendAllTx(addr btcutil.Address, feeLevel wallet.FeeLevel) (*wire.MsgTx, error) {

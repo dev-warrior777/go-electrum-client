@@ -90,6 +90,7 @@ func configure() (*client.ClientConfig, error) {
 }
 
 func main() {
+	fmt.Println("Goele", client.GoeleVersion)
 	cfg, err := configure()
 	if err != nil {
 		fmt.Println(err, " - exiting")
@@ -147,6 +148,8 @@ func main() {
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
+
+	// SIGINT kills the node server(s) & test rpc server
 
 	sc := ec.GetNode().GetServerConn().SvrConn
 	<-sc.Done()

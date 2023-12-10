@@ -4,58 +4,87 @@ import (
 	"fmt"
 	"log"
 	"net/rpc"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cast"
 )
 
-// func main() {
-// 	client, err := rpc.DialHTTP("tcp", "127.0.0.1:8888")
-// 	if err != nil {
-// 		log.Fatal("dialing:", err)
-// 	}
-// 	var request = make(map[string]string)
-// 	request["a"] = "A"
-// 	request["b"] = "B"
-// 	request["c"] = "C"
-// 	var response = make(map[string]string)
-// 	err = client.Call("Ec.RPCEcho", &request, &response)
-// 	if err != nil {
-// 		log.Fatal("Ec.RPCEcho:", err)
-// 	}
-// 	fmt.Printf("client response %v\n", response)
-// }
+func usage() {
+	fmt.Println("rpctest v0.1.0")
+	fmt.Println()
+	fmt.Println("usage:")
+	fmt.Println("  cmd [positional args]")
+	fmt.Println("")
+	fmt.Println("  help", "\t\t\t\t\t This help")
+	fmt.Println("  echo <any>", "\t\t\t\t Echo any input args - test only")
+	fmt.Println("  tip", "\t\t\t\t\t Get blockchain tip")
+	fmt.Println("  listunspent", "\t\t\t\t List all wallet utxos")
+	fmt.Println("  spend pw amount address feeType", "\t Make signed transaction from wallet utxos")
+	fmt.Println("  broadcast rawTx", "\t\t\t Broadcast rawTx to ElectrumX")
+	fmt.Println("-------------------------------------------------------------")
+	fmt.Println()
+}
 
-// func main() {
-// 	client, err := rpc.DialHTTP("tcp", "127.0.0.1:8888")
-// 	if err != nil {
-// 		log.Fatal("dialing:", err)
-// 	}
-// 	var request = make(map[string]string)
-// 	var response = make(map[string]string)
-// 	err = client.Call("Ec.RPCTip", &request, &response)
-// 	if err != nil {
-// 		log.Fatal("Ec.RPCTip:", err)
-// 	}
-// 	fmt.Printf("client response %v\n", response)
-// }
+type cmd struct {
+	cmd  string
+	args []string
+}
 
-func main() {
-	client, err := rpc.DialHTTP("tcp", "127.0.0.1:8888")
-	if err != nil {
-		log.Fatal("dialing:", err)
+func (c *cmd) String() string {
+	var a string = ""
+	if len(c.args) > 0 {
+		a = strings.Join(c.args, " ")
+
 	}
+	return fmt.Sprintf("%s    %s\n", c.cmd, a)
+}
+
+// echo
+func (c *cmd) echo(client *rpc.Client) {
+	var request = make(map[string]string)
+	for _, a := range c.args {
+		request[a] = a
+	}
+	var response = make(map[string]string)
+	err := client.Call("Ec.RPCEcho", &request, &response)
+	if err != nil {
+		log.Fatal("Ec.RPCEcho:", err)
+	}
+	fmt.Printf("client response %v\n", response)
+}
+
+// tip
+func (c *cmd) tip(client *rpc.Client) {
 	var request = make(map[string]string)
 	var response = make(map[string]string)
-	err = client.Call("Ec.RPCListUnspent", &request, &response)
+	err := client.Call("Ec.RPCTip", &request, &response)
+	if err != nil {
+		log.Fatal("Ec.RPCTip:", err)
+	}
+	fmt.Printf("client response %v\n", response)
+	tip := cast.ToString(response["tip"])
+	synced := cast.ToString(response["synced"])
+	fmt.Println("tip", tip)
+	fmt.Println("synced", synced)
+}
+
+// listunspent
+func (c *cmd) listunspent(client *rpc.Client) {
+	var request = make(map[string]string)
+	var response = make(map[string]string)
+	err := client.Call("Ec.RPCListUnspent", &request, &response)
 	if err != nil {
 		log.Fatal("Ec.RPCListUnspent:", err)
 	}
 	fmt.Printf("client response %v\n", response)
 	allUnspents := cast.ToString(response["unspents"])
-
+	if len(allUnspents) == 0 { // zero length string
+		fmt.Println("[]")
+		return
+	}
 	unspents := strings.Split(allUnspents, "\n")
-
 	var us []string
 	fmt.Println("[")
 	for _, unspent := range unspents {
@@ -73,34 +102,128 @@ func main() {
 	fmt.Println("]")
 }
 
-////////////////////////////////////
-// Old
-//////
-// // =====
-// // Spend
-// // =====
-// r, err := c.Call(context.Background(), "spend", jsonrpc.Params{
-// 	"address": "bcrt1q322tg0y2hzyp9zztr7d2twdclhqg88anvzxwwr",
-// 	"amount":  "100000000",
-// 	"feeType": "NORMAL",
-// })
-// if err != nil {
-// 	logger.Errorf("failed to call: %s", err)
-// 	return
-// }
+// broadcast
+func (c *cmd) broadcast(client *rpc.Client) {
+	var request = make(map[string]string)
+	request["rawTx"] = c.args[0]
+	var response = make(map[string]string)
+	err := client.Call("Ec.RPCBroadcast", &request, &response)
+	if err != nil {
+		log.Fatal("Ec.RPCBroadcast:", err)
+	}
+	fmt.Printf("client response %v\n", response)
+	txid := cast.ToString(response["txid"])
+	fmt.Println("txid", txid)
+}
 
-// logger.Info("tx: %d", cast.ToString(r.Get("tx")))
-// logger.Info("txid: %v", cast.ToString(r.Get("txid")))
+// spend
+func (c *cmd) spend(client *rpc.Client) {
+	var request = make(map[string]string)
+	request["pw"] = c.args[0]
+	request["amount"] = c.args[1]
+	request["address"] = c.args[2]
+	request["feeType"] = c.args[3]
+	var response = make(map[string]string)
+	err := client.Call("Ec.RPCSpend", &request, &response)
+	if err != nil {
+		log.Fatal("Ec.RPCSpend:", err)
+	}
+	fmt.Printf("client response %v\n", response)
+	changeIndex := cast.ToString("changeIndex")
+	fmt.Println("changeIndex", changeIndex)
+	tx := cast.ToString(response["tx"])
+	fmt.Println("tx", tx)
+	txid := cast.ToString(response["txid"])
+	fmt.Println("txid", txid)
+}
 
-// // =========
-// // Broadcast
-// // =========
-// r, err := c.Call(context.Background(), "broadcast", jsonrpc.Params{
-// 	"rawTx": "0100000001ea2d00243734672280308a112cc5b77ec6b7550c522d4a5a1578fd2edd92f65b000000006b483045022100cd5ef583ade6acd1fdd9650b52d4b8a3a50d1d061cba6fdf3840083f43ac840d022010d8731fe53930e17ba7775378528e689af2d21e65b4fab7fd6dcd949553b772012102cb969af83427bfb1d271a7eb16f7fa3d16794a93369d0da293f721e925af9135000000000200e1f505000000001600148a94b43c8ab88812884b1f9aa5b9b8fdc0839fb3a8f66528000000001976a914dd3c22b42d29ea8ab7ec454e8bce628a07200ccd88ac00000000",
-// })
-// if err != nil {
-// 	logger.Errorf("failed to call: %s", err)
-// 	return
-// }
+func main() {
+	args := os.Args
+	if len(args) < 2 {
+		usage()
+		log.Fatal("no args given")
+	}
 
-// logger.Info("txid: %v", cast.ToString(r.Get("txid")))
+	var c = cmd{
+		args: make([]string, 0),
+	}
+
+	for i, a := range args {
+		if i == 0 {
+			continue
+		}
+		if i == 1 {
+			c.cmd = a
+			continue
+		}
+		c.args = append(c.args, a)
+	}
+	fmt.Println(c.String())
+	if c.cmd == "help" {
+		usage()
+		os.Exit(0)
+	}
+
+	switch c.cmd {
+	case "tip", "listunspent":
+	// no params
+	case "echo":
+	// any number of params
+	case "broadcast":
+		// 1 param, others ignored
+		if len(c.args) < 1 {
+			usage()
+			log.Fatal(c.String(), "needs 1 argument: the raw tx")
+		}
+	case "spend":
+		// 4 params, others ignored
+		if len(c.args) < 4 {
+			usage()
+			log.Fatal(c.String(), "needs 4 arguments: pw amount address feeType")
+		}
+		if len(c.args[0]) == 0 {
+			usage()
+			log.Fatal(c.String(), "empty password")
+		}
+		i, err := strconv.Atoi(c.args[1])
+		if err != nil {
+			usage()
+			log.Fatal(c.String(), "amount should be a number in satoshis")
+		}
+		if i < 10000 {
+			usage()
+			log.Fatal(c.String(), i, "amount is dust")
+		}
+		if len(c.args[2]) == 0 {
+			usage()
+			log.Fatal(c.String(), "address should be a bitcoin address")
+		}
+		switch c.args[3] {
+		case "NORMAL", "PRIORITY", "ECONOMIC":
+		default:
+			usage()
+			log.Fatal(c.String(), "feeType should be NORMAL, PRIORITY or ECONOMIC")
+		}
+	default:
+		usage()
+		log.Fatal(c.String(), "unknown command")
+	}
+
+	client, err := rpc.DialHTTP("tcp", "127.0.0.1:8888")
+	if err != nil {
+		log.Fatal("dialing:", err)
+	}
+
+	switch c.cmd {
+	case "echo":
+		c.echo(client)
+	case "tip":
+		c.tip(client)
+	case "listunspent":
+		c.listunspent(client)
+	case "broadcast":
+		c.broadcast(client)
+	case "spend":
+		c.spend(client)
+	}
+}
