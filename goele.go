@@ -105,7 +105,7 @@ func main() {
 	ec.CreateNode(client.SingleNode)
 	err = ec.GetNode().Start()
 	if err != nil {
-		fmt.Println(err, " - exiting")
+		fmt.Println(err, " - exiting, \ncheckout client/btc/test_harness\nsource harness.sh + ex.sh  - ")
 		os.Exit(1)
 	}
 
