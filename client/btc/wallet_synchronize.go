@@ -49,65 +49,76 @@ func historyToStatusHash(history electrumx.HistoryResult) string {
 
 // We need a mapping both ways
 type subscription struct {
-	address    btcutil.Address
+	// wallet subscribe watch list public key script. hex string
+	pkScript string
+	// electrum 1.4 protocol 'scripthash'
 	scripthash string
-	lastStatus string // a future optimization
+	// a future optimization
+	lastStatus string
 }
 
 type AddressSynchronizer struct {
-	subscriptions    map[btcutil.Address]*subscription
+	subscriptions    map[string]*subscription
 	subscriptionsMtx sync.Mutex
 	network          *chaincfg.Params
 }
 
-func (as *AddressSynchronizer) getAddressForScripthash(scripthash string) btcutil.Address {
+func (as *AddressSynchronizer) getPkScriptForScripthash(scripthash string) string {
 	for _, sub := range as.subscriptions {
 		if sub.scripthash == scripthash {
-			return sub.address
+			return sub.pkScript
 		}
 	}
-	return nil
+	return ""
 }
 
-func (as *AddressSynchronizer) isSubscribed(address btcutil.Address) bool {
+func (as *AddressSynchronizer) isSubscribed(pkScript string) bool {
 	as.subscriptionsMtx.Lock()
 	defer as.subscriptionsMtx.Unlock()
-	return as.subscriptions[address] != nil
+	return as.subscriptions[pkScript] != nil
 }
 
-func (as *AddressSynchronizer) addSubscription(address btcutil.Address, scripthash string) {
+func (as *AddressSynchronizer) addSubscription(pkScript string, scripthash string) {
 	as.subscriptionsMtx.Lock()
 	sub := subscription{
-		address:    address,
+		pkScript:   pkScript,
 		scripthash: scripthash,
 		lastStatus: "",
 	}
-	as.subscriptions[address] = &sub
+	as.subscriptions[pkScript] = &sub
 	as.subscriptionsMtx.Unlock()
 }
 
-func (as *AddressSynchronizer) removeSubscription(address btcutil.Address) {
+func (as *AddressSynchronizer) removeSubscription(pkScript string) {
 	as.subscriptionsMtx.Lock()
-	if as.subscriptions[address] != nil {
-		delete(as.subscriptions, address)
+	if as.subscriptions[pkScript] != nil {
+		delete(as.subscriptions, pkScript)
 	}
 	as.subscriptionsMtx.Unlock()
 }
 
 func (as *AddressSynchronizer) getSubscriptionForScripthash(scripthash string) *subscription {
-	address := as.getAddressForScripthash(scripthash)
-	return as.subscriptions[address]
+	pkScript := as.getPkScriptForScripthash(scripthash)
+	return as.subscriptions[pkScript]
 }
 
 func NewWalletSychronizer(cfg *client.ClientConfig) *AddressSynchronizer {
 	as := AddressSynchronizer{
-		subscriptions: make(map[btcutil.Address]*subscription, client.GAP_LIMIT*2),
+		subscriptions: make(map[string]*subscription, client.GAP_LIMIT*2),
 		network:       cfg.Params,
 	}
 	return &as
 }
 
-// addrToScripthash takes a public key script and makes an electrum 1.4 protocol 'scripthash'
+func (as *AddressSynchronizer) pkScriptStringToElectrumScripthash(pkScript string) (string, error) {
+	pkScriptBytes, err := hex.DecodeString(pkScript)
+	if err != nil {
+		return "", err
+	}
+	return as.pkScriptToElectrumScripthash(pkScriptBytes), nil
+}
+
+// pkScriptToElectrumScripthash takes a public key script and makes an electrum 1.4 protocol 'scripthash'
 func (as *AddressSynchronizer) pkScriptToElectrumScripthash(pkScript []byte) string {
 	revBytes := func(b []byte) []byte {
 		size := len(b)
@@ -191,11 +202,11 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 				sub.lastStatus = status.Status
 
 				// get scripthash history
-				history, err := ec.GetAddressHistoryFromNode(sub.address)
+				history, err := ec.GetAddressHistoryFromNode(sub.pkScript)
 				if err != nil {
 					continue
 				}
-				dumpHistory(sub.address, history)
+				ec.dumpHistory(sub.pkScript, history)
 
 				// update wallet txstore
 				ec.addTxHistoryToWallet(history)
@@ -206,33 +217,37 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 	return nil
 }
 
-// alreadySubscribed checks if this address is already subscribed
-func (ec *BtcElectrumClient) alreadySubscribed(address btcutil.Address) bool {
-	return ec.walletSynchronizer.isSubscribed(address)
+// alreadySubscribed checks if this public key script address is already subscribed
+func (ec *BtcElectrumClient) alreadySubscribed(pkScript string) bool {
+	return ec.walletSynchronizer.isSubscribed(pkScript)
 }
 
-// SubscribeAddressNotify subscribes to notifications from ElectrumX for an address
-// It returns a subscribe status which is the hash of all address history known to the
-// and can be zero length string if the subscription is new and has no history.
-func (ec *BtcElectrumClient) SubscribeAddressNotify(address btcutil.Address) (string, error) {
-	if ec.alreadySubscribed(address) {
-		return "", errors.New("address already subscribed")
+// SubscribeAddressNotify subscribes to notifications from ElectrumX for a public
+// key script address. It returns a subscribe status which is the hash of all
+// address history known to the electrumX server and can be zero length string if the subscription is new
+// and has no history.
+func (ec *BtcElectrumClient) SubscribeAddressNotify(pkScript string) (string, error) {
+	node := ec.GetNode()
+	if node == nil {
+		return "", ErrNoNode
+	}
+	if ec.alreadySubscribed(pkScript) {
+		return "", errors.New("pkScript already subscribed")
 	}
 
 	// subscribe
-	scripthash, err := ec.walletSynchronizer.addressToElectrumScripthash(
-		address, ec.GetConfig().Params)
+	scripthash, err := ec.walletSynchronizer.pkScriptStringToElectrumScripthash(pkScript)
 	if err != nil {
 		return "", err
 	}
-	res, err := ec.GetNode().SubscribeScripthashNotify(scripthash)
+	res, err := node.SubscribeScripthashNotify(scripthash)
 	if err != nil {
 		return "", err
 	}
 	if res == nil {
 		return "", errors.New("empty result")
 	}
-	ec.walletSynchronizer.addSubscription(address, scripthash)
+	ec.walletSynchronizer.addSubscription(pkScript, scripthash)
 
 	fmt.Println("Subscribed scripthash", res.Scripthash, " status:", res.Status)
 
@@ -240,25 +255,31 @@ func (ec *BtcElectrumClient) SubscribeAddressNotify(address btcutil.Address) (st
 }
 
 // UnsubscribeAddressNotify unsubscribes from notifications for an address
-func (ec *BtcElectrumClient) UnsubscribeAddressNotify(address btcutil.Address) {
-	if !ec.alreadySubscribed(address) {
+func (ec *BtcElectrumClient) UnsubscribeAddressNotify(pkScript string) {
+	node := ec.GetNode()
+	if node == nil {
+		return
+	}
+	if !ec.alreadySubscribed(pkScript) {
 		return
 	}
 
 	// unsubscribe
-	scripthash, err := ec.walletSynchronizer.addressToElectrumScripthash(
-		address, ec.GetConfig().Params)
+	scripthash, err := ec.walletSynchronizer.pkScriptStringToElectrumScripthash(pkScript)
 	if err != nil {
 		return
 	}
-	ec.GetNode().UnsubscribeScripthashNotify(scripthash)
-	ec.walletSynchronizer.removeSubscription(address)
+	node.UnsubscribeScripthashNotify(scripthash)
+	ec.walletSynchronizer.removeSubscription(pkScript)
 	fmt.Println("unsubscribed scripthash")
 }
 
-func (ec *BtcElectrumClient) GetAddressHistoryFromNode(address btcutil.Address) (electrumx.HistoryResult, error) {
-	scripthash, err := ec.walletSynchronizer.addressToElectrumScripthash(
-		address, ec.GetConfig().Params)
+func (ec *BtcElectrumClient) GetAddressHistoryFromNode(pkScript string) (electrumx.HistoryResult, error) {
+	node := ec.GetNode()
+	if node == nil {
+		return nil, ErrNoNode
+	}
+	scripthash, err := ec.walletSynchronizer.pkScriptStringToElectrumScripthash(pkScript)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +289,7 @@ func (ec *BtcElectrumClient) GetAddressHistoryFromNode(address btcutil.Address) 
 	}
 
 	if len(res) == 0 {
-		fmt.Println("empty history result for: ", address.String())
+		fmt.Println("empty history result for: ", pkScript)
 		return nil, nil
 	}
 
@@ -276,7 +297,11 @@ func (ec *BtcElectrumClient) GetAddressHistoryFromNode(address btcutil.Address) 
 }
 
 func (ec *BtcElectrumClient) GetRawTransactionFromNode(txid string) (*wire.MsgTx, time.Time, error) {
-	txres, err := ec.GetNode().GetRawTransaction(txid)
+	node := ec.GetNode()
+	if node == nil {
+		return nil, time.Time{}, ErrNoNode
+	}
+	txres, err := node.GetRawTransaction(txid)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
@@ -336,8 +361,29 @@ func (ec *BtcElectrumClient) updateWalletTip() {
 	}
 }
 
-func dumpHistory(address btcutil.Address, history electrumx.HistoryResult) {
-	fmt.Println("History for address ", address.String())
+// //////////////////////////
+// dbg dump
+///////////
+
+func (ec *BtcElectrumClient) pkScriptStringToAddressPubkeyHash(pkScriptStr string) (btcutil.Address, string) {
+	pkScript, err := hex.DecodeString(pkScriptStr)
+	if err != nil {
+		return nil, ""
+	}
+	pks, err := txscript.ParsePkScript(pkScript)
+	if err != nil {
+		return nil, ""
+	}
+	apkh, err := pks.Address(ec.GetConfig().Params)
+	if err != nil {
+		return nil, ""
+	}
+	return apkh, apkh.String()
+}
+
+func (ec *BtcElectrumClient) dumpHistory(pkScript string, history electrumx.HistoryResult) {
+	_, apkhs := ec.pkScriptStringToAddressPubkeyHash(pkScript)
+	fmt.Println("Address Hsitory for script address", pkScript, apkhs)
 	for _, h := range history {
 		fmt.Println("Height:", h.Height)
 		fmt.Println("TxHash: ", h.TxHash)

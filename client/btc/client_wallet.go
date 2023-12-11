@@ -20,25 +20,29 @@ var ErrNoNode error = errors.New("no node")
 
 // devdbg: just one known wallet address
 func (ec *BtcElectrumClient) SyncWallet() error {
+	w := ec.GetWallet()
+	if w == nil {
+		return ErrNoWallet
+	}
 
-	address, err := ec.GetWallet().GetUnusedAddress(wallet.RECEIVING)
+	address, err := w.GetUnusedAddress(wallet.RECEIVING)
 	if err != nil {
 		return err
 	}
 
-	payToAddrScript, err := ec.GetWallet().AddressToScript(address)
+	payToAddrScript, err := w.AddressToScript(address)
 	if err != nil {
 		return err
 	}
 
-	err = ec.GetWallet().AddSubscribeScript(payToAddrScript)
+	err = w.AddSubscribeScript(payToAddrScript)
 	if err != nil {
 		return err
 	}
 
 	//..................
 
-	subscribeScripts, err := ec.GetWallet().ListSubscribeScripts()
+	subscribeScripts, err := w.ListSubscribeScripts()
 	if err != nil {
 		return err
 	}
@@ -53,27 +57,23 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		//   - get the up to date history list of txid:height, if any
 		//     - update db
 
-		address, err := ec.GetWallet().ScriptToAddress(subscribeScript)
-		if err != nil {
-			return err
-		}
-		fmt.Println(address.String())
-
-		status, err := ec.SubscribeAddressNotify(address)
+		pkScriptStr := hex.EncodeToString(subscribeScript)
+		fmt.Println("subscribe script", pkScriptStr)
+		status, err := ec.SubscribeAddressNotify(pkScriptStr)
 		if err != nil {
 			return err
 		}
 		if status == "" {
-			fmt.Println("no history for this address .. yet")
+			fmt.Println("no history for this script address .. yet")
 			continue
 		}
 
 		// grab all address history to date for this address
-		history, err := ec.GetAddressHistoryFromNode(address)
+		history, err := ec.GetAddressHistoryFromNode(pkScriptStr)
 		if err != nil {
 			return err
 		}
-		// dumpHistory(address, history)
+		ec.dumpHistory(pkScriptStr, history)
 
 		// update wallet txstore if needed
 		ec.addTxHistoryToWallet(history)
@@ -88,6 +88,7 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 	return nil
 }
 
+//------------------------------------------
 // 		// // fun with dick & jane
 // 		// script := address.ScriptAddress()
 // 		// s := hex.EncodeToString(script)
@@ -112,12 +113,6 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 // 		if err != nil {
 // 			return err
 // 		}
-// 	}
-
-// 	// start goroutine to listen for scripthash status change notifications arriving
-
-// 	return nil
-// }
 //------------------------------------------
 
 //////////////////////////////////////////////////////////////////////////////
