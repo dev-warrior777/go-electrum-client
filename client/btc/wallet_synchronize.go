@@ -107,8 +107,8 @@ func NewWalletSychronizer(cfg *client.ClientConfig) *AddressSynchronizer {
 	return &as
 }
 
-// addrToScripthash takes a btcutil.Address and makes an electrum 1.4 protocol 'scripthash'
-func (as *AddressSynchronizer) addressToElectrumScripthash(address btcutil.Address, network *chaincfg.Params) (string, error) {
+// addrToScripthash takes a public key script and makes an electrum 1.4 protocol 'scripthash'
+func (as *AddressSynchronizer) pkScriptToElectrumScripthash(pkScript []byte) string {
 	revBytes := func(b []byte) []byte {
 		size := len(b)
 		buf := make([]byte, size)
@@ -118,18 +118,19 @@ func (as *AddressSynchronizer) addressToElectrumScripthash(address btcutil.Addre
 		}
 		return buf
 	}
+	fmt.Println("pkScript", hex.EncodeToString(pkScript), " before electrum extra hashing")
+	pkScriptHashBytes := chainhash.HashB(pkScript)
+	revScriptHashBytes := revBytes(pkScriptHashBytes)
+	return hex.EncodeToString(revScriptHashBytes)
+}
 
-	pkscript, err := txscript.PayToAddrScript(address)
+// addrToScripthash takes a btcutil.Address and makes an electrum 1.4 protocol 'scripthash'
+func (as *AddressSynchronizer) addressToElectrumScripthash(address btcutil.Address, network *chaincfg.Params) (string, error) {
+	pkScript, err := txscript.PayToAddrScript(address)
 	if err != nil {
 		return "", err
 	}
-	fmt.Println("pkscript", hex.EncodeToString(pkscript), " before electrum extra hashing")
-
-	pkScriptHashBytes := chainhash.HashB(pkscript)
-	revScriptHashBytes := revBytes(pkScriptHashBytes)
-	scripthash := hex.EncodeToString(revScriptHashBytes)
-
-	return scripthash, nil
+	return as.pkScriptToElectrumScripthash(pkScript), nil
 }
 
 // addrToElectrumScripthash takes a bech or legacy bitcoin address and makes an electrum
@@ -210,8 +211,8 @@ func (ec *BtcElectrumClient) alreadySubscribed(address btcutil.Address) bool {
 	return ec.walletSynchronizer.isSubscribed(address)
 }
 
-// SubscribeAddressNotify subscribes to notifications for an address from ElectrumX
-// It returns a subscribe statuswhich is the hash of all address history known to the
+// SubscribeAddressNotify subscribes to notifications from ElectrumX for an address
+// It returns a subscribe status which is the hash of all address history known to the
 // and can be zero length string if the subscription is new and has no history.
 func (ec *BtcElectrumClient) SubscribeAddressNotify(address btcutil.Address) (string, error) {
 	if ec.alreadySubscribed(address) {
@@ -331,7 +332,7 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResul
 func (ec *BtcElectrumClient) updateWalletTip() {
 	w := ec.GetWallet()
 	if w != nil {
-		w.UpdateTip(ec.clientHeaders.hdrsTip, ec.clientHeaders.synced)
+		w.UpdateTip(ec.Tip())
 	}
 }
 

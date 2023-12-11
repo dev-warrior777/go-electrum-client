@@ -148,7 +148,7 @@ func (ec *BtcElectrumClient) CreateNode(_ client.NodeType) {
 //
 // SyncWallet() error
 // Spend(amount int64, toAddress string, feeLevel wallet.FeeLevel, broadcast bool) (string, string, error)
-// Broadcast(rawTx string) (string, error)
+// Broadcast(*BroadcastParams) (string, error)
 // ListUnspent() (string, error)
 
 //////////////////////////////////////////////////////////////////////////////

@@ -117,8 +117,9 @@ func (e *Ec) RPCSpend(request map[string]string, response *map[string]string) er
 func (e *Ec) RPCBroadcast(request map[string]string, response *map[string]string) error {
 	r := *response
 	rawTx := cast.ToString(request["rawTx"])
+	changeIndex := cast.ToInt(request["changeIndex"])
 	fmt.Println("rpc:", rawTx)
-	txid, err := e.EleClient.Broadcast(rawTx)
+	txid, err := e.EleClient.ExternalBroadcast(rawTx, changeIndex)
 	fmt.Println("rpc err:", err)
 	if err != nil {
 		return err

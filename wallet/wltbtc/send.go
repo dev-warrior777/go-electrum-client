@@ -28,7 +28,7 @@ func (w *BtcElectrumWallet) Broadcast(tx *wire.MsgTx) error {
 	}
 
 	fmt.Printf("Broadcasting tx %s to electrumX server", tx.TxHash().String())
-	//TODO: move to client
+	//TODO: move to client, wallets don't broadcast
 	return nil
 }
 

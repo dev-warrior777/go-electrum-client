@@ -8,10 +8,12 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
 var ErrNoWallet error = errors.New("no wallet")
+var ErrNoNode error = errors.New("no node")
 
 // Here is the client interface between the node & wallet for transaction
 // broadcast and wallet synchronize
@@ -42,6 +44,15 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 	}
 
 	for _, subscribeScript := range subscribeScripts {
+
+		// - get all subscribed receive/change addresses in wallet
+		//
+		// for each
+		//   - subscribe for scripthash notifications
+		//   - on sub the return is hash of all known history known to server
+		//   - get the up to date history list of txid:height, if any
+		//     - update db
+
 		address, err := ec.GetWallet().ScriptToAddress(subscribeScript)
 		if err != nil {
 			return err
@@ -76,21 +87,6 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 
 	return nil
 }
-
-//-------------------------------------------------
-// func (ec *BtcElectrumClient) SyncWallet() error {
-
-// 	// - get all watched receive/our change addresses in wallet
-
-// 	// for each
-// 	//   - subscribe for scripthash notifications
-// 	//   - on sub the return is hash of all known history known to server
-// 	//   - get the prev stored history for the address from db if any
-// 	//   - hash prev history and compare to what the server sends back
-// 	//   - if different get the up to date history list of txid:height
-// 	//     - update db
-
-// 	for _, address := range addresses {
 
 // 		// // fun with dick & jane
 // 		// script := address.ScriptAddress()
@@ -168,13 +164,61 @@ func (ec *BtcElectrumClient) Spend(
 	return changeIndex, rawTxHex, txidHex, nil
 }
 
-// Broadcast sends a transaction to the server for broadcast on the bitcoin
-// network. It returns txid as a string.
-func (ec *BtcElectrumClient) Broadcast(rawTx string) (string, error) {
-
+// ExternalBroadcast sends a transaction to the server for broadcast on the bitcoin
+// network. It returns txid as a string. It is not part of the ElectrumClient
+// interface.
+func (ec *BtcElectrumClient) ExternalBroadcast(rawTx string, changeIndex int) (string, error) {
 	txid, err := ec.GetNode().Broadcast(rawTx)
 	if err != nil {
 		return "", err
+	}
+	return txid, nil
+}
+
+// Broadcast sends a transaction to the server for broadcast on the bitcoin
+// network. It returns txid as a string.
+func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, error) {
+	node := ec.GetNode()
+	if node == nil {
+		return "", ErrNoNode
+	}
+	if bc.Tx == nil {
+		return "", errors.New("nil Tx")
+	}
+
+	// serialize tx
+	b := make([]byte, bc.Tx.SerializeSize())
+	bb := bytes.NewBuffer(b)
+	rawTx := bb.Bytes()
+
+	// check change index is valid
+	if bc.ChangeIndex >= 0 {
+		fmt.Println("change output index", bc.ChangeIndex)
+		txOuts := bc.Tx.TxOut
+		if len(txOuts) < bc.ChangeIndex+1 {
+			return "", errors.New("invalid change index")
+		}
+	}
+
+	// Send tx to ElectrumX for broadcasting to the bitcoin network
+	rawTxStr := hex.EncodeToString(rawTx)
+	txid, err := node.Broadcast(rawTxStr)
+	if err != nil {
+		return "", err
+	}
+
+	// Subscribe any addresses we might be interested in. This should also add
+	// the containing tx to the wallet. In particular we almost always have a
+	// change script address to watch paying back to our wallet after tx mined.
+
+	change := bc.Tx.TxOut[bc.ChangeIndex]
+	scripthash := ec.walletSynchronizer.pkScriptToElectrumScripthash(change.PkScript)
+	res, err := node.SubscribeScripthashNotify(scripthash)
+	if err != nil {
+		return "", err
+	}
+	if res == nil {
+		return "", errors.New("empty result")
 	}
 
 	return txid, nil
