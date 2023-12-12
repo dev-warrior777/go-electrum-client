@@ -93,7 +93,7 @@ type Datastore interface {
 	Stxos() Stxos
 	Txns() Txns
 	Keys() Keys
-	SubscribeScripts() SubscribeScripts
+	Subscriptions() Subscriptions
 }
 
 type Cfg interface {
@@ -201,16 +201,47 @@ type Keys interface {
 	GetLookaheadWindows() map[KeyPurpose]int
 }
 
-type SubscribeScripts interface {
+type Subscriptions interface {
 
 	// Add a script to subscribe & have ElectrumX watch for status changes
-	Put(scriptPubKey []byte) error
+	Put(subscription *Subscription) error
+
+	// Return the subscribe script for scriptPubKey
+	Get(scriptPubKey string) (*Subscription, error)
+
+	// Return the subscribe script for electrumScripthash (not indexed)
+	GetElectrumScripthash(electrumScripthash string) (*Subscription, error)
 
 	// Return all subscribe scripts
-	GetAll() ([][]byte, error)
+	GetAll() ([]*Subscription, error)
 
 	// Delete a subscribe script
-	Delete(scriptPubKey []byte) error
+	Delete(scriptPubkey string) error
+}
+
+type Subscription struct {
+	// wallet subscribe watch list public key script. hex string
+	PkScript string
+	// electrum 1.4 protocol 'scripthash'
+	ElectrumScripthash string
+	// address
+	Address string
+}
+
+func (s *Subscription) IsEqual(alt *Subscription) bool {
+	if alt == nil {
+		return s == nil
+	}
+	if alt.PkScript != s.PkScript {
+		return false
+	}
+	if alt.ElectrumScripthash != s.ElectrumScripthash {
+		return false
+	}
+	if alt.Address != s.Address {
+		return false
+	}
+	return true
 }
 
 type Utxo struct {

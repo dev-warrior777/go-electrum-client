@@ -21,8 +21,6 @@ type BtcElectrumClient struct {
 	Node         electrumx.ElectrumXNode
 	// client copy of blockchain headers
 	clientHeaders *Headers
-	// client wallet receive address synchronization with the node
-	walletSynchronizer *AddressSynchronizer
 }
 
 func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
@@ -32,7 +30,6 @@ func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 		Node:         nil,
 	}
 	ec.clientHeaders = NewHeaders(cfg)
-	ec.walletSynchronizer = NewWalletSychronizer(cfg)
 	return &ec
 }
 

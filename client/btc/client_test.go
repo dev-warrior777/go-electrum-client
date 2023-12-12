@@ -24,8 +24,7 @@ func AddrToElectrumScripthash(addr string, network *chaincfg.Params) (string, er
 	cfg := client.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
 	cfg.Params = network
-	walletSync := NewWalletSychronizer(cfg)
-	return walletSync.addrToElectrumScripthash(addr, network)
+	return addrToElectrumScripthash(addr, network)
 }
 
 func TestElectrumScripthash(t *testing.T) {

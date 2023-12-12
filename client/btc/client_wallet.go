@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
@@ -18,7 +19,7 @@ var ErrNoNode error = errors.New("no node")
 // Here is the client interface between the node & wallet for transaction
 // broadcast and wallet synchronize
 
-// devdbg: just one known wallet address
+// devdbg: add just one known wallet address -------------------------------->
 func (ec *BtcElectrumClient) SyncWallet() error {
 	w := ec.GetWallet()
 	if w == nil {
@@ -30,26 +31,32 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		return err
 	}
 
-	payToAddrScript, err := w.AddressToScript(address)
+	payToAddrScript, err := txscript.PayToAddrScript(address)
 	if err != nil {
 		return err
 	}
 
-	err = w.AddSubscribeScript(payToAddrScript)
+	subscription := &wallet.Subscription{
+		PkScript:           hex.EncodeToString(payToAddrScript),
+		ElectrumScripthash: pkScriptToElectrumScripthash(payToAddrScript),
+		Address:            address.String(),
+	}
+
+	err = w.AddSubscription(subscription)
 	if err != nil {
 		return err
 	}
 
-	//..................
+	// <---------------------------------------------------------------devdbg:
 
-	subscribeScripts, err := w.ListSubscribeScripts()
+	subscriptions, err := w.ListSubscriptions()
 	if err != nil {
 		return err
 	}
 
-	for _, subscribeScript := range subscribeScripts {
+	for _, subscription := range subscriptions {
 
-		// - get all subscribed receive/change addresses in wallet
+		// - get all subscribed receive/change/watched addresses in wallet
 		//
 		// for each
 		//   - subscribe for scripthash notifications
@@ -57,9 +64,8 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		//   - get the up to date history list of txid:height, if any
 		//     - update db
 
-		pkScriptStr := hex.EncodeToString(subscribeScript)
-		fmt.Println("subscribe script", pkScriptStr)
-		status, err := ec.SubscribeAddressNotify(pkScriptStr)
+		pkScript := subscription.PkScript
+		status, err := ec.SubscribeAddressNotify(subscription)
 		if err != nil {
 			return err
 		}
@@ -69,11 +75,11 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		}
 
 		// grab all address history to date for this address
-		history, err := ec.GetAddressHistoryFromNode(pkScriptStr)
+		history, err := ec.GetAddressHistoryFromNode(subscription)
 		if err != nil {
 			return err
 		}
-		ec.dumpHistory(pkScriptStr, history)
+		ec.dumpHistory(pkScript, history)
 
 		// update wallet txstore if needed
 		ec.addTxHistoryToWallet(history)
@@ -207,7 +213,7 @@ func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, erro
 	// change script address to watch paying back to our wallet after tx mined.
 
 	change := bc.Tx.TxOut[bc.ChangeIndex]
-	scripthash := ec.walletSynchronizer.pkScriptToElectrumScripthash(change.PkScript)
+	scripthash := pkScriptToElectrumScripthash(change.PkScript)
 	res, err := node.SubscribeScripthashNotify(scripthash)
 	if err != nil {
 		return "", err

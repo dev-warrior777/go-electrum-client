@@ -22,7 +22,7 @@ type MockDatastore struct {
 	utxos            wallet.Utxos
 	stxos            wallet.Stxos
 	txns             wallet.Txns
-	subscribeScripts wallet.SubscribeScripts
+	subscribeScripts wallet.Subscriptions
 }
 
 func (m *MockDatastore) Cfg() wallet.Cfg {
@@ -49,7 +49,7 @@ func (m *MockDatastore) Txns() wallet.Txns {
 	return m.txns
 }
 
-func (m *MockDatastore) SubscribeScripts() wallet.SubscribeScripts {
+func (m *MockDatastore) Subscriptions() wallet.Subscriptions {
 	return m.subscribeScripts
 }
 
@@ -356,30 +356,49 @@ func (m *mockTxnStore) Delete(txid chainhash.Hash) error {
 	return nil
 }
 
-type mockSubscribeScriptsStore struct {
-	scripts map[string][]byte
+type mockSubscriptionsStore struct {
+	subcriptions map[string]*wallet.Subscription
 }
 
-func (m *mockSubscribeScriptsStore) Put(scriptPubKey []byte) error {
-	m.scripts[hex.EncodeToString(scriptPubKey)] = scriptPubKey
+func (m *mockSubscriptionsStore) Put(sub *wallet.Subscription) error {
+	if sub == nil {
+		return errors.New("nil subscription")
+	}
+	m.subcriptions[sub.PkScript] = sub
 	return nil
 }
 
-func (m *mockSubscribeScriptsStore) GetAll() ([][]byte, error) {
-	var ret [][]byte
-	for _, b := range m.scripts {
-		ret = append(ret, b)
+func (m *mockSubscriptionsStore) Get(scriptPubKey string) (*wallet.Subscription, error) {
+	_, ok := m.subcriptions[scriptPubKey]
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	return m.subcriptions[scriptPubKey], nil
+}
+
+func (m *mockSubscriptionsStore) GetElectrumScripthash(electrumScripthash string) (*wallet.Subscription, error) {
+	for _, sub := range m.subcriptions {
+		if sub.ElectrumScripthash == electrumScripthash {
+			return sub, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *mockSubscriptionsStore) GetAll() ([]*wallet.Subscription, error) {
+	var ret []*wallet.Subscription
+	for _, sub := range m.subcriptions {
+		ret = append(ret, sub)
 	}
 	return ret, nil
 }
 
-func (m *mockSubscribeScriptsStore) Delete(scriptPubKey []byte) error {
-	enc := hex.EncodeToString(scriptPubKey)
-	_, ok := m.scripts[enc]
+func (m *mockSubscriptionsStore) Delete(scriptPubKey string) error {
+	_, ok := m.subcriptions[scriptPubKey]
 	if !ok {
 		return errors.New("not found")
 	}
-	delete(m.scripts, enc)
+	delete(m.subcriptions, scriptPubKey)
 	return nil
 }
 

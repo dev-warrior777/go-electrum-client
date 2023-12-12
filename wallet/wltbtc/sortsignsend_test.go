@@ -24,7 +24,7 @@ func createTxStore() (*TxStore, *StorageManager) {
 		&mockUtxoStore{make(map[string]*wallet.Utxo)},
 		&mockStxoStore{make(map[string]*wallet.Stxo)},
 		&mockTxnStore{make(map[string]*wallet.Txn)},
-		&mockSubscribeScriptsStore{make(map[string][]byte)},
+		&mockSubscriptionsStore{make(map[string]*wallet.Subscription)},
 	}
 	seed := make([]byte, 32)
 	rand.Read(seed)

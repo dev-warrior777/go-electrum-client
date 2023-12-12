@@ -5,27 +5,35 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-type SubscribeManager struct {
-	datastore wallet.SubscribeScripts
+type SubscriptionManager struct {
+	datastore wallet.Subscriptions
 	params    *chaincfg.Params
 }
 
-func NewSubscribeManager(db wallet.SubscribeScripts, params *chaincfg.Params) *SubscribeManager {
-	sm := &SubscribeManager{
+func NewSubscriptionManager(db wallet.Subscriptions, params *chaincfg.Params) *SubscriptionManager {
+	sm := &SubscriptionManager{
 		datastore: db,
 		params:    params,
 	}
 	return sm
 }
 
-func (sm *SubscribeManager) Put(scriptPubKey []byte) error {
-	return sm.datastore.Put(scriptPubKey)
+func (sm *SubscriptionManager) Put(subscription *wallet.Subscription) error {
+	return sm.datastore.Put(subscription)
 }
 
-func (sm *SubscribeManager) GetAll() ([][]byte, error) {
+func (sm *SubscriptionManager) Get(scriptPubKey string) (*wallet.Subscription, error) {
+	return sm.datastore.Get(scriptPubKey)
+}
+
+func (sm *SubscriptionManager) GetElectrumScripthash(electrumScripthash string) (*wallet.Subscription, error) {
+	return sm.datastore.GetElectrumScripthash(electrumScripthash)
+}
+
+func (sm *SubscriptionManager) GetAll() ([]*wallet.Subscription, error) {
 	return sm.datastore.GetAll()
 }
 
-func (sm *SubscribeManager) Delete(scriptPubKey []byte) error {
+func (sm *SubscriptionManager) Delete(scriptPubKey string) error {
 	return sm.datastore.Delete(scriptPubKey)
 }

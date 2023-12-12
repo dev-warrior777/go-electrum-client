@@ -39,10 +39,10 @@ type BtcElectrumWallet struct {
 
 	repoPath string
 
-	storageManager   *StorageManager
-	txstore          *TxStore
-	keyManager       *KeyManager
-	subscribeManager *SubscribeManager
+	storageManager      *StorageManager
+	txstore             *TxStore
+	keyManager          *KeyManager
+	subscriptionManager *SubscriptionManager
 
 	mutex *sync.RWMutex
 
@@ -147,7 +147,7 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 		return nil, err
 	}
 
-	w.subscribeManager = NewSubscribeManager(config.DB.SubscribeScripts(), w.params)
+	w.subscriptionManager = NewSubscriptionManager(config.DB.Subscriptions(), w.params)
 
 	err = config.DB.Cfg().PutCreationDate(w.creationDate)
 	if err != nil {
@@ -203,7 +203,7 @@ func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrum
 		return nil, err
 	}
 
-	w.subscribeManager = NewSubscribeManager(config.DB.SubscribeScripts(), w.params)
+	w.subscriptionManager = NewSubscriptionManager(config.DB.Subscriptions(), w.params)
 
 	w.creationDate, err = config.DB.Cfg().GetCreationDate()
 	if err != nil {
@@ -302,16 +302,24 @@ func (w *BtcElectrumWallet) AddressToScript(address btcutil.Address) ([]byte, er
 	return txscript.PayToAddrScript(address)
 }
 
-func (w *BtcElectrumWallet) AddSubscribeScript(script []byte) error {
-	err := w.subscribeManager.Put(script)
-	if err != nil {
-		return err
-	}
-	return nil
+func (w *BtcElectrumWallet) AddSubscription(subcription *wallet.Subscription) error {
+	return w.subscriptionManager.Put(subcription)
 }
 
-func (w *BtcElectrumWallet) ListSubscribeScripts() ([][]byte, error) {
-	return w.subscribeManager.GetAll()
+func (w *BtcElectrumWallet) RemoveSubscription(scriptPubKey string) {
+	w.subscriptionManager.Delete(scriptPubKey)
+}
+
+func (w *BtcElectrumWallet) GetSubscription(scriptPubKey string) (*wallet.Subscription, error) {
+	return w.subscriptionManager.Get(scriptPubKey)
+}
+
+func (w *BtcElectrumWallet) GetSubscriptionForElectrumScripthash(electrumScripthash string) (*wallet.Subscription, error) {
+	return w.subscriptionManager.GetElectrumScripthash(electrumScripthash)
+}
+
+func (w *BtcElectrumWallet) ListSubscriptions() ([]*wallet.Subscription, error) {
+	return w.subscriptionManager.GetAll()
 }
 
 func (w *BtcElectrumWallet) HasAddress(address btcutil.Address) bool {

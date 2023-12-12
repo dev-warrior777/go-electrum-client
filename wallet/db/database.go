@@ -12,15 +12,15 @@ import (
 // This database is an SqLite3 implementation of Datastore.
 // A different database could be plugged in .. bbolt maybe
 type SQLiteDatastore struct {
-	cfg              wallet.Cfg
-	enc              wallet.Enc
-	keys             wallet.Keys
-	utxos            wallet.Utxos
-	stxos            wallet.Stxos
-	txns             wallet.Txns
-	subscribeScripts wallet.SubscribeScripts
-	db               *sql.DB
-	lock             *sync.RWMutex
+	cfg           wallet.Cfg
+	enc           wallet.Enc
+	keys          wallet.Keys
+	utxos         wallet.Utxos
+	stxos         wallet.Stxos
+	txns          wallet.Txns
+	subscriptions wallet.Subscriptions
+	db            *sql.DB
+	lock          *sync.RWMutex
 }
 
 func Create(repoPath string) (*SQLiteDatastore, error) {
@@ -56,7 +56,7 @@ func Create(repoPath string) (*SQLiteDatastore, error) {
 			db:   conn,
 			lock: l,
 		},
-		subscribeScripts: &SubscribeScriptsDB{
+		subscriptions: &SubscriptionsDB{
 			db:   conn,
 			lock: l,
 		},
@@ -85,8 +85,8 @@ func (db *SQLiteDatastore) Stxos() wallet.Stxos {
 func (db *SQLiteDatastore) Txns() wallet.Txns {
 	return db.txns
 }
-func (db *SQLiteDatastore) SubscribeScripts() wallet.SubscribeScripts {
-	return db.subscribeScripts
+func (db *SQLiteDatastore) Subscriptions() wallet.Subscriptions {
+	return db.subscriptions
 }
 
 func initDatabaseTables(db *sql.DB) error {
@@ -96,7 +96,7 @@ func initDatabaseTables(db *sql.DB) error {
 	create table if not exists utxos (outpoint text primary key not null, value integer, height integer, scriptPubKey text, watchOnly integer, frozen integer);
 	create table if not exists stxos (outpoint text primary key not null, value integer, height integer, scriptPubKey text, watchOnly integer, spendHeight integer, spendTxid text);
 	create table if not exists txns (txid text primary key not null, value integer, height integer, timestamp integer, watchOnly integer, tx blob);
-	create table if not exists subscribeScripts (scriptPubKey text primary key not null);
+	create table if not exists subscriptions (scriptPubKey text primary key not null, electrumScripthash text, address text);
 	create table if not exists config(key text primary key not null, value blob);
 	create table if not exists enc(key text primary key not null, value blob);
 	`

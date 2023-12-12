@@ -1,58 +1,65 @@
 package wltbtc
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-func createSubscribeManager() *SubscribeManager {
-	scripts := make(map[string][]byte)
-	return NewSubscribeManager(&mockSubscribeScriptsStore{scripts: scripts}, &chaincfg.MainNetParams)
+func createSubscriptionManager() *SubscriptionManager {
+	subscriptions := make(map[string]*wallet.Subscription)
+	return NewSubscriptionManager(&mockSubscriptionsStore{subcriptions: subscriptions}, &chaincfg.MainNetParams)
 }
 
-func TestStoreSubscribeScript(t *testing.T) {
-	sm := createSubscribeManager()
-	req := []byte("paymentscript")
-	err := sm.datastore.Put(req)
+func TestStoreSubscription(t *testing.T) {
+	sm := createSubscriptionManager()
+	sub := &wallet.Subscription{
+		PkScript:           "paymentscript",
+		ElectrumScripthash: "electrumScripthash",
+		Address:            "address",
+	}
+	err := sm.datastore.Put(sub)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ret, err := sm.datastore.GetAll()
+	subs, err := sm.datastore.GetAll()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, s := range ret {
-		if string(s) == string(req) {
+	for _, s := range subs {
+		if s.IsEqual(sub) {
 			return
 		}
 	}
-	t.Fatal("req != ret")
+	t.Fatal("stored subscription is not returned")
 }
 
-func TestDeleteSubscribeScript(t *testing.T) {
-	sm := createSubscribeManager()
-	req := []byte("paymentscript")
-	err := sm.datastore.Put(req)
+func TestDeleteSubscription(t *testing.T) {
+	sm := createSubscriptionManager()
+	sub := &wallet.Subscription{
+		PkScript:           "paymentscript",
+		ElectrumScripthash: "electrumScripthash",
+		Address:            "address",
+	}
+	err := sm.datastore.Put(sub)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = sm.datastore.Delete(req)
+	err = sm.datastore.Delete("paymentscript")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ret, err := sm.datastore.GetAll()
+	subs, err := sm.datastore.GetAll()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, s := range ret {
-		fmt.Println(ret)
-		if string(s) == string(req) {
-			t.Fatal("req != ret")
+	for _, s := range subs {
+		if s.IsEqual(sub) {
+			t.Fatal("deleted subscription returned")
 		}
 	}
 }
