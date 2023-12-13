@@ -59,12 +59,11 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		// - get all subscribed receive/change/watched addresses in wallet
 		//
 		// for each
-		//   - subscribe for scripthash notifications
+		//   - subscribe for scripthash notifications from electrumX node
 		//   - on sub the return is hash of all known history known to server
 		//   - get the up to date history list of txid:height, if any
-		//     - update db
+		//     - update txns db
 
-		pkScript := subscription.PkScript
 		status, err := ec.SubscribeAddressNotify(subscription)
 		if err != nil {
 			return err
@@ -79,7 +78,7 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		if err != nil {
 			return err
 		}
-		ec.dumpHistory(pkScript, history)
+		ec.dumpHistory(subscription, history)
 
 		// update wallet txstore if needed
 		ec.addTxHistoryToWallet(history)
@@ -165,20 +164,31 @@ func (ec *BtcElectrumClient) Spend(
 	return changeIndex, rawTxHex, txidHex, nil
 }
 
-// ExternalBroadcast sends a transaction to the server for broadcast on the bitcoin
+// RpcBroadcast sends a transaction to the server for broadcast on the bitcoin
 // network. It returns txid as a string. It is not part of the ElectrumClient
 // interface.
-func (ec *BtcElectrumClient) ExternalBroadcast(rawTx string, changeIndex int) (string, error) {
-	txid, err := ec.GetNode().Broadcast(rawTx)
+func (ec *BtcElectrumClient) RpcBroadcast(rawTx string, changeIndex int) (string, error) {
+	txBytes, err := hex.DecodeString(rawTx)
 	if err != nil {
 		return "", err
 	}
-	return txid, nil
+	r := bytes.NewBuffer(txBytes)
+	wireMsgTx := wire.NewMsgTx(1)
+	wireMsgTx.BtcDecode(r, 1, wire.WitnessEncoding)
+	bc := client.BroadcastParams{
+		Tx:          wireMsgTx,
+		ChangeIndex: changeIndex,
+	}
+	return ec.Broadcast(&bc)
 }
 
 // Broadcast sends a transaction to the server for broadcast on the bitcoin
 // network. It returns txid as a string.
 func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		return "", ErrNoWallet
+	}
 	node := ec.GetNode()
 	if node == nil {
 		return "", ErrNoNode
@@ -188,9 +198,13 @@ func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, erro
 	}
 
 	// serialize tx
-	b := make([]byte, bc.Tx.SerializeSize())
-	bb := bytes.NewBuffer(b)
-	rawTx := bb.Bytes()
+	b := make([]byte, 0)
+	wb := bytes.NewBuffer(b)
+	err := bc.Tx.BtcEncode(wb, 1, wire.WitnessEncoding)
+	if err != nil {
+		return "", err
+	}
+	rawTx := wb.Bytes()
 
 	// check change index is valid
 	if bc.ChangeIndex >= 0 {
@@ -213,12 +227,30 @@ func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, erro
 	// change script address to watch paying back to our wallet after tx mined.
 
 	change := bc.Tx.TxOut[bc.ChangeIndex]
+
 	scripthash := pkScriptToElectrumScripthash(change.PkScript)
+
+	// wallet
+	pkScriptStr := hex.EncodeToString(change.PkScript)
+	_, addr := ec.pkScriptToAddressPubkeyHash(change.PkScript)
+	newSub := wallet.Subscription{
+		PkScript:           pkScriptStr,
+		ElectrumScripthash: scripthash,
+		Address:            addr,
+	}
+	ec.dumpSubscription("adding change subscription", &newSub)
+	err = w.AddSubscription(&newSub)
+	if err != nil {
+		panic(err)
+	}
+
+	// node
 	res, err := node.SubscribeScripthashNotify(scripthash)
 	if err != nil {
 		return "", err
 	}
 	if res == nil {
+		w.RemoveSubscription(newSub.PkScript)
 		return "", errors.New("empty result")
 	}
 

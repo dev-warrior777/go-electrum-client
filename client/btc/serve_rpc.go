@@ -118,8 +118,10 @@ func (e *Ec) RPCBroadcast(request map[string]string, response *map[string]string
 	r := *response
 	rawTx := cast.ToString(request["rawTx"])
 	changeIndex := cast.ToInt(request["changeIndex"])
-	fmt.Println("rpc:", rawTx)
-	txid, err := e.EleClient.ExternalBroadcast(rawTx, changeIndex)
+	if len(rawTx) > 27 {
+		fmt.Println("rpc:", rawTx[:27], "...", " changeIndex", changeIndex)
+	}
+	txid, err := e.EleClient.RpcBroadcast(rawTx, changeIndex)
 	fmt.Println("rpc err:", err)
 	if err != nil {
 		return err
@@ -194,25 +196,3 @@ func (ec *BtcElectrumClient) RPCServe() error {
 	fmt.Println("rpc clean exit")
 	return nil
 }
-
-/////////////////////////////////////////
-// Old
-// ///
-// s.Register("broadcast", func(ctx context.Context, params jsonrpc.Params) (jsonrpc.Result, error) {
-// 	logger.Info("params: %v", params)
-
-// 	rawTx := cast.ToString(params.Get("rawTx"))
-
-// 	txid, err := ec.Broadcast(rawTx)
-
-// 	if err != nil {
-// 		fmt.Printf("Broadcast error: %v\n", err.Error())
-// 		return jsonrpc.Result{
-// 			"txid": "",
-// 		}, err
-// 	}
-
-// 	return jsonrpc.Result{
-// 		"txid": txid,
-// 	}, nil
-// })

@@ -22,7 +22,7 @@ func usage() {
 	fmt.Println("  tip", "\t\t\t\t\t Get blockchain tip")
 	fmt.Println("  listunspent", "\t\t\t\t List all wallet utxos")
 	fmt.Println("  spend pw amount address feeType", "\t Make signed transaction from wallet utxos")
-	fmt.Println("  broadcast rawTx", "\t\t\t Broadcast rawTx to ElectrumX")
+	fmt.Println("  broadcast rawTx changeIndex", "\t\t Broadcast rawTx to ElectrumX")
 	fmt.Println("-------------------------------------------------------------")
 	fmt.Println()
 }
@@ -128,8 +128,8 @@ func (c *cmd) spend(client *rpc.Client) {
 	if err != nil {
 		log.Fatal("Ec.RPCSpend:", err)
 	}
-	fmt.Printf("client response %v\n", response)
-	changeIndex := cast.ToString("changeIndex")
+	fmt.Printf("\nclient response %v\n", response)
+	changeIndex := cast.ToString(response["changeIndex"])
 	fmt.Println("changeIndex", changeIndex)
 	tx := cast.ToString(response["tx"])
 	fmt.Println("tx", tx)
@@ -170,10 +170,10 @@ func main() {
 	case "echo":
 	// any number of params
 	case "broadcast":
-		// 1 param, others ignored
-		if len(c.args) < 1 {
+		// 2 param, others ignored
+		if len(c.args) < 2 {
 			usage()
-			log.Fatal(c.String(), "needs 1 argument: the raw tx")
+			log.Fatal(c.String(), "needs 2 argument: the raw tx and change index")
 		}
 	case "spend":
 		// 4 params, others ignored

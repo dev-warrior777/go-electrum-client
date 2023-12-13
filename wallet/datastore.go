@@ -19,11 +19,11 @@ type CoinType uint32
 
 const (
 	Bitcoin     CoinType = 0
-	Litecoin             = 1
-	Dash                 = 5 // TODO: impl
-	Zcash                = 133
-	BitcoinCash          = 145
-	Ethereum             = 60
+	Litecoin    CoinType = 1
+	Dash        CoinType = 5 // TODO: impl
+	Zcash       CoinType = 133
+	BitcoinCash CoinType = 145
+	Ethereum    CoinType = 60
 
 	TestnetBitcoin     = 1000000
 	TestnetLitecoin    = 1000001
@@ -201,31 +201,32 @@ type Keys interface {
 	GetLookaheadWindows() map[KeyPurpose]int
 }
 
+// Subscriptions is used to track ElectrumX scriptHash status change
+// subscriptions made to ElectrumX nodes.
 type Subscriptions interface {
-
-	// Add a script to subscribe & have ElectrumX watch for status changes
+	// Add a subscription.
 	Put(subscription *Subscription) error
 
-	// Return the subscribe script for scriptPubKey
+	// Return the subscription for the scriptPubKey
 	Get(scriptPubKey string) (*Subscription, error)
 
-	// Return the subscribe script for electrumScripthash (not indexed)
+	// Return the subscription for the electrumScripthash (not indexed)
 	GetElectrumScripthash(electrumScripthash string) (*Subscription, error)
 
-	// Return all subscribe scripts
+	// Return all subscriptions
 	GetAll() ([]*Subscription, error)
 
-	// Delete a subscribe script
+	// Delete a subscription
 	Delete(scriptPubkey string) error
 }
 
 type Subscription struct {
-	// wallet subscribe watch list public key script. hex string
+	// wallet subscribe watch list public key script; hex string
 	PkScript string
-	// electrum 1.4 protocol 'scripthash'
+	// electrum 1.4 protocol 'scripthash'; hex string
 	ElectrumScripthash string
 	// address
-	Address string
+	Address string // encoded legacy or bech address
 }
 
 func (s *Subscription) IsEqual(alt *Subscription) bool {

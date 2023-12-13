@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -31,20 +30,20 @@ import (
 // sha256 hashed. The result has bytes reversed for network send. It is sent
 // to ElectrumX as a string.
 
-// historyToStatusHash hashes together the stored history list for a subscription
-func historyToStatusHash(history electrumx.HistoryResult) string {
-	if len(history) == 0 {
-		return ""
-	}
-	sb := strings.Builder{}
-	for _, h := range history {
-		sb.WriteString(h.TxHash)
-		sb.WriteString(":")
-		sb.WriteString(fmt.Sprintf("%d", h.Height))
-		sb.WriteString(":")
-	}
-	return hex.EncodeToString(chainhash.HashB([]byte(sb.String())))
-}
+// // historyToStatusHash hashes together the stored history list for a subscription
+// func historyToStatusHash(history electrumx.HistoryResult) string {
+// 	if len(history) == 0 {
+// 		return ""
+// 	}
+// 	sb := strings.Builder{}
+// 	for _, h := range history {
+// 		sb.WriteString(h.TxHash)
+// 		sb.WriteString(":")
+// 		sb.WriteString(fmt.Sprintf("%d", h.Height))
+// 		sb.WriteString(":")
+// 	}
+// 	return hex.EncodeToString(chainhash.HashB([]byte(sb.String())))
+// }
 
 var ErrNoSubscriptionFoundInDb = errors.New("no subscription found in db")
 
@@ -172,6 +171,7 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 				return
 
 			case status := <-scripthashNotifyCh:
+				fmt.Printf("\n\n%s\n", "----------------------------------------")
 				fmt.Println("<-scripthashNotifyCh - # items left in buffer", len(scripthashNotifyCh))
 				fmt.Println("scripthash notify")
 				if status == nil {
@@ -187,7 +187,7 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 				// is status same as last status?
 				sub, err := ec.getSubscriptionForScripthash(status.Scripthash)
 				if err != nil {
-					panic(err)
+					panic(err) ////////////// no rows in result set ////////////////// 2
 				}
 				if sub == nil {
 					panic("no subscription for subscribed scripthash")
@@ -198,7 +198,7 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 				if err != nil {
 					continue
 				}
-				ec.dumpHistory(sub.PkScript, history)
+				ec.dumpHistory(sub, history)
 
 				// update wallet txstore
 				ec.addTxHistoryToWallet(history)
@@ -349,13 +349,8 @@ func (ec *BtcElectrumClient) updateWalletTip() {
 
 // //////////////////////////
 // dbg dump
-///////////
-
-func (ec *BtcElectrumClient) pkScriptStringToAddressPubkeyHash(pkScriptStr string) (btcutil.Address, string) {
-	pkScript, err := hex.DecodeString(pkScriptStr)
-	if err != nil {
-		return nil, ""
-	}
+// /////////
+func (ec *BtcElectrumClient) pkScriptToAddressPubkeyHash(pkScript []byte) (btcutil.Address, string) {
 	pks, err := txscript.ParsePkScript(pkScript)
 	if err != nil {
 		return nil, ""
@@ -367,12 +362,27 @@ func (ec *BtcElectrumClient) pkScriptStringToAddressPubkeyHash(pkScriptStr strin
 	return apkh, apkh.String()
 }
 
-func (ec *BtcElectrumClient) dumpHistory(pkScript string, history electrumx.HistoryResult) {
-	_, apkhs := ec.pkScriptStringToAddressPubkeyHash(pkScript)
-	fmt.Println("Address Hsitory for script address", pkScript, apkhs)
+func (ec *BtcElectrumClient) pkScriptStringToAddressPubkeyHash(pkScriptStr string) (btcutil.Address, string) {
+	pkScript, err := hex.DecodeString(pkScriptStr)
+	if err != nil {
+		return nil, ""
+	}
+	return ec.pkScriptToAddressPubkeyHash(pkScript)
+}
+
+func (ec *BtcElectrumClient) dumpSubscription(title string, sub *wallet.Subscription) {
+	fmt.Printf("%s\n PkScript: %s\n ElectrumScriptHash: %s\n Address: %s\n\n",
+		title,
+		sub.PkScript,
+		sub.ElectrumScripthash,
+		sub.Address)
+}
+
+func (ec *BtcElectrumClient) dumpHistory(sub *wallet.Subscription, history electrumx.HistoryResult) {
+	ec.dumpSubscription("Address History for subscription:", sub)
 	for _, h := range history {
-		fmt.Println("Height:", h.Height)
-		fmt.Println("TxHash: ", h.TxHash)
-		fmt.Println("Fee: ", h.Fee)
+		fmt.Println(" Height:", h.Height)
+		fmt.Println(" TxHash: ", h.TxHash)
+		fmt.Println(" Fee: ", h.Fee)
 	}
 }
