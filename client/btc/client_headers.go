@@ -185,7 +185,9 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 	svrCtx := node.GetServerConn().SvrCtx
 
 	go func() {
+
 		fmt.Println("=== Waiting for headers ===")
+
 		for {
 			select {
 
@@ -229,7 +231,7 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 
 						} else {
 							// Server can skip any amount of headers but we should
-							// trust that this SingleNode's tip is the tip.
+							// trust that this SingleNode's tip is the tip ..maybe
 							fmt.Println("More than one header..")
 							numMissing := x.Height - maybeTip
 							from := maybeTip + 1

@@ -13,18 +13,24 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
+/////////////////////////////////////////////////////////////////////////
+// Here is the client interface between the node & wallet for transaction
+// broadcast and wallet synchronization with ElectrumX's network 'view'
+/////////////////////////////////////////////////////////////////////////
+
 var ErrNoWallet error = errors.New("no wallet")
 var ErrNoNode error = errors.New("no node")
 
-// Here is the client interface between the node & wallet for transaction
-// broadcast and wallet synchronize
-
-// devdbg: add just one known wallet address -------------------------------->
+// SyncWallet sets up address notifications for subscribed addresses in the
+// wallet db. This will update txns, utxos, stxos wallet db tables with any
+// new address status history since the wallet was last open.
 func (ec *BtcElectrumClient) SyncWallet() error {
 	w := ec.GetWallet()
 	if w == nil {
 		return ErrNoWallet
 	}
+
+	// devdbg: add just one known wallet address -------------------------------->
 
 	address, err := w.GetUnusedAddress(wallet.RECEIVING)
 	if err != nil {
@@ -56,7 +62,7 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 
 	for _, subscription := range subscriptions {
 
-		// - get all subscribed receive/change/watched addresses in wallet
+		// - get all subscribed receive/change/watched addresses in wallet db
 		//
 		// for each
 		//   - subscribe for scripthash notifications from electrumX node
@@ -93,41 +99,15 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 	return nil
 }
 
-//------------------------------------------
-// 		// // fun with dick & jane
-// 		// script := address.ScriptAddress()
-// 		// s := hex.EncodeToString(script)
-// 		// fmt.Println("ScriptAddress", s)
-// 		// segwitAddress, swerr := btcutil.NewAddressWitnessPubKeyHash(script, ec.GetConfig().Params)
-// 		// if swerr != nil {
-// 		// 	fmt.Println(swerr)
-// 		// 	continue
-// 		// }
-// 		// fmt.Println("segwitAddress", segwitAddress.String())
-// 		// fmt.Println("segwitAddress", segwitAddress.EncodeAddress())
-// 		// address = segwitAddress
-// 		// // end fun
-
-// 		err := ec.SubscribeAddressNotify(address)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		// AddWatchedScript adds the pkscript to db. If it already exists this
-// 		// is a no-op
-// 		err = ec.GetWallet().AddWatchedScript(address.ScriptAddress())
-// 		if err != nil {
-// 			return err
-// 		}
-//------------------------------------------
-
 //////////////////////////////////////////////////////////////////////////////
 // Python console-like subset
 /////////////////////////////
 
 // Spend tries to create a new transaction to pay amount from the wallet to
 // toAddress. It returns Tx & Txid as hex strings. The client needs to know
-// the change address so it can set up notify from ElectrumX.
-// to the network via electrumX.
+// the change address so it can set up notification of change address status
+// after ElectrumX broadcasts the resultant pend tx to the bitcoin network.
+// The wallet password is required in order to sign the tx.
 func (ec *BtcElectrumClient) Spend(
 	pw string,
 	amount int64,
@@ -165,8 +145,8 @@ func (ec *BtcElectrumClient) Spend(
 }
 
 // RpcBroadcast sends a transaction to the server for broadcast on the bitcoin
-// network. It returns txid as a string. It is not part of the ElectrumClient
-// interface.
+// network. It is a test rpc server endpoint and it is thus not part of the
+// ElectrumClient interface.
 func (ec *BtcElectrumClient) RpcBroadcast(rawTx string, changeIndex int) (string, error) {
 	txBytes, err := hex.DecodeString(rawTx)
 	if err != nil {
@@ -182,8 +162,9 @@ func (ec *BtcElectrumClient) RpcBroadcast(rawTx string, changeIndex int) (string
 	return ec.Broadcast(&bc)
 }
 
-// Broadcast sends a transaction to the server for broadcast on the bitcoin
-// network. It returns txid as a string.
+// Broadcast sends a transaction to the ElectrumX server for broadcast on the
+// bitcoin network. It may also set up address status change notifications with
+// ElectrumX and the wallet db for a change address belonging to the wallet.
 func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, error) {
 	w := ec.GetWallet()
 	if w == nil {
@@ -197,9 +178,8 @@ func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, erro
 		return "", errors.New("nil Tx")
 	}
 
-	// serialize tx
-	b := make([]byte, 0)
-	wb := bytes.NewBuffer(b)
+	// serialize msg tx
+	wb := bytes.NewBuffer(make([]byte, 0))
 	err := bc.Tx.BtcEncode(wb, 1, wire.WitnessEncoding)
 	if err != nil {
 		return "", err
@@ -207,12 +187,14 @@ func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, erro
 	rawTx := wb.Bytes()
 
 	// check change index is valid
+	hasChange := false
 	if bc.ChangeIndex >= 0 {
 		fmt.Println("change output index", bc.ChangeIndex)
 		txOuts := bc.Tx.TxOut
 		if len(txOuts) < bc.ChangeIndex+1 {
 			return "", errors.New("invalid change index")
 		}
+		hasChange = true
 	}
 
 	// Send tx to ElectrumX for broadcasting to the bitcoin network
@@ -222,42 +204,49 @@ func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, erro
 		return "", err
 	}
 
-	// Subscribe any addresses we might be interested in. This should also add
-	// the containing tx to the wallet. In particular we almost always have a
-	// change script address to watch paying back to our wallet after tx mined.
+	// Subscribe for address status notification from ElectrumX for addresses
+	// we might be interested in. This should also add the containing tx to the
+	// wallet txns db in response to the first status change notification of the
+	// subscribed address. In particular we almost always have a change script
+	// address to watch paying back to our wallet after it's containing tx is
+	// broadcasted to the network by ElectrumX.
 
-	change := bc.Tx.TxOut[bc.ChangeIndex]
+	if hasChange {
+		change := bc.Tx.TxOut[bc.ChangeIndex]
 
-	scripthash := pkScriptToElectrumScripthash(change.PkScript)
+		scripthash := pkScriptToElectrumScripthash(change.PkScript)
 
-	// wallet
-	pkScriptStr := hex.EncodeToString(change.PkScript)
-	_, addr := ec.pkScriptToAddressPubkeyHash(change.PkScript)
-	newSub := wallet.Subscription{
-		PkScript:           pkScriptStr,
-		ElectrumScripthash: scripthash,
-		Address:            addr,
-	}
-	ec.dumpSubscription("adding change subscription", &newSub)
-	err = w.AddSubscription(&newSub)
-	if err != nil {
-		panic(err)
-	}
+		// wallet db
+		pkScriptStr := hex.EncodeToString(change.PkScript)
+		_, addr := ec.pkScriptToAddressPubkeyHash(change.PkScript)
+		newSub := wallet.Subscription{
+			PkScript:           pkScriptStr,
+			ElectrumScripthash: scripthash,
+			Address:            addr,
+		}
+		ec.dumpSubscription("adding change subscription", &newSub)
+		err = w.AddSubscription(&newSub)
+		if err != nil {
+			// assert db store
+			panic(err)
+		}
 
-	// node
-	res, err := node.SubscribeScripthashNotify(scripthash)
-	if err != nil {
-		return "", err
-	}
-	if res == nil {
-		w.RemoveSubscription(newSub.PkScript)
-		return "", errors.New("empty result")
+		// request notifications from node
+		res, err := node.SubscribeScripthashNotify(scripthash)
+		if err != nil {
+			w.RemoveSubscription(newSub.PkScript)
+			return "", err
+		}
+		if res == nil { // network error
+			w.RemoveSubscription(newSub.PkScript)
+			return "", errors.New("empty result")
+		}
 	}
 
 	return txid, nil
 }
 
-// ListUnspent
+// ListUnspent returns a list of all utxos in the wallet db.
 func (ec *BtcElectrumClient) ListUnspent() ([]wallet.Utxo, error) {
 	w := ec.GetWallet()
 	if w == nil {

@@ -17,8 +17,8 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-// Here is the client interface between the node & wallet for monitoring the status
-// of wallet 'scripthashes'
+// Here is the client interface between the node & wallet for monitoring the
+// status of wallet 'scripthashes'
 //
 // https://electrumx.readthedocs.io/en/latest/protocol-basics.html
 //
@@ -30,84 +30,7 @@ import (
 // sha256 hashed. The result has bytes reversed for network send. It is sent
 // to ElectrumX as a string.
 
-// // historyToStatusHash hashes together the stored history list for a subscription
-// func historyToStatusHash(history electrumx.HistoryResult) string {
-// 	if len(history) == 0 {
-// 		return ""
-// 	}
-// 	sb := strings.Builder{}
-// 	for _, h := range history {
-// 		sb.WriteString(h.TxHash)
-// 		sb.WriteString(":")
-// 		sb.WriteString(fmt.Sprintf("%d", h.Height))
-// 		sb.WriteString(":")
-// 	}
-// 	return hex.EncodeToString(chainhash.HashB([]byte(sb.String())))
-// }
-
 var ErrNoSubscriptionFoundInDb = errors.New("no subscription found in db")
-
-func (ec *BtcElectrumClient) addSubscription(subscription *wallet.Subscription) error {
-	w := ec.GetWallet()
-	if w == nil {
-		return ErrNoWallet
-	}
-	return w.AddSubscription(subscription)
-}
-
-func (ec *BtcElectrumClient) getSubscriptionForScripthash(scripthash string) (*wallet.Subscription, error) {
-	w := ec.GetWallet()
-	if w == nil {
-		return nil, ErrNoWallet
-	}
-	subscription, err := w.GetSubscriptionForElectrumScripthash(scripthash)
-	if err != nil {
-		return nil, err
-	}
-	if subscription == nil {
-		return nil, ErrNoSubscriptionFoundInDb
-	}
-	return subscription, nil
-}
-
-func (ec *BtcElectrumClient) getSubscription(scriptPubKey string) (*wallet.Subscription, error) {
-	w := ec.GetWallet()
-	if w == nil {
-		return nil, ErrNoWallet
-	}
-	subscription, err := w.GetSubscription(scriptPubKey)
-	if err != nil {
-		return nil, err
-	}
-	if subscription == nil {
-		return nil, ErrNoSubscriptionFoundInDb
-	}
-	return subscription, nil
-}
-
-func (ec *BtcElectrumClient) isSubscribed(pkScript string) (bool, error) {
-	w := ec.GetWallet()
-	if w == nil {
-		return false, ErrNoWallet
-	}
-	subscription, err := w.GetSubscription(pkScript)
-	if err != nil {
-		return false, err
-	}
-	if subscription == nil {
-		return false, nil
-	}
-	return true, nil
-}
-
-func (ec *BtcElectrumClient) removeSubscription(pkScript string) error {
-	w := ec.GetWallet()
-	if w == nil {
-		return ErrNoWallet
-	}
-	w.RemoveSubscription(pkScript)
-	return nil
-}
 
 // pkScriptToElectrumScripthash takes a public key script and makes an electrum
 // 1.4 protocol 'scripthash'
@@ -121,7 +44,6 @@ func pkScriptToElectrumScripthash(pkScript []byte) string {
 		}
 		return buf
 	}
-	fmt.Println("pkScript", hex.EncodeToString(pkScript), " before electrum extra hashing")
 	pkScriptHashBytes := chainhash.HashB(pkScript)
 	revScriptHashBytes := revBytes(pkScriptHashBytes)
 	return hex.EncodeToString(revScriptHashBytes)
@@ -146,6 +68,76 @@ func addrToElectrumScripthash(addr string, network *chaincfg.Params) (string, er
 	return addressToElectrumScripthash(address, network)
 }
 
+// addSubscription adds subscription details to the wallet db
+func (ec *BtcElectrumClient) addSubscription(subscription *wallet.Subscription) error {
+	w := ec.GetWallet()
+	if w == nil {
+		return ErrNoWallet
+	}
+	return w.AddSubscription(subscription)
+}
+
+// getSubscriptionForScripthash gets subscription details from the wallet db keyed
+// on electrum scripthash
+func (ec *BtcElectrumClient) getSubscriptionForScripthash(scripthash string) (*wallet.Subscription, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		return nil, ErrNoWallet
+	}
+	subscription, err := w.GetSubscriptionForElectrumScripthash(scripthash)
+	if err != nil {
+		return nil, err
+	}
+	if subscription == nil {
+		return nil, ErrNoSubscriptionFoundInDb
+	}
+	return subscription, nil
+}
+
+// getSubscriptionForScripthash
+func (ec *BtcElectrumClient) getSubscription(scriptPubKey string) (*wallet.Subscription, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		return nil, ErrNoWallet
+	}
+	subscription, err := w.GetSubscription(scriptPubKey)
+	if err != nil {
+		return nil, err
+	}
+	if subscription == nil {
+		return nil, ErrNoSubscriptionFoundInDb
+	}
+	return subscription, nil
+}
+
+// isSubscribed tests if an address pub key script has subscription details stored
+// the wallet db
+func (ec *BtcElectrumClient) isSubscribed(pkScript string) (bool, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		return false, ErrNoWallet
+	}
+	subscription, err := w.GetSubscription(pkScript)
+	if err != nil {
+		return false, err
+	}
+	if subscription == nil {
+		return false, nil
+	}
+	return true, nil
+}
+
+// removeSubscription removes subscription details stored the wallet db for an
+// address pub key script
+func (ec *BtcElectrumClient) removeSubscription(pkScript string) error {
+	w := ec.GetWallet()
+	if w == nil {
+		return ErrNoWallet
+	}
+	w.RemoveSubscription(pkScript)
+	return nil
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // wallet <-> client <-> node
 /////////////////////////////
@@ -161,7 +153,9 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 	svrCtx := node.GetServerConn().SvrCtx
 
 	go func() {
+
 		fmt.Println("=== Waiting for address change notifications ===")
+
 		for {
 			select {
 
@@ -184,12 +178,13 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 					fmt.Println("status.Status is null", status.Status, " no history yet; ignoring...")
 					continue
 				}
-				// is status same as last status?
+
+				// get wallet db subscription details
 				sub, err := ec.getSubscriptionForScripthash(status.Scripthash)
-				if err != nil {
-					panic(err) ////////////// no rows in result set ////////////////// 2
+				if err != nil { // db assert  'no rows in result set'
+					panic(err)
 				}
-				if sub == nil {
+				if sub == nil { // db assert
 					panic("no subscription for subscribed scripthash")
 				}
 
@@ -200,7 +195,7 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 				}
 				ec.dumpHistory(sub, history)
 
-				// update wallet txstore
+				// update wallet db tx store
 				ec.addTxHistoryToWallet(history)
 			}
 		}
@@ -212,8 +207,8 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 // SubscribeAddressNotify subscribes to notifications from ElectrumX for a public
 // key script address. It also adds the new subscription to the wallet database.
 // It returns a subscribe status which is the hash of all address history known
-// to the electrumX server and can be zero length string if the subscription is
-// new and has no history.
+// to the electrumX server and can be a zero length string if the subscription
+// is new and has no history yet.
 func (ec *BtcElectrumClient) SubscribeAddressNotify(newSub *wallet.Subscription) (string, error) {
 	node := ec.GetNode()
 	if node == nil {
@@ -242,8 +237,8 @@ func (ec *BtcElectrumClient) SubscribeAddressNotify(newSub *wallet.Subscription)
 	return res.Status, nil
 }
 
-// UnsubscribeAddressNotify unsubscribes from notifications for an address
-// and removes the subscription from the wallet database
+// UnsubscribeAddressNotify both unsubscribes from notifications for an address
+// _and_ removes the subscription details from the wallet database.
 func (ec *BtcElectrumClient) UnsubscribeAddressNotify(pkScript string) {
 	node := ec.GetNode()
 	if node == nil {
@@ -255,15 +250,18 @@ func (ec *BtcElectrumClient) UnsubscribeAddressNotify(pkScript string) {
 		return
 	}
 
-	// unsubscribe from node and wallet database
+	// unsubscribe from node and wallet db
 	node.UnsubscribeScripthashNotify(subscription.ElectrumScripthash)
 	err = ec.removeSubscription(pkScript)
 	if err != nil {
+		fmt.Println("removeSubscription", err)
 		return
 	}
 	fmt.Println("unsubscribed scripthash")
 }
 
+// GetAddressHistoryFromNode requests address history from ElectrumX  for a
+// subscribed address.
 func (ec *BtcElectrumClient) GetAddressHistoryFromNode(subscription *wallet.Subscription) (electrumx.HistoryResult, error) {
 	node := ec.GetNode()
 	if node == nil {
@@ -282,6 +280,9 @@ func (ec *BtcElectrumClient) GetAddressHistoryFromNode(subscription *wallet.Subs
 	return res, nil
 }
 
+// GetRawTransactionFromNode requests a raw hex transaction for a subscribed address
+// from ElectrumX keyed on a txid. This txid is usually taken from an ElectrumX
+// history list.
 func (ec *BtcElectrumClient) GetRawTransactionFromNode(txid string) (*wire.MsgTx, time.Time, error) {
 	node := ec.GetNode()
 	if node == nil {
@@ -305,6 +306,7 @@ func (ec *BtcElectrumClient) GetRawTransactionFromNode(txid string) (*wire.MsgTx
 	return &msgTx, txTime, nil
 }
 
+// addTxHistoryToWallet adds new transaction details for an ElectrumX histiry list
 func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResult) {
 	for _, h := range history {
 		txid, err := hex.DecodeString(h.TxHash)
@@ -340,6 +342,9 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResul
 	}
 }
 
+// updateWalletTip updates wallet's notion of the blockchain tip based on the
+// latest client headers' 'maybe' tip. This would be used for calculating tx
+// confirmations for example.
 func (ec *BtcElectrumClient) updateWalletTip() {
 	w := ec.GetWallet()
 	if w != nil {
@@ -360,14 +365,6 @@ func (ec *BtcElectrumClient) pkScriptToAddressPubkeyHash(pkScript []byte) (btcut
 		return nil, ""
 	}
 	return apkh, apkh.String()
-}
-
-func (ec *BtcElectrumClient) pkScriptStringToAddressPubkeyHash(pkScriptStr string) (btcutil.Address, string) {
-	pkScript, err := hex.DecodeString(pkScriptStr)
-	if err != nil {
-		return nil, ""
-	}
-	return ec.pkScriptToAddressPubkeyHash(pkScript)
 }
 
 func (ec *BtcElectrumClient) dumpSubscription(title string, sub *wallet.Subscription) {
