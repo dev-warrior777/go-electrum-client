@@ -391,35 +391,36 @@ func (w *BtcElectrumWallet) HasTransaction(txid chainhash.Hash) bool {
 
 func (w *BtcElectrumWallet) GetTransaction(txid chainhash.Hash) (wallet.Txn, error) {
 	txn, err := w.txstore.Txns().Get(txid)
-	if err == nil {
-		tx := wire.NewMsgTx(1)
-		rbuf := bytes.NewReader(txn.Bytes)
-		err := tx.BtcDecode(rbuf, wire.ProtocolVersion, wire.WitnessEncoding)
+	if err != nil {
+		return txn, err
+	}
+	tx := wire.NewMsgTx(1)
+	rbuf := bytes.NewReader(txn.Bytes)
+	err = tx.BtcDecode(rbuf, wire.ProtocolVersion, wire.WitnessEncoding)
+	if err != nil {
+		return txn, err
+	}
+	outs := []wallet.TransactionOutput{}
+	for i, out := range tx.TxOut {
+		var address btcutil.Address
+		_, addrs, _, err := txscript.ExtractPkScriptAddrs(out.PkScript, w.params)
 		if err != nil {
+			fmt.Printf("error extracting address from txn pkscript: %v\n", err)
 			return txn, err
 		}
-		outs := []wallet.TransactionOutput{}
-		for i, out := range tx.TxOut {
-			var address btcutil.Address
-			_, addrs, _, err := txscript.ExtractPkScriptAddrs(out.PkScript, w.params)
-			if err != nil {
-				fmt.Printf("error extracting address from txn pkscript: %v\n", err)
-				return txn, err
-			}
-			if len(addrs) == 0 {
-				address = nil
-			} else {
-				address = addrs[0]
-			}
-			tout := wallet.TransactionOutput{
-				Address: address,
-				Value:   out.Value,
-				Index:   uint32(i),
-			}
-			outs = append(outs, tout)
+		if len(addrs) == 0 {
+			address = nil
+		} else {
+			address = addrs[0]
 		}
-		txn.Outputs = outs
+		tout := wallet.TransactionOutput{
+			Address: address,
+			Value:   out.Value,
+			Index:   uint32(i),
+		}
+		outs = append(outs, tout)
 	}
+	txn.Outputs = outs
 	return txn, err
 }
 

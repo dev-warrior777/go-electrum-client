@@ -50,7 +50,7 @@ func pkScriptToElectrumScripthash(pkScript []byte) string {
 }
 
 // addrToScripthash takes a btcutil.Address and makes an electrum 1.4 protocol 'scripthash'
-func addressToElectrumScripthash(address btcutil.Address, network *chaincfg.Params) (string, error) {
+func addressToElectrumScripthash(address btcutil.Address) (string, error) {
 	pkScript, err := txscript.PayToAddrScript(address)
 	if err != nil {
 		return "", err
@@ -65,7 +65,7 @@ func addrToElectrumScripthash(addr string, network *chaincfg.Params) (string, er
 	if err != nil {
 		return "", err
 	}
-	return addressToElectrumScripthash(address, network)
+	return addressToElectrumScripthash(address)
 }
 
 // addSubscription adds subscription details to the wallet db

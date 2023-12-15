@@ -113,13 +113,13 @@ type ElectrumWallet interface {
 	// This command uses the local wallet. We can also get from ElectrumX.
 	Balance() (int64, int64)
 
-	// Returns a list of transactions for this wallet
+	// Returns a list of transactions for this wallet - currently unused
 	Transactions() ([]Txn, error)
 
 	// Does the wallet have a specific transaction?
 	HasTransaction(txid chainhash.Hash) bool
 
-	// Get info on a specific transaction
+	// Get info on a specific transaction - currently unused
 	GetTransaction(txid chainhash.Hash) (Txn, error)
 
 	// Return the confirmed txids and heights for an address
