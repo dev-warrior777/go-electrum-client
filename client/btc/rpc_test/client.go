@@ -63,7 +63,7 @@ func (c *cmd) tip(client *rpc.Client) {
 	if err != nil {
 		log.Fatal("Ec.RPCTip:", err)
 	}
-	fmt.Printf("client response %v\n", response)
+	// fmt.Printf("client response %v\n", response)
 	tip := cast.ToString(response["tip"])
 	synced := cast.ToString(response["synced"])
 	fmt.Println("tip", tip)
@@ -78,7 +78,7 @@ func (c *cmd) listunspent(client *rpc.Client) {
 	if err != nil {
 		log.Fatal("Ec.RPCListUnspent:", err)
 	}
-	fmt.Printf("client response %v\n", response)
+	// fmt.Printf("client response %v\n", response)
 	allUnspents := cast.ToString(response["unspents"])
 	if len(allUnspents) == 0 { // zero length string
 		fmt.Println("[]")
@@ -102,20 +102,6 @@ func (c *cmd) listunspent(client *rpc.Client) {
 	fmt.Println("]")
 }
 
-// broadcast
-func (c *cmd) broadcast(client *rpc.Client) {
-	var request = make(map[string]string)
-	request["rawTx"] = c.args[0]
-	var response = make(map[string]string)
-	err := client.Call("Ec.RPCBroadcast", &request, &response)
-	if err != nil {
-		log.Fatal("Ec.RPCBroadcast:", err)
-	}
-	fmt.Printf("client response %v\n", response)
-	txid := cast.ToString(response["txid"])
-	fmt.Println("txid", txid)
-}
-
 // spend
 func (c *cmd) spend(client *rpc.Client) {
 	var request = make(map[string]string)
@@ -128,13 +114,30 @@ func (c *cmd) spend(client *rpc.Client) {
 	if err != nil {
 		log.Fatal("Ec.RPCSpend:", err)
 	}
-	fmt.Printf("\nclient response %v\n", response)
+	// fmt.Printf("\nclient response %v\n", response)
 	changeIndex := cast.ToString(response["changeIndex"])
 	fmt.Println("changeIndex", changeIndex)
 	tx := cast.ToString(response["tx"])
 	fmt.Println("tx", tx)
 	txid := cast.ToString(response["txid"])
 	fmt.Println("txid", txid)
+}
+
+// broadcast
+func (c *cmd) broadcast(client *rpc.Client) {
+	var request = make(map[string]string)
+	request["rawTx"] = c.args[0]
+	request["changeIndex"] = c.args[1]
+	var response = make(map[string]string)
+	err := client.Call("Ec.RPCBroadcast", &request, &response)
+	if err != nil {
+		log.Fatal("Ec.RPCBroadcast:", err)
+	}
+	// fmt.Printf("client response %v\n", response)
+	txid := cast.ToString(response["txid"])
+	fmt.Println("txid", txid)
+	changeIndex := cast.ToString(response["changeIndex"])
+	fmt.Println("changeIndex", changeIndex)
 }
 
 func main() {
@@ -169,12 +172,6 @@ func main() {
 	// no params
 	case "echo":
 	// any number of params
-	case "broadcast":
-		// 2 param, others ignored
-		if len(c.args) < 2 {
-			usage()
-			log.Fatal(c.String(), "needs 2 argument: the raw tx and change index")
-		}
 	case "spend":
 		// 4 params, others ignored
 		if len(c.args) < 4 {
@@ -203,6 +200,12 @@ func main() {
 		default:
 			usage()
 			log.Fatal(c.String(), "feeType should be NORMAL, PRIORITY or ECONOMIC")
+		}
+	case "broadcast":
+		// 2 param, others ignored
+		if len(c.args) < 2 {
+			usage()
+			log.Fatal(c.String(), "needs 2 argument: the raw tx and change index")
 		}
 	default:
 		usage()

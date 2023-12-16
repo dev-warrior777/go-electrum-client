@@ -188,8 +188,8 @@ func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, erro
 
 	// check change index is valid
 	hasChange := false
+	fmt.Println("*** change output index", bc.ChangeIndex, "***")
 	if bc.ChangeIndex >= 0 {
-		fmt.Println("change output index", bc.ChangeIndex)
 		txOuts := bc.Tx.TxOut
 		if len(txOuts) < bc.ChangeIndex+1 {
 			return "", errors.New("invalid change index")

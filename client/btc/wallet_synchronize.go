@@ -306,7 +306,7 @@ func (ec *BtcElectrumClient) GetRawTransactionFromNode(txid string) (*wire.MsgTx
 	return &msgTx, txTime, nil
 }
 
-// addTxHistoryToWallet adds new transaction details for an ElectrumX histiry list
+// addTxHistoryToWallet adds new transaction details for an ElectrumX history list
 func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResult) {
 	for _, h := range history {
 		txid, err := hex.DecodeString(h.TxHash)

@@ -127,6 +127,7 @@ func (e *Ec) RPCBroadcast(request map[string]string, response *map[string]string
 		return err
 	}
 	r["txid"] = txid
+	r["changeIndex"] = txid
 	return nil
 }
 
