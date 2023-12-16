@@ -30,30 +30,30 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		return ErrNoWallet
 	}
 
-	// devdbg: add just one known wallet address -------------------------------->
+	// // devdbg: add just one known wallet address -------------------------------->
 
-	address, err := w.GetUnusedAddress(wallet.RECEIVING)
-	if err != nil {
-		return err
-	}
+	// address, err := w.GetUnusedAddress(wallet.RECEIVING)
+	// if err != nil {
+	// 	return err
+	// }
 
-	payToAddrScript, err := txscript.PayToAddrScript(address)
-	if err != nil {
-		return err
-	}
+	// payToAddrScript, err := txscript.PayToAddrScript(address)
+	// if err != nil {
+	// 	return err
+	// }
 
-	subscription := &wallet.Subscription{
-		PkScript:           hex.EncodeToString(payToAddrScript),
-		ElectrumScripthash: pkScriptToElectrumScripthash(payToAddrScript),
-		Address:            address.String(),
-	}
+	// subscription := &wallet.Subscription{
+	// 	PkScript:           hex.EncodeToString(payToAddrScript),
+	// 	ElectrumScripthash: pkScriptToElectrumScripthash(payToAddrScript),
+	// 	Address:            address.String(),
+	// }
 
-	err = w.AddSubscription(subscription)
-	if err != nil {
-		return err
-	}
+	// err = w.AddSubscription(subscription)
+	// if err != nil {
+	// 	return err
+	// }
 
-	// <---------------------------------------------------------------devdbg:
+	// // <---------------------------------------------------------------devdbg:
 
 	subscriptions, err := w.ListSubscriptions()
 	if err != nil {
@@ -239,7 +239,7 @@ func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, erro
 		}
 		if res == nil { // network error
 			w.RemoveSubscription(newSub.PkScript)
-			return "", errors.New("empty result")
+			return "", errors.New("network: empty result")
 		}
 	}
 
@@ -253,4 +253,52 @@ func (ec *BtcElectrumClient) ListUnspent() ([]wallet.Utxo, error) {
 		return nil, ErrNoWallet
 	}
 	return w.ListUnspent()
+}
+
+// UnusedAddress gets a new unused wallet receive address and subscribes for
+// ElectrumX address status notify events on the returned address.
+func (ec *BtcElectrumClient) UnusedAddress() (string, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		return "", ErrNoWallet
+	}
+	node := ec.GetNode()
+	if node == nil {
+		return "", ErrNoNode
+	}
+
+	address, err := w.GetUnusedAddress(wallet.RECEIVING)
+	if err != nil {
+		return "", err
+	}
+	payToAddrScript, err := txscript.PayToAddrScript(address)
+	if err != nil {
+		return "", err
+	}
+
+	// wallet db
+	newSub := &wallet.Subscription{
+		PkScript:           hex.EncodeToString(payToAddrScript),
+		ElectrumScripthash: pkScriptToElectrumScripthash(payToAddrScript),
+		Address:            address.String(),
+	}
+	ec.dumpSubscription("adding/updating get unused address subscription", newSub)
+	// insert or update
+	err = w.AddSubscription(newSub)
+	if err != nil {
+		return "", err
+	}
+
+	// request notifications from node
+	res, err := node.SubscribeScripthashNotify(newSub.ElectrumScripthash)
+	if err != nil {
+		w.RemoveSubscription(newSub.PkScript)
+		return "", err
+	}
+	if res == nil { // network error
+		w.RemoveSubscription(newSub.PkScript)
+		return "", errors.New("network: empty result")
+	}
+
+	return address.String(), nil
 }

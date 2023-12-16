@@ -51,11 +51,9 @@ func (e *Ec) RPCTip(request map[string]string, response *map[string]string) erro
 // List unspent outputs in the wallet including frozen utxos
 func (e *Ec) ListUnspent() (string, error) {
 	utxos, err := e.EleClient.ListUnspent()
-
 	if err != nil {
 		return "", err
 	}
-
 	var sb strings.Builder
 	var last = len(utxos) - 1
 	for i, utxo := range utxos {
@@ -83,6 +81,17 @@ func (e *Ec) RPCListUnspent(request map[string]string, response *map[string]stri
 		return err
 	}
 	r["unspents"] = unspents
+	return nil
+}
+
+// Get a new unused wallet receive address
+func (e *Ec) RPCUnusedAddress(request map[string]string, response *map[string]string) error {
+	r := *response
+	address, err := e.EleClient.UnusedAddress()
+	if err != nil {
+		return err
+	}
+	r["address"] = address
 	return nil
 }
 
