@@ -30,31 +30,6 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		return ErrNoWallet
 	}
 
-	// // devdbg: add just one known wallet address -------------------------------->
-
-	// address, err := w.GetUnusedAddress(wallet.RECEIVING)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// payToAddrScript, err := txscript.PayToAddrScript(address)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// subscription := &wallet.Subscription{
-	// 	PkScript:           hex.EncodeToString(payToAddrScript),
-	// 	ElectrumScripthash: pkScriptToElectrumScripthash(payToAddrScript),
-	// 	Address:            address.String(),
-	// }
-
-	// err = w.AddSubscription(subscription)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // <---------------------------------------------------------------devdbg:
-
 	subscriptions, err := w.ListSubscriptions()
 	if err != nil {
 		return err
