@@ -71,5 +71,6 @@ type ElectrumClient interface {
 	Broadcast(*BroadcastParams) (string, error)
 	ListUnspent() ([]wallet.Utxo, error)
 	UnusedAddress() (string, error)
+	Balance() (int64, int64, error)
 	//...
 }

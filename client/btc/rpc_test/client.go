@@ -20,6 +20,7 @@ func usage() {
 	fmt.Println("  help", "\t\t\t\t\t This help")
 	fmt.Println("  echo <any>", "\t\t\t\t Echo any input args - test only")
 	fmt.Println("  tip", "\t\t\t\t\t Get blockchain tip")
+	fmt.Println("  getbalance", "\t\t\t\t Get wallet confirmed & unconfirmed balance")
 	fmt.Println("  listunspent", "\t\t\t\t List all wallet utxos")
 	fmt.Println("  getunusedaddress", "\t\t\t Get a new unused wallet receive address")
 	fmt.Println("  spend pw amount address feeType", "\t Make signed transaction from wallet utxos")
@@ -71,6 +72,21 @@ func (c *cmd) tip(client *rpc.Client) {
 	fmt.Println("synced", synced)
 }
 
+// getbalance
+func (c *cmd) getbalance(client *rpc.Client) {
+	var request = make(map[string]string)
+	var response = make(map[string]string)
+	err := client.Call("Ec.RPCBalance", &request, &response)
+	if err != nil {
+		log.Fatal("Ec.RPCBalance:", err)
+	}
+	// fmt.Printf("client response %v\n", response)
+	confirmed := cast.ToString(response["confirmed"])
+	unconfirmed := cast.ToString(response["unconfirmed"])
+	fmt.Println("confirmed", confirmed)
+	fmt.Println("unconfirmed", unconfirmed)
+}
+
 // listunspent
 func (c *cmd) listunspent(client *rpc.Client) {
 	var request = make(map[string]string)
@@ -103,7 +119,7 @@ func (c *cmd) listunspent(client *rpc.Client) {
 	fmt.Println("]")
 }
 
-// tip
+// getunusedaddress
 func (c *cmd) getunusedaddress(client *rpc.Client) {
 	var request = make(map[string]string)
 	var response = make(map[string]string)
@@ -111,7 +127,7 @@ func (c *cmd) getunusedaddress(client *rpc.Client) {
 	if err != nil {
 		log.Fatal("Ec.RPCUnusedAddress:", err)
 	}
-	fmt.Printf("client response %v\n", response)
+	// fmt.Printf("client response %v\n", response)
 	address := cast.ToString(response["address"])
 	fmt.Println("address", address)
 }
@@ -150,8 +166,6 @@ func (c *cmd) broadcast(client *rpc.Client) {
 	// fmt.Printf("client response %v\n", response)
 	txid := cast.ToString(response["txid"])
 	fmt.Println("txid", txid)
-	changeIndex := cast.ToString(response["changeIndex"])
-	fmt.Println("changeIndex", changeIndex)
 }
 
 func main() {
@@ -182,7 +196,7 @@ func main() {
 	}
 
 	switch c.cmd {
-	case "tip", "listunspent", "getunusedaddress":
+	case "tip", "listunspent", "getunusedaddress", "getbalance":
 	// no params
 	case "echo":
 	// any number of params
@@ -236,6 +250,8 @@ func main() {
 		c.echo(client)
 	case "tip":
 		c.tip(client)
+	case "getbalance":
+		c.getbalance(client)
 	case "listunspent":
 		c.listunspent(client)
 	case "getunusedaddress":

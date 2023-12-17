@@ -35,15 +35,14 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		return err
 	}
 
+	// - get all subscribed receive/change/watched addresses in wallet db
 	for _, subscription := range subscriptions {
 
-		// - get all subscribed receive/change/watched addresses in wallet db
-		//
-		// for each
+		// for each:
 		//   - subscribe for scripthash notifications from electrumX node
-		//   - on sub the return is hash of all known history known to server
-		//   - get the up to date history list of txid:height, if any
-		//     - update txns db
+		//   - on sub the return is hash of all address history known to server
+		//     i.e. the up to date history list of txid:height, if any
+		//   - for each tx insert or update the wallet db
 
 		status, err := ec.SubscribeAddressNotify(subscription)
 		if err != nil {
@@ -54,7 +53,7 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 			continue
 		}
 
-		// grab all address history to date for this address
+		// get address history to date for this address from ElectrumX
 		history, err := ec.GetAddressHistoryFromNode(subscription)
 		if err != nil {
 			return err
@@ -81,8 +80,9 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 // Spend tries to create a new transaction to pay amount from the wallet to
 // toAddress. It returns Tx & Txid as hex strings and the index of any change
 // output or -1 if none. The client needs to know the change address so it can
-// set up notification of change address status after ElectrumX broadcasts the
-// resultant spend tx to the bitcoin network.
+// set up notification of change address status after ElectrumX later broadcasts
+// the resultant spend tx to the bitcoin network. This function does not broadcast
+// the transaction.
 // The wallet password is required in order to sign the tx.
 func (ec *BtcElectrumClient) Spend(
 	pw string,
@@ -276,4 +276,12 @@ func (ec *BtcElectrumClient) UnusedAddress() (string, error) {
 	}
 
 	return address.String(), nil
+}
+
+func (ec *BtcElectrumClient) Balance() (int64, int64, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		return 0, 0, ErrNoWallet
+	}
+	return w.Balance()
 }

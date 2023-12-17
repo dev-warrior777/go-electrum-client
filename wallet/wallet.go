@@ -106,12 +106,15 @@ type ElectrumWallet interface {
 	// Returns a list of addresses for this wallet
 	ListAddresses() []btcutil.Address
 
-	// Balance returns the confirmed balance for the wallet.
-	// For utxo based wallets, if a spend of confirmed coins is made, the resulting "change"
-	// should be also counted as confirmed even if the spending transaction is unconfirmed.
+	// Balance returns the confirmed & unconfirmed aggregate balance for the wallet.
+	// For utxo based wallets if a spend of confirmed coins is made, the resulting
+	// "change" should be also counted as confirmed even if the spending transaction
+	// is unconfirmed. The reason for this that if the spend never confirms, no coins
+	// will be lost to the wallet.
 	//
-	// This command uses the local wallet. We can also get from ElectrumX.
-	Balance() (int64, int64)
+	// This command uses the local wallet. We can also get from ElectrumX but on a per
+	// address basis.
+	Balance() (int64, int64, error)
 
 	// Returns a list of transactions for this wallet - currently unused
 	Transactions() ([]Txn, error)

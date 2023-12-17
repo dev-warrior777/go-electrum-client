@@ -48,6 +48,19 @@ func (e *Ec) RPCTip(request map[string]string, response *map[string]string) erro
 	return nil
 }
 
+func (e *Ec) RPCBalance(request map[string]string, response *map[string]string) error {
+	r := *response
+	c, u, err := e.EleClient.Balance()
+	if err != nil {
+		return err
+	}
+	confirmed := cast.ToString(c)
+	unconfirmed := cast.ToString(u)
+	r["confirmed"] = confirmed
+	r["unconfirmed"] = unconfirmed
+	return nil
+}
+
 // List unspent outputs in the wallet including frozen utxos
 func (e *Ec) ListUnspent() (string, error) {
 	utxos, err := e.EleClient.ListUnspent()

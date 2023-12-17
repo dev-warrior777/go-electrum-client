@@ -147,5 +147,7 @@ func (ec *BtcElectrumClient) CreateNode(_ client.NodeType) {
 // Spend(amount int64, toAddress string, feeLevel wallet.FeeLevel, broadcast bool) (string, string, error)
 // Broadcast(*BroadcastParams) (string, error)
 // ListUnspent() (string, error)
+// UnusedAddress() (string, error)
+// Balance() (int64, int64)
 
 //////////////////////////////////////////////////////////////////////////////

@@ -340,7 +340,7 @@ func (w *BtcElectrumWallet) ListAddresses() []btcutil.Address {
 	return addresses
 }
 
-func (w *BtcElectrumWallet) Balance() (int64, int64) {
+func (w *BtcElectrumWallet) Balance() (int64, int64, error) {
 
 	//TODO: check if this works with the newly rewritten logic
 
@@ -360,8 +360,14 @@ func (w *BtcElectrumWallet) Balance() (int64, int64) {
 
 	confirmed := int64(0)
 	unconfirmed := int64(0)
-	utxos, _ := w.txstore.Utxos().GetAll()
-	stxos, _ := w.txstore.Stxos().GetAll()
+	utxos, err := w.txstore.Utxos().GetAll()
+	if err != nil {
+		return 0, 0, err
+	}
+	stxos, err := w.txstore.Stxos().GetAll()
+	if err != nil {
+		return 0, 0, err
+	}
 	for _, utxo := range utxos {
 		if utxo.WatchOnly {
 			continue
@@ -376,7 +382,7 @@ func (w *BtcElectrumWallet) Balance() (int64, int64) {
 			}
 		}
 	}
-	return confirmed, unconfirmed
+	return confirmed, unconfirmed, nil
 }
 
 func (w *BtcElectrumWallet) Transactions() ([]wallet.Txn, error) {
