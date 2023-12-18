@@ -148,6 +148,6 @@ func (ec *BtcElectrumClient) CreateNode(_ client.NodeType) {
 // Broadcast(*BroadcastParams) (string, error)
 // ListUnspent() (string, error)
 // UnusedAddress() (string, error)
-// Balance() (int64, int64)
+// Balance() (int64, int64, error)
 
 //////////////////////////////////////////////////////////////////////////////

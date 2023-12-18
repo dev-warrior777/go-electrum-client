@@ -342,8 +342,6 @@ func (w *BtcElectrumWallet) ListAddresses() []btcutil.Address {
 
 func (w *BtcElectrumWallet) Balance() (int64, int64, error) {
 
-	//TODO: check if this works with the newly rewritten logic
-
 	checkIfStxoIsConfirmed := func(utxo wallet.Utxo, stxos []wallet.Stxo) bool {
 		for _, stxo := range stxos {
 			if stxo.Utxo.WatchOnly {

@@ -11,6 +11,9 @@ import (
 	"github.com/spf13/cast"
 )
 
+// ////////////////////////////////////////////////
+// Very simple rpc client. Everything is a string!
+// ////////////////////////////////////////////////
 func usage() {
 	fmt.Println("rpctest v0.1.0")
 	fmt.Println()
