@@ -134,6 +134,13 @@ func (ec *BtcElectrumClient) CreateNode(_ client.NodeType) {
 	ec.Node = n
 }
 
+func (ec *BtcElectrumClient) Close() {
+	w := ec.GetWallet()
+	if w != nil {
+		w.Close()
+	}
+}
+
 // Interface methods in client_headers.go
 //
 // SyncHeaders() error

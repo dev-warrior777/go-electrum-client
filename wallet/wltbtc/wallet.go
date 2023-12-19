@@ -460,44 +460,45 @@ func (w *BtcElectrumWallet) Close() {
 		// Any other teardown here .. long running threads, etc.
 		w.running = false
 	}
-
-	/////////////////////////////
-	// implementations in send.go
-
-	// // Send bitcoins to an external wallet
-	// Spend(amount int64, toAddress btcutil.Address, feeLevel wallet.FeeLevel) ([]byte, error) {
-
-	// // Calculates the estimated size of the transaction and returns the total fee
-	// // for the given feePerByte
-	// EstimateFee(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, feePerByte uint64) int64
-
-	//////////////////////////////
-	// implementations in sweep.go
-
-	// // Build a transaction that sweeps all coins from an address. If it is a p2sh
-	// // multisig then the redeemScript must be included.
-	// SweepAddress(utxos []wallet.Utxo, address btcutil.Address, key *hdkeychain.ExtendedKey, redeemScript *[]byte, feeLevel wallet.FeeLevel) ([]byte, error)
-
-	////////////////////////////////
-	// implementations in bumpfee.go
-
-	// CPFP logic - No rbf and never will be here!
-	// func (w *BtcElectrumWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error)
-
-	//////////////////////////////////
-	// implementations in multisend.go
-
-	// // Generate a multisig script from public keys. If a timeout is included the
-	// // returned script should be a timelocked escrow which releases using the
-	// // timeoutKey.
-	// GenerateMultisigScript(keys []hdkeychain.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hdkeychain.ExtendedKey) (address btcutil.Address, redeemScript []byte, err error) {
-
-	// // Create a signature for a multisig transaction
-	// CreateMultisigSignature(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, key *hdkeychain.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]wallet.Signature, error)
-
-	// // Combine signatures and optionally broadcast
-	// Multisign(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, sigs1 []wallet.Signature, sigs2 []wallet.Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error)
+	fmt.Println("btc wallet closed")
 }
+
+/////////////////////////////
+// implementations in send.go
+
+// // Send bitcoins to an external wallet
+// Spend(amount int64, toAddress btcutil.Address, feeLevel wallet.FeeLevel) ([]byte, error) {
+
+// // Calculates the estimated size of the transaction and returns the total fee
+// // for the given feePerByte
+// EstimateFee(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, feePerByte uint64) int64
+
+//////////////////////////////
+// implementations in sweep.go
+
+// // Build a transaction that sweeps all coins from an address. If it is a p2sh
+// // multisig then the redeemScript must be included.
+// SweepAddress(utxos []wallet.Utxo, address btcutil.Address, key *hdkeychain.ExtendedKey, redeemScript *[]byte, feeLevel wallet.FeeLevel) ([]byte, error)
+
+////////////////////////////////
+// implementations in bumpfee.go
+
+// CPFP logic - No rbf and never will be here!
+// func (w *BtcElectrumWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error)
+
+//////////////////////////////////
+// implementations in multisend.go
+
+// // Generate a multisig script from public keys. If a timeout is included the
+// // returned script should be a timelocked escrow which releases using the
+// // timeoutKey.
+// GenerateMultisigScript(keys []hdkeychain.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hdkeychain.ExtendedKey) (address btcutil.Address, redeemScript []byte, err error) {
+
+// // Create a signature for a multisig transaction
+// CreateMultisigSignature(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, key *hdkeychain.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]wallet.Signature, error)
+
+// // Combine signatures and optionally broadcast
+// Multisign(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, sigs1 []wallet.Signature, sigs2 []wallet.Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error)
 
 // end interface impl
 /////////////////////

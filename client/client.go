@@ -62,6 +62,7 @@ type ElectrumClient interface {
 	LoadWallet(pw string) error
 	//
 	SyncWallet() error
+	Close()
 	//
 	// Simple RPC server for test only; not production
 	RPCServe() error

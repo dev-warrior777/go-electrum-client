@@ -153,4 +153,5 @@ func main() {
 
 	sc := ec.GetNode().GetServerConn().SvrConn
 	<-sc.Done()
+	ec.Close()
 }
