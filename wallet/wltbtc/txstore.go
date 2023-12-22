@@ -3,6 +3,7 @@ package wltbtc
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -49,11 +50,17 @@ func (ts *TxStore) PopulateAdrs() {
 	ts.addrMutex.Lock()
 	ts.adrs = []btcutil.Address{}
 	for _, k := range keys {
-		addr, err := k.Address(ts.params)
+		address, err := k.Address(ts.params)
 		if err != nil {
 			continue
 		}
-		ts.adrs = append(ts.adrs, addr)
+		script := address.ScriptAddress()
+		segwitAddress, swerr := btcutil.NewAddressWitnessPubKeyHash(script, ts.params)
+		if swerr != nil {
+			fmt.Println(swerr)
+			continue
+		}
+		ts.adrs = append(ts.adrs, segwitAddress)
 		k.Zero()
 	}
 	ts.addrMutex.Unlock()

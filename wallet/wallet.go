@@ -69,7 +69,7 @@ type ElectrumWallet interface {
 
 	// CreateNewAddress returns a new, never-before-returned address.
 	// CAUTION: This will be outside the gap limit.     [deprecated]
-	CreateNewAddress(purpose KeyPurpose) btcutil.Address
+	// CreateNewAddress(purpose KeyPurpose) btcutil.Address
 
 	// DecodeAddress parses the address string and return an address.
 	DecodeAddress(addr string) (btcutil.Address, error)

@@ -266,21 +266,23 @@ func (w *BtcElectrumWallet) GetUnusedAddress(purpose wallet.KeyPurpose) (btcutil
 	if err != nil {
 		return nil, nil
 	}
-	addrPubKeyHash, err := key.Address(w.params)
+	address, err := key.Address(w.params)
 	key.Zero()
 	if err != nil {
 		return nil, nil
 	}
-	return btcutil.Address(addrPubKeyHash), nil
+	script := address.ScriptAddress()
+	segwitAddress, swerr := btcutil.NewAddressWitnessPubKeyHash(script, w.params)
+	if swerr != nil {
+		return nil, swerr
+	}
+
+	return segwitAddress, nil
 }
 
 // Marks the address as used (involved in at least one transaction)
 func (w *BtcElectrumWallet) MarkAddressUsed(address btcutil.Address) error {
 	return w.txstore.Keys().MarkKeyAsUsed(address.ScriptAddress())
-}
-
-func (w *BtcElectrumWallet) CreateNewAddress(purpose wallet.KeyPurpose) btcutil.Address {
-	panic("deprecated method")
 }
 
 func (w *BtcElectrumWallet) DecodeAddress(addr string) (btcutil.Address, error) {

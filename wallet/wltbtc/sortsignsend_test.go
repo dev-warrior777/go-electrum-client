@@ -82,7 +82,7 @@ func Test_gatherCoins(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	coinmap := w.gatherCoins()
+	coinmap := w.gatherCoins(false)
 	for coin, key := range coinmap {
 		if !bytes.Equal(coin.PkScript(), script1) {
 			t.Error("Pubkey script in coin is incorrect")
@@ -113,7 +113,7 @@ func Test_gatherCoins(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	coinmap = w.gatherCoins()
+	coinmap = w.gatherCoins(false)
 	if len(coinmap) > 0 {
 		t.Fatal("should be no unfrozen coin in map")
 	}
@@ -133,11 +133,24 @@ func Test_newTransaction(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	// addr1, err := key1.Address(&chaincfg.RegressionNetParams)
+	// if err != nil {
+	// 	t.Error(err)
+	// }
+	// script1, err := w.AddressToScript(addr1)
+	// if err != nil {
+	// 	t.Error(err)
+	// }
 	addr1, err := key1.Address(&chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
 	}
-	script1, err := w.AddressToScript(addr1)
+	script := addr1.ScriptAddress()
+	segwitAddress, swerr := btcutil.NewAddressWitnessPubKeyHash(script, w.params)
+	if swerr != nil {
+		t.Error(err)
+	}
+	script1, err := w.AddressToScript(segwitAddress)
 	if err != nil {
 		t.Error(err)
 	}

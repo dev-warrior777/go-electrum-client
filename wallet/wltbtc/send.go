@@ -59,7 +59,7 @@ func NewCoin(txHash *chainhash.Hash, index uint32, value btcutil.Amount, numConf
 }
 
 // gather
-func (w *BtcElectrumWallet) gatherCoins() map[coinset.Coin]*hdkeychain.ExtendedKey {
+func (w *BtcElectrumWallet) gatherCoins(excludeUnconfirmed bool) map[coinset.Coin]*hdkeychain.ExtendedKey {
 	tip := w.blockchainTip
 	utxos, _ := w.txstore.Utxos().GetAll()
 	m := make(map[coinset.Coin]*hdkeychain.ExtendedKey)
@@ -68,6 +68,9 @@ func (w *BtcElectrumWallet) gatherCoins() map[coinset.Coin]*hdkeychain.ExtendedK
 			continue
 		}
 		if u.Frozen {
+			continue
+		}
+		if excludeUnconfirmed && u.AtHeight <= 0 {
 			continue
 		}
 		var confirmations int64
@@ -170,7 +173,7 @@ func (w *BtcElectrumWallet) buildTx(amount int64, addr btcutil.Address, feeLevel
 	var additionalKeysByAddress map[string]*btcutil.WIF
 
 	// Create input source
-	coinMap := w.gatherCoins()
+	coinMap := w.gatherCoins(true) // exclude unconfirmed
 	coins := make([]coinset.Coin, 0, len(coinMap))
 	for k := range coinMap {
 		coins = append(coins, k)
@@ -268,7 +271,7 @@ func (w *BtcElectrumWallet) buildTx(amount int64, addr btcutil.Address, feeLevel
 func (w *BtcElectrumWallet) buildSpendAllTx(addr btcutil.Address, feeLevel wallet.FeeLevel) (*wire.MsgTx, error) {
 	tx := wire.NewMsgTx(1)
 
-	coinMap := w.gatherCoins()
+	coinMap := w.gatherCoins(true) // exclude unconfirmed
 	inVals := make(map[wire.OutPoint]int64)
 	totalIn := int64(0)
 	additionalPrevScripts := make(map[wire.OutPoint][]byte)
