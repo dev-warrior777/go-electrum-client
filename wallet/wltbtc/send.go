@@ -253,26 +253,35 @@ func (w *BtcElectrumWallet) buildTx(amount int64, addr btcutil.Address, feeLevel
 	// it’s a SegWit transaction. Such transactions are serialized differently
 	// from legacy ones; both for signing and pushing.
 
-	gotSegwitInputs := false
-	gotLegacyInputs := false
+	// currently we support:
+	// native P2WPKH or P2WSH
+	gotNativeSegwitInputs := false
+	// legacy P2PKH
+	gotLegacyP2PKHInputs := false
+
 	for k, v := range prevScripts {
 		fmt.Println("prevScripts[", k.String(), "]", k.String(), v)
-		if v[0] == 0x00 && (v[1] == 0x14 || v[1] == 0x20) { // P2WPKH or P2WSH
-			gotSegwitInputs = true
-		} else {
-			gotLegacyInputs = true
+		if len(v) < 22 { // sanity only
+			continue
+		}
+		if v[0] == 0x00 && (v[1] == 0x14 || v[1] == 0x20) {
+			gotNativeSegwitInputs = true
+		} else if v[0] == 0x76 && v[1] == 0xa9 {
+			gotLegacyP2PKHInputs = true
 		}
 	}
-	if gotSegwitInputs && gotLegacyInputs {
-		fmt.Println("mixed segwit & legacy inputs not (yet) supported")
-		return -1, nil, errors.New("mixed segwit & legacy inputs not (yet) supported")
+	if !gotNativeSegwitInputs && !gotLegacyP2PKHInputs {
+		return -1, nil, errors.New("unsupported input type(s)")
+	}
+	if gotNativeSegwitInputs && gotLegacyP2PKHInputs {
+		return -1, nil, errors.New("mixed segwit & legacy inputs not supported")
 	}
 
-	if gotSegwitInputs {
+	if gotNativeSegwitInputs {
 		return w.segwitSign(authoredTx, prevScripts, keysByAddress)
 	}
 
-	if gotLegacyInputs {
+	if gotLegacyP2PKHInputs {
 		return w.legacySign(authoredTx, prevScripts, keysByAddress)
 	}
 

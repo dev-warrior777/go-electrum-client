@@ -165,7 +165,7 @@ func Test_newSegwitTransaction(t *testing.T) {
 		t.Error(err)
 	}
 
-	fmt.Println("Segwit address", segwitAddress.EncodeAddress())
+	// fmt.Println("Segwit address", segwitAddress.EncodeAddress())
 	script, err := txscript.PayToAddrScript(segwitAddress)
 	if err != nil {
 		t.Error(err)
@@ -197,11 +197,8 @@ func Test_newSegwitTransaction(t *testing.T) {
 		false,
 	)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
-	// if tx != nil {
-	// 	fmt.Println(tx.TxHash().String(), changeIndex)
-	// }
 }
 
 func Test_newLegacyTransaction(t *testing.T) {
