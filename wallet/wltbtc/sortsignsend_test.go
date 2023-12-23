@@ -3,6 +3,7 @@ package wltbtc
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"testing"
@@ -12,9 +13,17 @@ import (
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
+	"github.com/tyler-smith/go-bip39"
 )
+
+var test_mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
+
+func makeRegtestSeed(mnemonic string) ([]byte, error) {
+	return bip39.NewSeedWithErrorChecking(test_mnemonic, "")
+}
 
 func createTxStore() (*TxStore, *StorageManager) {
 	mockDb := MockDatastore{
@@ -26,8 +35,15 @@ func createTxStore() (*TxStore, *StorageManager) {
 		&mockTxnStore{make(map[string]*wallet.Txn)},
 		&mockSubscriptionsStore{make(map[string]*wallet.Subscription)},
 	}
-	seed := make([]byte, 32)
-	rand.Read(seed)
+
+	var seed []byte
+	seed, err := makeRegtestSeed(test_mnemonic)
+	if err != nil {
+		// make random seed
+		seed := make([]byte, 32)
+		rand.Read(seed)
+		fmt.Println("Made random seed")
+	}
 	key, _ := hdkeychain.NewMaster(seed, &chaincfg.RegressionNetParams)
 	km, _ := NewKeyManager(mockDb.Keys(), &chaincfg.RegressionNetParams, key)
 	sm := NewStorageManager(mockDb.Enc(), &chaincfg.RegressionNetParams)
@@ -120,7 +136,75 @@ func Test_gatherCoins(t *testing.T) {
 	os.Remove("headers.bin")
 }
 
-func Test_newTransaction(t *testing.T) {
+// We do pure segwit inputs only for now. No mixed inputs. The wallet is segwit
+// by default. Later if there is a use case we can add the 30% extra code needed
+// for that such as wrapped P2SH-P2WPKH, etc.
+func Test_newSegwitTransaction(t *testing.T) {
+	w := MockWallet()
+	w.blockchainTip = 500
+
+	// A real Tx from harness->goele
+
+	// make one utxo
+	txid := "50b636d971e7d4d918d92876d6d53a22ccc960e051f540108056ca4ad6ec080c"
+	vout := 0
+	// witnessProgram := "0014a30a0cf1da8c0c36ae8d637b674663ccf2b31e45"
+	witnessProgram := "a30a0cf1da8c0c36ae8d637b674663ccf2b31e45"
+	h1Txid, err := chainhash.NewHashFromStr(txid)
+	if err != nil {
+		t.Error(err)
+	}
+	h1OutIndex := uint32(vout)
+	h1WitnessProgram, err := hex.DecodeString(witnessProgram)
+	if err != nil {
+		t.Error(err)
+	}
+
+	segwitAddress, swerr := btcutil.NewAddressWitnessPubKeyHash(h1WitnessProgram, w.params)
+	if swerr != nil {
+		t.Error(err)
+	}
+
+	fmt.Println("Segwit address", segwitAddress.EncodeAddress())
+	script, err := txscript.PayToAddrScript(segwitAddress)
+	if err != nil {
+		t.Error(err)
+	}
+	op := wire.OutPoint{
+		Hash:  *h1Txid,
+		Index: h1OutIndex,
+	}
+	err = w.txstore.Utxos().Put(wallet.Utxo{
+		Op:           op,
+		ScriptPubkey: script,
+		AtHeight:     421,
+		Value:        10030000})
+	if err != nil {
+		t.Error(err)
+	}
+
+	// to harness ->
+	address, err := btcutil.DecodeAddress("bcrt1q322tg0y2hzyp9zztr7d2twdclhqg88anvzxwwr", &chaincfg.RegressionNetParams)
+	if err != nil {
+		t.Error(err)
+	}
+	_, _, err = w.Spend(
+		// changeIndex, tx, err := w.Spend(
+		"abc",
+		int64(3000000),
+		address,
+		wallet.NORMAL,
+		false,
+	)
+	if err != nil {
+		t.Error(err)
+	}
+	// if tx != nil {
+	// 	fmt.Println(tx.TxHash().String(), changeIndex)
+	// }
+}
+
+func Test_newLegacyTransaction(t *testing.T) {
 	w := MockWallet()
 	w.blockchainTip = 100
 	// make one utxo
@@ -133,24 +217,11 @@ func Test_newTransaction(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	// addr1, err := key1.Address(&chaincfg.RegressionNetParams)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
-	// script1, err := w.AddressToScript(addr1)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
 	addr1, err := key1.Address(&chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
 	}
-	script := addr1.ScriptAddress()
-	segwitAddress, swerr := btcutil.NewAddressWitnessPubKeyHash(script, w.params)
-	if swerr != nil {
-		t.Error(err)
-	}
-	script1, err := w.AddressToScript(segwitAddress)
+	script1, err := w.AddressToScript(addr1)
 	if err != nil {
 		t.Error(err)
 	}
