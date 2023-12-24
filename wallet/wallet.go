@@ -135,7 +135,7 @@ type ElectrumWallet interface {
 	ListUnspent() ([]Utxo, error)
 
 	// Make a new spending transaction
-	Spend(pw string, amount int64, toAddress btcutil.Address, feeLevel FeeLevel, spendAll bool) (int, *wire.MsgTx, error)
+	Spend(pw string, amount int64, toAddress btcutil.Address, feeLevel FeeLevel) (int, *wire.MsgTx, error)
 
 	// Calculates the estimated size of the transaction and returns the total fee for the given feePerByte
 	EstimateFee(ins []TransactionInput, outs []TransactionOutput, feePerByte int64) int64
@@ -143,7 +143,7 @@ type ElectrumWallet interface {
 	// Build a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
 	SweepAddress(ins []TransactionInput, address btcutil.Address, key *hd.ExtendedKey, redeemScript []byte, feeLevel FeeLevel) (*wire.MsgTx, error)
 
-	// CPFP logic
+	// CPFP logic; rbf not supported
 	BumpFee(txid chainhash.Hash) (*wire.MsgTx, error)
 
 	// Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked

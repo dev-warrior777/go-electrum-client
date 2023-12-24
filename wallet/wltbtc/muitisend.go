@@ -8,7 +8,7 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-// Multisig functionality here
+//TODO: FUTURE: Multisig functionality here
 
 func (w *BtcElectrumWallet) GenerateMultisigScript(keys []hdkeychain.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hdkeychain.ExtendedKey) (addr btcutil.Address, redeemScript []byte, err error) {
 

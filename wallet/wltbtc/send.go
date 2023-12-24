@@ -4,7 +4,6 @@ package wltbtc
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
@@ -16,7 +15,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcwallet/wallet/txauthor"
-	"github.com/btcsuite/btcwallet/wallet/txrules"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -47,7 +45,6 @@ func (ss *secretSource) GetKey(address btcutil.Address) (*btcec.PrivateKey, bool
 // GetScript fetches the redemption script for the specified p2sh/p2wsh address.
 func (ss *secretSource) GetScript(address btcutil.Address) ([]byte, error) {
 	return txscript.PayToAddrScript(address)
-	// return nil, nil
 }
 
 type Coin struct {
@@ -76,7 +73,7 @@ func NewCoin(txHash *chainhash.Hash, index uint32, value btcutil.Amount, numConf
 	return coinset.Coin(c)
 }
 
-// gather
+// gatherCoins aggregates acceptable utxos into a map of hdkey keyed by coinset
 func (w *BtcElectrumWallet) gatherCoins(excludeUnconfirmed bool) map[coinset.Coin]*hdkeychain.ExtendedKey {
 	tip := w.blockchainTip
 	utxos, _ := w.txstore.Utxos().GetAll()
@@ -109,87 +106,39 @@ func (w *BtcElectrumWallet) gatherCoins(excludeUnconfirmed bool) map[coinset.Coi
 	return m
 }
 
-func (w *BtcElectrumWallet) Spend(pw string, amount int64, addr btcutil.Address, feeLevel wallet.FeeLevel, spendAll bool) (int, *wire.MsgTx, error) {
+// Spend creates and signs a new transaction from wallet coins
+func (w *BtcElectrumWallet) Spend(
+	pw string,
+	amount int64,
+	address btcutil.Address,
+	feeLevel wallet.FeeLevel) (int, *wire.MsgTx, error) {
+
 	if ok := w.storageManager.IsValidPw(pw); !ok {
 		return -1, nil, errors.New("invalid password")
 	}
-	var (
-		changeIndex int
-		tx          *wire.MsgTx
-		err         error
-	)
-	changeIndex = -1
-	if spendAll {
-		tx, err = w.buildSpendAllTx(addr, feeLevel)
-		if err != nil {
-			return -1, nil, err
-		}
-	} else {
-		changeIndex, tx, err = w.buildTx(amount, addr, feeLevel, nil)
-		if err != nil {
-			return -1, nil, err
-		}
-	}
 
+	changeIndex, tx, err := w.buildTx(amount, address, feeLevel)
+	if err != nil {
+		return -1, nil, err
+	}
 	return changeIndex, tx, nil
 }
 
-func (w *BtcElectrumWallet) EstimateFee(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, feePerByte int64) int64 {
-	tx := new(wire.MsgTx)
-	for _, out := range outs {
-		scriptPubKey, _ := txscript.PayToAddrScript(out.Address)
-		output := wire.NewTxOut(out.Value, scriptPubKey)
-		tx.TxOut = append(tx.TxOut, output)
-	}
-	estimatedSize := EstimateSerializeSize(len(ins), tx.TxOut, false, P2PKH)
-	fee := estimatedSize * int(feePerByte)
-	return int64(fee)
-}
+// buildTx builds a normal Pay to (witness) pubkey hash transaction.
+func (w *BtcElectrumWallet) buildTx(
+	amount int64,
+	address btcutil.Address,
+	feeLevel wallet.FeeLevel) (int, *wire.MsgTx, error) {
 
-// Build a spend transaction for the amount and return the transaction fee
-func (w *BtcElectrumWallet) EstimateSpendFee(amount int64, feeLevel wallet.FeeLevel) (uint64, error) {
-	// Since this is an estimate we can use a dummy output address. Let's use a long one so we don't under estimate.
-	addr, err := btcutil.DecodeAddress("bc1qxtq7ha2l5qg70atpwp3fus84fx3w0v2w4r2my7gt89ll3w0vnlgspu349h", w.params)
-	if err != nil {
-		return 0, err
-	}
-	_, tx, err := w.buildTx(amount, addr, feeLevel, nil)
-	if err != nil {
-		return 0, err
-	}
-	var outval int64
-	for _, output := range tx.TxOut {
-		outval += output.Value
-	}
-	var inval int64
-	utxos, err := w.txstore.Utxos().GetAll()
-	if err != nil {
-		return 0, err
-	}
-	for _, input := range tx.TxIn {
-		for _, utxo := range utxos {
-			if utxo.Op.Hash.IsEqual(&input.PreviousOutPoint.Hash) && utxo.Op.Index == input.PreviousOutPoint.Index {
-				inval += utxo.Value
-				break
-			}
-		}
-	}
-	if inval < outval {
-		return 0, errors.New("error building transaction: inputs less than outputs")
-	}
-	return uint64(inval - outval), err
-}
-
-// buildTx builds a normal Pay to (witness) pubb key hash transaction.
-func (w *BtcElectrumWallet) buildTx(amount int64, address btcutil.Address, feeLevel wallet.FeeLevel, optionalOutput *wire.TxOut) (int, *wire.MsgTx, error) {
 	// Check for dust
-	script, _ := txscript.PayToAddrScript(address)
 	if w.IsDust(amount) {
 		return -1, nil, wallet.ErrDustAmount
 	}
 
-	var prevScripts map[wire.OutPoint]*wire.TxOut
-	var keysByAddress map[string]*btcutil.WIF
+	script, err := txscript.PayToAddrScript(address)
+	if err != nil {
+		return -1, nil, wallet.ErrDustAmount
+	}
 
 	// create input source
 	coinMap := w.gatherCoins(true) // exclude unconfirmed
@@ -198,7 +147,15 @@ func (w *BtcElectrumWallet) buildTx(amount int64, address btcutil.Address, feeLe
 		coins = append(coins, k)
 	}
 
-	inputSource := func(target btcutil.Amount) (total btcutil.Amount, inputs []*wire.TxIn, inputValues []btcutil.Amount, scripts [][]byte, err error) {
+	var prevScripts map[wire.OutPoint]*wire.TxOut
+	var keysByAddress map[string]*btcutil.WIF
+
+	inputSource := func(target btcutil.Amount) (
+		total btcutil.Amount,
+		inputs []*wire.TxIn,
+		inputValues []btcutil.Amount,
+		scripts [][]byte, err error) {
+
 		coinSelector := coinset.MaxValueAgeCoinSelector{MaxInputs: 10000, MinChangeAmount: btcutil.Amount(0)}
 		coins, err := coinSelector.CoinSelect(target, coins)
 		if err != nil {
@@ -211,7 +168,6 @@ func (w *BtcElectrumWallet) buildTx(amount int64, address btcutil.Address, feeLe
 			outpoint := wire.NewOutPoint(c.Hash(), c.Index())
 			in := wire.NewTxIn(outpoint, []byte{}, [][]byte{})
 			in.Sequence = uint32(0xffffffff)
-			// in.Sequence = 0 // Opt-in RBF so we can bump fees //TODO: change this ffffffff
 			inputs = append(inputs, in)
 			prevScripts[*outpoint] = wire.NewTxOut(int64(c.Value()), c.PkScript())
 			key := coinMap[c]
@@ -236,9 +192,9 @@ func (w *BtcElectrumWallet) buildTx(amount int64, address btcutil.Address, feeLe
 	// outputs
 	out := wire.NewTxOut(amount, script)
 
-	// Create change source
+	// create change source
 	changeSource := func() ([]byte, error) {
-		address, err := w.GetUnusedAddress(wallet.INTERNAL)
+		address, err := w.GetUnusedAddress(wallet.CHANGE)
 		if err != nil {
 			return []byte{}, err
 		}
@@ -248,17 +204,15 @@ func (w *BtcElectrumWallet) buildTx(amount int64, address btcutil.Address, feeLe
 		}
 		return script, nil
 	}
-	var scriptSize int = 0
+	var scriptSize int = 33 // max size, over-estimated
 	changeOutputsSource := txauthor.ChangeSource{
 		NewScript:  changeSource,
 		ScriptSize: scriptSize,
 	}
 
 	outputs := []*wire.TxOut{out}
-	if optionalOutput != nil {
-		outputs = append(outputs, optionalOutput)
-	}
-	authoredTx, err := NewUnsignedTransaction(outputs, btcutil.Amount(feePerKB), inputSource, changeOutputsSource)
+
+	authoredTx, err := txauthor.NewUnsignedTransaction(outputs, btcutil.Amount(feePerKB), inputSource, &changeOutputsSource)
 	if err != nil {
 		return -1, nil, err
 	}
@@ -266,84 +220,7 @@ func (w *BtcElectrumWallet) buildTx(amount int64, address btcutil.Address, feeLe
 	// BIP 69 sorting
 	txsort.InPlaceSort(authoredTx.Tx)
 
-	/////////////////////////////////
-	// Up to here can be similar code
-	//
-	// If a transaction has at least one SegWit input, native or wrapped, then
-	// it’s a SegWit transaction. Such transactions are serialized differently
-	// from legacy ones; both for signing and pushing.
-
-	// currently we support:
-	// native segwit P2WPKH or P2WSH
-	gotNativeSegwitInputs := false
-	// legacy P2PKH
-	gotLegacyP2PKHInputs := false
-
-	for k, v := range prevScripts {
-		fmt.Println("prevScripts[", k.String(), "]", k.String(), v)
-		if len(v.PkScript) < 22 { // sanity only
-			continue
-		}
-		if v.PkScript[0] == 0x00 && (v.PkScript[1] == 0x14 || v.PkScript[1] == 0x20) {
-			gotNativeSegwitInputs = true
-		} else if v.PkScript[0] == 0x76 && v.PkScript[1] == 0xa9 {
-			gotLegacyP2PKHInputs = true
-		}
-	}
-	if !gotNativeSegwitInputs && !gotLegacyP2PKHInputs {
-		return -1, nil, errors.New("unsupported input type(s)")
-	}
-	if gotNativeSegwitInputs && gotLegacyP2PKHInputs {
-		return -1, nil, errors.New("mixed segwit & legacy inputs not supported")
-	}
-
-	if gotLegacyP2PKHInputs {
-		return w.legacySign(authoredTx, prevScripts, keysByAddress)
-	}
-
-	if gotNativeSegwitInputs {
-		return w.segwitSign(authoredTx, prevScripts, keysByAddress)
-	}
-
-	return -1, nil, errors.New("unknown input types")
-}
-
-// Not pretty!
-// Pre-Segwit signing only. But this wallet is segwit by default.
-func (w *BtcElectrumWallet) legacySign(
-	authoredTx *txauthor.AuthoredTx,
-	prevScripts map[wire.OutPoint]*wire.TxOut,
-	// prevScripts map[wire.OutPoint][]byte,
-	keysByAddress map[string]*btcutil.WIF) (int, *wire.MsgTx, error) {
-	// Sign tx
-	getKey := txscript.KeyClosure(func(addr btcutil.Address) (*btcec.PrivateKey, bool, error) {
-		addrStr := addr.EncodeAddress()
-		wif := keysByAddress[addrStr]
-		return wif.PrivKey, wif.CompressPubKey, nil
-	})
-	getScript := txscript.ScriptClosure(func(
-		addr btcutil.Address) ([]byte, error) {
-		return []byte{}, nil
-	})
-	for i, txIn := range authoredTx.Tx.TxIn {
-		prevOutScript := prevScripts[txIn.PreviousOutPoint].PkScript
-		script, err := txscript.SignTxOutput(w.params,
-			authoredTx.Tx, i, prevOutScript, txscript.SigHashAll, getKey,
-			getScript, txIn.SignatureScript)
-		if err != nil {
-			return -1, nil, errors.New("failed to sign transaction")
-		}
-		txIn.SignatureScript = script
-	}
-	return authoredTx.ChangeIndex, authoredTx.Tx, nil
-}
-
-func (w *BtcElectrumWallet) segwitSign(
-	authoredTx *txauthor.AuthoredTx,
-	prevScripts map[wire.OutPoint]*wire.TxOut,
-	// prevScripts map[wire.OutPoint][]byte,
-	keysByAddress map[string]*btcutil.WIF) (int, *wire.MsgTx, error) {
-
+	// Sign
 	var prevPkScripts [][]byte
 	var inputValues []btcutil.Amount
 	for _, txIn := range authoredTx.Tx.TxIn {
@@ -356,184 +233,56 @@ func (w *BtcElectrumWallet) segwitSign(
 		txIn.SignatureScript = nil
 		txIn.Witness = nil
 	}
-	err := txauthor.AddAllInputScripts(authoredTx.Tx, prevPkScripts, inputValues, &secretSource{w})
+	err = txauthor.AddAllInputScripts(authoredTx.Tx, prevPkScripts, inputValues, &secretSource{w})
 	if err != nil {
 		return -1, nil, err
 	}
 	return authoredTx.ChangeIndex, authoredTx.Tx, nil
 }
 
-func (w *BtcElectrumWallet) buildSpendAllTx(addr btcutil.Address, feeLevel wallet.FeeLevel) (*wire.MsgTx, error) {
-	tx := wire.NewMsgTx(1)
-
-	coinMap := w.gatherCoins(true) // exclude unconfirmed
-	inVals := make(map[wire.OutPoint]int64)
-	totalIn := int64(0)
-	additionalPrevScripts := make(map[wire.OutPoint][]byte)
-	additionalKeysByAddress := make(map[string]*btcutil.WIF)
-
-	for coin, key := range coinMap {
-		outpoint := wire.NewOutPoint(coin.Hash(), coin.Index())
-		in := wire.NewTxIn(outpoint, nil, nil)
-		additionalPrevScripts[*outpoint] = coin.PkScript()
-		tx.TxIn = append(tx.TxIn, in)
-		val := int64(coin.Value().ToUnit(btcutil.AmountSatoshi))
-		totalIn += val
-		inVals[*outpoint] = val
-
-		addr, err := key.Address(w.params)
-		if err != nil {
-			continue
-		}
-		privKey, err := key.ECPrivKey()
-		if err != nil {
-			continue
-		}
-		wif, _ := btcutil.NewWIF(privKey, w.params, true)
-		additionalKeysByAddress[addr.EncodeAddress()] = wif
-	}
-
-	// outputs
-	script, err := txscript.PayToAddrScript(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the fee
-	feePerByte := int64(w.GetFeePerByte(feeLevel))
-	estimatedSize := EstimateSerializeSize(1, []*wire.TxOut{wire.NewTxOut(0, script)}, false, P2PKH)
-	fee := int64(estimatedSize) * feePerByte
-
-	// Check for dust output
-	if w.IsDust(totalIn - fee) {
-		return nil, wallet.ErrDustAmount
-	}
-
-	// Build the output
-	out := wire.NewTxOut(totalIn-fee, script)
-	tx.TxOut = append(tx.TxOut, out)
-
-	// BIP 69 sorting
-	txsort.InPlaceSort(tx)
-
-	// Sign
-	getKey := txscript.KeyClosure(func(addr btcutil.Address) (*btcec.PrivateKey, bool, error) {
-		addrStr := addr.EncodeAddress()
-		wif, ok := additionalKeysByAddress[addrStr]
-		if !ok {
-			return nil, false, errors.New("key not found")
-		}
-		return wif.PrivKey, wif.CompressPubKey, nil
-	})
-	getScript := txscript.ScriptClosure(func(
-		addr btcutil.Address) ([]byte, error) {
-		return []byte{}, nil
-	})
-	for i, txIn := range tx.TxIn {
-		prevOutScript := additionalPrevScripts[txIn.PreviousOutPoint]
-		script, err := txscript.SignTxOutput(w.params,
-			tx, i, prevOutScript, txscript.SigHashAll, getKey,
-			getScript, txIn.SignatureScript)
-		if err != nil {
-			return nil, errors.New("failed to sign transaction")
-		}
-		txIn.SignatureScript = script
-	}
-	return tx, nil
-}
-
-func isDust(amount int64) bool {
-	return btcutil.Amount(amount) < txrules.DefaultRelayFeePerKb
-}
-
-func NewUnsignedTransaction(outputs []*wire.TxOut, feePerKb btcutil.Amount, fetchInputs txauthor.InputSource, changeSource txauthor.ChangeSource) (*txauthor.AuthoredTx, error) {
-	var targetAmount btcutil.Amount
-	for _, txOut := range outputs {
-		targetAmount += btcutil.Amount(txOut.Value)
-	}
-
-	estimatedSize := EstimateSerializeSize(1, outputs, true, P2PKH)
-	targetFee := txrules.FeeForSerializeSize(feePerKb, estimatedSize)
-
-	for {
-		inputAmount, inputs, _, scripts, err := fetchInputs(targetAmount + targetFee)
-		if err != nil {
-			return nil, err
-		}
-		if inputAmount < targetAmount+targetFee {
-			return nil, errors.New("insufficient funds available to construct transaction")
-		}
-
-		maxSignedSize := EstimateSerializeSize(len(inputs), outputs, true, P2PKH)
-		maxRequiredFee := txrules.FeeForSerializeSize(feePerKb, maxSignedSize)
-		remainingAmount := inputAmount - targetAmount
-		if remainingAmount < maxRequiredFee {
-			targetFee = maxRequiredFee
-			continue
-		}
-
-		unsignedTransaction := &wire.MsgTx{
-			Version:  wire.TxVersion,
-			TxIn:     inputs,
-			TxOut:    outputs,
-			LockTime: 0,
-		}
-		changeIndex := -1
-		changeAmount := inputAmount - targetAmount - maxRequiredFee
-		if changeAmount != 0 && !isDust(int64(changeAmount)) {
-			changeScript, err := changeSource.NewScript()
-			if err != nil {
-				return nil, err
-			}
-			if len(changeScript) > P2PKHPkScriptSize {
-				return nil, errors.New("fee estimation requires change " +
-					"scripts no larger than P2PKH output scripts")
-			}
-			change := wire.NewTxOut(int64(changeAmount), changeScript)
-			l := len(outputs)
-			unsignedTransaction.TxOut = append(outputs[:l:l], change)
-			changeIndex = l
-		}
-
-		return &txauthor.AuthoredTx{
-			Tx:          unsignedTransaction,
-			PrevScripts: scripts,
-			TotalInput:  inputAmount,
-			ChangeIndex: changeIndex,
-		}, nil
-	}
-}
-
 func (w *BtcElectrumWallet) GetFeePerByte(feeLevel wallet.FeeLevel) int64 {
 	return w.feeProvider.GetFeePerByte(feeLevel)
 }
 
-func LockTimeFromRedeemScript(redeemScript []byte) (uint32, error) {
-	if len(redeemScript) < 113 {
-		return 0, errors.New("redeem script invalid length")
+func (w *BtcElectrumWallet) EstimateFee(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, feePerByte int64) int64 {
+	tx := new(wire.MsgTx)
+	for _, out := range outs {
+		scriptPubKey, _ := txscript.PayToAddrScript(out.Address)
+		output := wire.NewTxOut(out.Value, scriptPubKey)
+		tx.TxOut = append(tx.TxOut, output)
 	}
-	if redeemScript[106] != 103 {
-		return 0, errors.New("rnvalid redeem script")
-	}
-	if redeemScript[107] == 0 {
-		return 0, nil
-	}
-	if 81 <= redeemScript[107] && redeemScript[107] <= 96 {
-		return uint32((redeemScript[107] - 81) + 1), nil
-	}
-	var v []byte
-	op := redeemScript[107]
-	if 1 <= op && op <= 75 {
-		for i := 0; i < int(op); i++ {
-			v = append(v, []byte{redeemScript[108+i]}...)
-		}
-	} else {
-		return 0, errors.New("too many bytes pushed for sequence")
-	}
-	var result int64
-	for i, val := range v {
-		result |= int64(val) << uint8(8*i)
-	}
-
-	return uint32(result), nil
+	estimatedSize := EstimateSerializeSize(len(ins), tx.TxOut, false, P2PKH)
+	fee := estimatedSize * int(feePerByte)
+	return int64(fee)
 }
+
+//TODO: FUTURE:
+// func LockTimeFromRedeemScript(redeemScript []byte) (uint32, error) {
+// 	if len(redeemScript) < 113 {
+// 		return 0, errors.New("redeem script invalid length")
+// 	}
+// 	if redeemScript[106] != 103 {
+// 		return 0, errors.New("rnvalid redeem script")
+// 	}
+// 	if redeemScript[107] == 0 {
+// 		return 0, nil
+// 	}
+// 	if 81 <= redeemScript[107] && redeemScript[107] <= 96 {
+// 		return uint32((redeemScript[107] - 81) + 1), nil
+// 	}
+// 	var v []byte
+// 	op := redeemScript[107]
+// 	if 1 <= op && op <= 75 {
+// 		for i := 0; i < int(op); i++ {
+// 			v = append(v, []byte{redeemScript[108+i]}...)
+// 		}
+// 	} else {
+// 		return 0, errors.New("too many bytes pushed for sequence")
+// 	}
+// 	var result int64
+// 	for i, val := range v {
+// 		result |= int64(val) << uint8(8*i)
+// 	}
+
+// 	return uint32(result), nil
+// }

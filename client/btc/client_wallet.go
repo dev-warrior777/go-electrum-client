@@ -101,7 +101,7 @@ func (ec *BtcElectrumClient) Spend(
 		return -1, "", "", err
 	}
 
-	changeIndex, wireTx, err := w.Spend(pw, amount, address, feeLevel, false)
+	changeIndex, wireTx, err := w.Spend(pw, amount, address, feeLevel)
 	if err != nil {
 		return -1, "", "", err
 	}
@@ -128,8 +128,8 @@ func (ec *BtcElectrumClient) RpcBroadcast(rawTx string, changeIndex int) (string
 		return "", err
 	}
 	r := bytes.NewBuffer(txBytes)
-	wireMsgTx := wire.NewMsgTx(1)
-	wireMsgTx.BtcDecode(r, 1, wire.WitnessEncoding)
+	wireMsgTx := wire.NewMsgTx(wire.TxVersion)
+	wireMsgTx.BtcDecode(r, wire.ProtocolVersion, wire.WitnessEncoding)
 	bc := client.BroadcastParams{
 		Tx:          wireMsgTx,
 		ChangeIndex: changeIndex,

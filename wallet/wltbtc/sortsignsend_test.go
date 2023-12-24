@@ -129,9 +129,7 @@ func Test_gatherCoins(t *testing.T) {
 	os.Remove("headers.bin")
 }
 
-// We do pure segwit inputs only for now. No mixed inputs. The wallet is segwit
-// by default. Later if there is a use case we can add the 30% extra code needed
-// for that such as wrapped P2SH-P2WPKH, etc.
+// The wallet is segwit by default.
 func Test_newSegwitTransaction(t *testing.T) {
 	w := MockWallet()
 	w.blockchainTip = 500
@@ -187,13 +185,15 @@ func Test_newSegwitTransaction(t *testing.T) {
 		int64(3000000),
 		address,
 		wallet.NORMAL,
-		false,
 	)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
+// The wallet is segwit by default. But we may want to spend from a legacy address
+// we previously passed to an entity (CEX?) that does not yet send to segwit bech32
+// addresses. Hopefully never!
 func Test_newLegacyTransaction(t *testing.T) {
 	w := MockWallet()
 	w.blockchainTip = 500
@@ -247,7 +247,6 @@ func Test_newLegacyTransaction(t *testing.T) {
 		int64(100000),
 		address,
 		wallet.NORMAL,
-		false,
 	)
 	if err != nil {
 		t.Error(err)
