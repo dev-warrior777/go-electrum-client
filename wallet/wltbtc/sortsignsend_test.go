@@ -2,7 +2,6 @@ package wltbtc
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -21,8 +20,8 @@ import (
 
 var test_mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
 
-func makeRegtestSeed(mnemonic string) ([]byte, error) {
-	return bip39.NewSeedWithErrorChecking(test_mnemonic, "")
+func makeRegtestSeed(mnemonic string) []byte {
+	return bip39.NewSeed(test_mnemonic, "")
 }
 
 func createTxStore() (*TxStore, *StorageManager) {
@@ -36,14 +35,8 @@ func createTxStore() (*TxStore, *StorageManager) {
 		&mockSubscriptionsStore{make(map[string]*wallet.Subscription)},
 	}
 
-	var seed []byte
-	seed, err := makeRegtestSeed(test_mnemonic)
-	if err != nil {
-		// make random seed
-		seed := make([]byte, 32)
-		rand.Read(seed)
-		fmt.Println("Made random seed")
-	}
+	seed = makeRegtestSeed(test_mnemonic)
+	fmt.Println("Made test seed")
 	key, _ := hdkeychain.NewMaster(seed, &chaincfg.RegressionNetParams)
 	km, _ := NewKeyManager(mockDb.Keys(), &chaincfg.RegressionNetParams, key)
 	sm := NewStorageManager(mockDb.Enc(), &chaincfg.RegressionNetParams)
@@ -148,7 +141,6 @@ func Test_newSegwitTransaction(t *testing.T) {
 	// make one utxo
 	txid := "50b636d971e7d4d918d92876d6d53a22ccc960e051f540108056ca4ad6ec080c"
 	vout := 0
-	// witnessProgram := "0014a30a0cf1da8c0c36ae8d637b674663ccf2b31e45"
 	witnessProgram := "a30a0cf1da8c0c36ae8d637b674663ccf2b31e45"
 	h1Txid, err := chainhash.NewHashFromStr(txid)
 	if err != nil {
@@ -165,7 +157,8 @@ func Test_newSegwitTransaction(t *testing.T) {
 		t.Error(err)
 	}
 
-	// fmt.Println("Segwit address", segwitAddress.EncodeAddress())
+	fmt.Println("Segwit address", segwitAddress.EncodeAddress())
+
 	script, err := txscript.PayToAddrScript(segwitAddress)
 	if err != nil {
 		t.Error(err)
@@ -188,8 +181,8 @@ func Test_newSegwitTransaction(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
 	_, _, err = w.Spend(
-		// changeIndex, tx, err := w.Spend(
 		"abc",
 		int64(3000000),
 		address,
@@ -197,47 +190,59 @@ func Test_newSegwitTransaction(t *testing.T) {
 		false,
 	)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 }
 
 func Test_newLegacyTransaction(t *testing.T) {
 	w := MockWallet()
-	w.blockchainTip = 100
+	w.blockchainTip = 500
+
 	// make one utxo
-	txid := "6f7a58ad92702601fcbaac0e039943a384f5274a205c16bb8bbab54f9ea2fbad"
-	h1, err := chainhash.NewHashFromStr(txid)
+	txid := "50b636d971e7d4d918d92876d6d53a22ccc960e051f540108056ca4ad6ec080c"
+	vout := 0
+	scriptAddress := "a30a0cf1da8c0c36ae8d637b674663ccf2b31e45"
+	h1Txid, err := chainhash.NewHashFromStr(txid)
 	if err != nil {
 		t.Error(err)
 	}
-	key1, err := w.keyManager.GetFreshKey(wallet.EXTERNAL)
+	h1OutIndex := uint32(vout)
+	h1ScriptAddress, err := hex.DecodeString(scriptAddress)
 	if err != nil {
 		t.Error(err)
 	}
-	addr1, err := key1.Address(&chaincfg.RegressionNetParams)
-	if err != nil {
+
+	legacyAddress, lgerr := btcutil.NewAddressPubKeyHash(h1ScriptAddress, w.params)
+	if lgerr != nil {
 		t.Error(err)
 	}
-	script1, err := w.AddressToScript(addr1)
+
+	fmt.Println("legacy address", legacyAddress.EncodeAddress())
+
+	script, err := txscript.PayToAddrScript(legacyAddress)
 	if err != nil {
 		t.Error(err)
 	}
 	op := wire.OutPoint{
-		Hash:  *h1,
-		Index: 0,
+		Hash:  *h1Txid,
+		Index: h1OutIndex,
 	}
-	err = w.txstore.Utxos().Put(wallet.Utxo{Op: op, ScriptPubkey: script1, AtHeight: 5, Value: 200000})
+	err = w.txstore.Utxos().Put(wallet.Utxo{
+		Op:           op,
+		ScriptPubkey: script,
+		AtHeight:     421,
+		Value:        10030000})
 	if err != nil {
 		t.Error(err)
 	}
 
-	/////////////////////// maybe set up more utxos later ////////////////////
-
+	// to harness ->
 	address, err := btcutil.DecodeAddress("bcrt1q322tg0y2hzyp9zztr7d2twdclhqg88anvzxwwr", &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
 	}
-	changeIndex, tx, err := w.Spend(
+
+	_, _, err = w.Spend(
 		"abc",
 		int64(100000),
 		address,
@@ -247,5 +252,4 @@ func Test_newLegacyTransaction(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	fmt.Println(tx.TxHash().String(), changeIndex)
 }

@@ -5,13 +5,13 @@ package wltbtc
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/coinset"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/btcutil/txsort"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -20,16 +20,34 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-func (w *BtcElectrumWallet) Broadcast(tx *wire.MsgTx) error {
-	// Our own tx; don't keep track of false positives
-	_, err := w.txstore.AddTransaction(tx, 0, time.Now())
-	if err != nil {
-		return err
-	}
+// secretSource is used to locate keys and redemption scripts while signing a
+// transaction. secretSource satisfies the txauthor.SecretsSource interface.
+type secretSource struct {
+	w *BtcElectrumWallet
+}
 
-	fmt.Printf("Broadcasting tx %s to electrumX server", tx.TxHash().String())
-	//TODO: move to client, wallets don't broadcast
-	return nil
+// ChainParams returns the chain parameters.
+func (ss *secretSource) ChainParams() *chaincfg.Params {
+	return ss.w.params
+}
+
+// GetKey fetches a private key for the specified address.
+func (ss *secretSource) GetKey(address btcutil.Address) (*btcec.PrivateKey, bool, error) {
+	extKey, err := ss.w.keyManager.GetKeyForScript(address.ScriptAddress())
+	if err != nil {
+		return nil, false, err
+	}
+	privKey, err := extKey.ECPrivKey()
+	if err != nil {
+		return nil, false, err
+	}
+	return privKey, true, nil
+}
+
+// GetScript fetches the redemption script for the specified p2sh/p2wsh address.
+func (ss *secretSource) GetScript(address btcutil.Address) ([]byte, error) {
+	return txscript.PayToAddrScript(address)
+	// return nil, nil
 }
 
 type Coin struct {
@@ -163,14 +181,14 @@ func (w *BtcElectrumWallet) EstimateSpendFee(amount int64, feeLevel wallet.FeeLe
 }
 
 // buildTx builds a normal Pay to (witness) pubb key hash transaction.
-func (w *BtcElectrumWallet) buildTx(amount int64, addr btcutil.Address, feeLevel wallet.FeeLevel, optionalOutput *wire.TxOut) (int, *wire.MsgTx, error) {
+func (w *BtcElectrumWallet) buildTx(amount int64, address btcutil.Address, feeLevel wallet.FeeLevel, optionalOutput *wire.TxOut) (int, *wire.MsgTx, error) {
 	// Check for dust
-	script, _ := txscript.PayToAddrScript(addr)
+	script, _ := txscript.PayToAddrScript(address)
 	if w.IsDust(amount) {
 		return -1, nil, wallet.ErrDustAmount
 	}
 
-	var prevScripts map[wire.OutPoint][]byte
+	var prevScripts map[wire.OutPoint]*wire.TxOut
 	var keysByAddress map[string]*btcutil.WIF
 
 	// create input source
@@ -186,15 +204,16 @@ func (w *BtcElectrumWallet) buildTx(amount int64, addr btcutil.Address, feeLevel
 		if err != nil {
 			return total, inputs, []btcutil.Amount{}, scripts, wallet.ErrInsufficientFunds
 		}
-		prevScripts = make(map[wire.OutPoint][]byte)
+		prevScripts = make(map[wire.OutPoint]*wire.TxOut)
 		keysByAddress = make(map[string]*btcutil.WIF)
 		for _, c := range coins.Coins() {
 			total += c.Value()
 			outpoint := wire.NewOutPoint(c.Hash(), c.Index())
 			in := wire.NewTxIn(outpoint, []byte{}, [][]byte{})
-			in.Sequence = 0 // Opt-in RBF so we can bump fees //TODO: change this ffffffff
+			in.Sequence = uint32(0xffffffff)
+			// in.Sequence = 0 // Opt-in RBF so we can bump fees //TODO: change this ffffffff
 			inputs = append(inputs, in)
-			prevScripts[*outpoint] = c.PkScript()
+			prevScripts[*outpoint] = wire.NewTxOut(int64(c.Value()), c.PkScript())
 			key := coinMap[c]
 			addr, err := key.Address(w.params)
 			if err != nil {
@@ -206,6 +225,7 @@ func (w *BtcElectrumWallet) buildTx(amount int64, addr btcutil.Address, feeLevel
 			}
 			wif, _ := btcutil.NewWIF(privKey, w.params, true)
 			keysByAddress[addr.EncodeAddress()] = wif
+			privKey.Zero()
 		}
 		return total, inputs, []btcutil.Amount{}, scripts, nil
 	}
@@ -254,19 +274,19 @@ func (w *BtcElectrumWallet) buildTx(amount int64, addr btcutil.Address, feeLevel
 	// from legacy ones; both for signing and pushing.
 
 	// currently we support:
-	// native P2WPKH or P2WSH
+	// native segwit P2WPKH or P2WSH
 	gotNativeSegwitInputs := false
 	// legacy P2PKH
 	gotLegacyP2PKHInputs := false
 
 	for k, v := range prevScripts {
 		fmt.Println("prevScripts[", k.String(), "]", k.String(), v)
-		if len(v) < 22 { // sanity only
+		if len(v.PkScript) < 22 { // sanity only
 			continue
 		}
-		if v[0] == 0x00 && (v[1] == 0x14 || v[1] == 0x20) {
+		if v.PkScript[0] == 0x00 && (v.PkScript[1] == 0x14 || v.PkScript[1] == 0x20) {
 			gotNativeSegwitInputs = true
-		} else if v[0] == 0x76 && v[1] == 0xa9 {
+		} else if v.PkScript[0] == 0x76 && v.PkScript[1] == 0xa9 {
 			gotLegacyP2PKHInputs = true
 		}
 	}
@@ -277,12 +297,12 @@ func (w *BtcElectrumWallet) buildTx(amount int64, addr btcutil.Address, feeLevel
 		return -1, nil, errors.New("mixed segwit & legacy inputs not supported")
 	}
 
-	if gotNativeSegwitInputs {
-		return w.segwitSign(authoredTx, prevScripts, keysByAddress)
-	}
-
 	if gotLegacyP2PKHInputs {
 		return w.legacySign(authoredTx, prevScripts, keysByAddress)
+	}
+
+	if gotNativeSegwitInputs {
+		return w.segwitSign(authoredTx, prevScripts, keysByAddress)
 	}
 
 	return -1, nil, errors.New("unknown input types")
@@ -292,7 +312,8 @@ func (w *BtcElectrumWallet) buildTx(amount int64, addr btcutil.Address, feeLevel
 // Pre-Segwit signing only. But this wallet is segwit by default.
 func (w *BtcElectrumWallet) legacySign(
 	authoredTx *txauthor.AuthoredTx,
-	prevScripts map[wire.OutPoint][]byte,
+	prevScripts map[wire.OutPoint]*wire.TxOut,
+	// prevScripts map[wire.OutPoint][]byte,
 	keysByAddress map[string]*btcutil.WIF) (int, *wire.MsgTx, error) {
 	// Sign tx
 	getKey := txscript.KeyClosure(func(addr btcutil.Address) (*btcec.PrivateKey, bool, error) {
@@ -305,7 +326,7 @@ func (w *BtcElectrumWallet) legacySign(
 		return []byte{}, nil
 	})
 	for i, txIn := range authoredTx.Tx.TxIn {
-		prevOutScript := prevScripts[txIn.PreviousOutPoint]
+		prevOutScript := prevScripts[txIn.PreviousOutPoint].PkScript
 		script, err := txscript.SignTxOutput(w.params,
 			authoredTx.Tx, i, prevOutScript, txscript.SigHashAll, getKey,
 			getScript, txIn.SignatureScript)
@@ -319,10 +340,27 @@ func (w *BtcElectrumWallet) legacySign(
 
 func (w *BtcElectrumWallet) segwitSign(
 	authoredTx *txauthor.AuthoredTx,
-	prevScripts map[wire.OutPoint][]byte,
+	prevScripts map[wire.OutPoint]*wire.TxOut,
+	// prevScripts map[wire.OutPoint][]byte,
 	keysByAddress map[string]*btcutil.WIF) (int, *wire.MsgTx, error) {
 
-	return -1, nil, errors.New("segwit testing - implementing segwit tx signing")
+	var prevPkScripts [][]byte
+	var inputValues []btcutil.Amount
+	for _, txIn := range authoredTx.Tx.TxIn {
+		op := txIn.PreviousOutPoint
+		prevOut := prevScripts[op]
+		inputValues = append(inputValues, btcutil.Amount(prevOut.Value))
+		prevPkScripts = append(prevPkScripts, prevOut.PkScript)
+		// Zero the previous witness and signature script or else
+		// AddAllInputScripts does some weird stuff.
+		txIn.SignatureScript = nil
+		txIn.Witness = nil
+	}
+	err := txauthor.AddAllInputScripts(authoredTx.Tx, prevPkScripts, inputValues, &secretSource{w})
+	if err != nil {
+		return -1, nil, err
+	}
+	return authoredTx.ChangeIndex, authoredTx.Tx, nil
 }
 
 func (w *BtcElectrumWallet) buildSpendAllTx(addr btcutil.Address, feeLevel wallet.FeeLevel) (*wire.MsgTx, error) {
