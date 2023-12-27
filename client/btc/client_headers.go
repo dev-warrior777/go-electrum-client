@@ -20,7 +20,7 @@ func (ec *BtcElectrumClient) SyncHeaders() error {
 // SyncClientHeaders reads blockchain_headers file, then gets any missing block from
 // end of file to current tip from server. The current set of headers is also
 // stored in headers map and the chain verified by checking previous block
-// hashes backwards from Tip.
+// hashes backwards from local Tip.
 // SyncClientHeaders is part of the ElectrumClient interface inmplementation
 func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	h := ec.clientHeaders
@@ -46,11 +46,9 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	// 2. Gather new block headers we did not have in file up to current tip
 
 	// Do not make block count too big or electrumX may throttle response
-	// as an anti ddos measure. But my experience is that after say 1500
-	// blocks the server disconnects. Need to find a way to down load full
-	// chain of headers from our startPoint (checkpoint) without disconnecting.
-	// Regtest no problem, testnet ~1500 at a time.
-	blockDelta := 512
+	// as an anti ddos measure. ElectrumX Doc.: "Recommended to be at least one
+	// bitcoin difficulty retarget period, i.e. 2016."
+	blockDelta := 2016
 	var doneGathering = false
 	var startHeight = startPointHeight + numHeaders
 	var blockCount = blockDelta
@@ -63,7 +61,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	}
 	count := hdrsRes.Count
 
-	fmt.Print("Count: ", count, " read from server at Height: ", startHeight)
+	fmt.Print("Count: ", count, " read from server at Height: ", startHeight, "max: ", hdrsRes.Max)
 
 	if count > 0 {
 		b, err := hex.DecodeString(hdrsRes.HexConcat)
@@ -104,7 +102,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 			}
 			count = hdrsRes.Count
 
-			fmt.Print("Count: ", count, " read from server at Height: ", startHeight)
+			fmt.Print("Count: ", count, " read from server at Height: ", startHeight, " max:", hdrsRes.Max)
 
 			if count > 0 {
 				b, err := hex.DecodeString(hdrsRes.HexConcat)

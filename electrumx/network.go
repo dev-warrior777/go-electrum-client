@@ -85,7 +85,7 @@ func (sc *ServerConn) listen(ctx context.Context) {
 	defer sc.closeHeadersNotify()    // close the single headers notify channel
 	defer sc.closeScripthashNotify() // close the single scripthash notify channel
 
-	reader := bufio.NewReader(io.LimitReader(sc.conn, 1<<18))
+	reader := bufio.NewReaderSize((sc.conn), 2016*80*16)
 
 	for {
 		if ctx.Err() != nil {
