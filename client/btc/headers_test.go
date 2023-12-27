@@ -104,7 +104,7 @@ func TestAppendHeaders(t *testing.T) {
 		hdrFilePath: path.Join("/tmp", fname),
 		net:         &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]wire.BlockHeader),
-		hdrsTip:     0,
+		tip:         0,
 		synced:      false,
 	}
 
@@ -153,10 +153,10 @@ func TestAppendHeaders(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	h.hdrsTip = maybeTip
+	h.tip = maybeTip
 
 	// verify chain
-	fmt.Println("verifying back from tip at height", h.hdrsTip)
+	fmt.Println("verifying back from tip at height", h.tip)
 	err = h.VerifyAll()
 	if err != nil {
 		log.Fatal(err)
@@ -194,12 +194,12 @@ func TestReadStoreHeaderFile(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	h.hdrsTip = numHdrs - 1
+	h.tip = numHdrs - 1
 	fmt.Printf("stored %d headers into hdrs map at height %d\n", numHdrs, 0)
 
 	// verify chain
 	var height int64
-	for height = h.hdrsTip; height > 0; height-- {
+	for height = h.tip; height > 0; height-- {
 		thisHdr := h.hdrs[height]
 		prevHdr := h.hdrs[height-1]
 		prevHdrBlkHash := prevHdr.BlockHash()
@@ -306,6 +306,6 @@ func TestMapIter(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	h.hdrsTip = numHeaders - 1
+	h.tip = numHeaders - 1
 	h.DumpAll()
 }

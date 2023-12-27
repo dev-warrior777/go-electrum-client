@@ -33,10 +33,11 @@ type Headers struct {
 	// checkpoint height to start the file. For regtest that is genesis.
 	net *chaincfg.Params
 	// decoded headers stored by height
-	hdrsMtx sync.RWMutex
-	hdrs    map[int64]wire.BlockHeader
-	hdrsTip int64
-	synced  bool
+	hdrsMtx    sync.RWMutex
+	hdrs       map[int64]wire.BlockHeader
+	startPoint int64
+	tip        int64
+	synced     bool
 }
 
 func NewHeaders(cfg *client.ClientConfig) *Headers {
@@ -47,10 +48,25 @@ func NewHeaders(cfg *client.ClientConfig) *Headers {
 		hdrFilePath: filePath,
 		net:         cfg.Params,
 		hdrs:        hdrsMap,
-		hdrsTip:     0,
+		startPoint:  getStartPointHeight(cfg),
+		tip:         0,
 		synced:      false,
 	}
 	return &hdrs
+}
+
+// stored Headers start from here
+func getStartPointHeight(cfg *client.ClientConfig) int64 {
+	var startAtHeight int64 = 0
+	switch cfg.Params {
+	case &chaincfg.RegressionNetParams:
+		startAtHeight = 0
+	case &chaincfg.TestNet3Params:
+		startAtHeight = int64(2560000)
+	case &chaincfg.MainNetParams:
+		startAtHeight = int64(823000)
+	}
+	return startAtHeight
 }
 
 func (h *Headers) ClearMap() {
@@ -59,7 +75,7 @@ func (h *Headers) ClearMap() {
 }
 
 func (h *Headers) Tip() int64 {
-	return h.hdrsTip
+	return h.tip
 }
 
 func (h *Headers) Synced() bool {
@@ -176,12 +192,12 @@ func (h *Headers) Store(b []byte, startHeight int64) error {
 // Verify headers prev hash back from tip. If all is true depth is ignored
 // and the whole chain is verified
 func (h *Headers) VerifyFromTip(depth int64, all bool) error {
-	downTo := h.hdrsTip - depth
+	downTo := h.tip - depth
 	if downTo < 0 || all {
-		downTo = 0
+		downTo = h.startPoint
 	}
 	var height int64
-	for height = h.hdrsTip; height > downTo; height-- {
+	for height = h.tip; height > downTo; height-- {
 		thisHdr := h.hdrs[height]
 		prevHdr := h.hdrs[height-1]
 		prevHdrBlkHash := prevHdr.BlockHash()
@@ -216,7 +232,7 @@ func (h *Headers) DumpAt(height int64) {
 
 func (h *Headers) DumpAll() {
 	var k int64
-	for k = 0; k <= h.hdrsTip; k++ {
+	for k = 0; k <= h.tip; k++ {
 		h.DumpAt(k)
 	}
 }

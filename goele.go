@@ -1,6 +1,6 @@
 package main
 
-// Run goele as an app
+// Run goele as an app for testing
 
 import (
 	"errors"
@@ -89,6 +89,20 @@ func configure() (*client.ClientConfig, error) {
 	return makeBasicConfig(*coin, *net)
 }
 
+func checkSimnetHelp(cfg *client.ClientConfig) string {
+	var help string
+	switch cfg.Params {
+	case &chaincfg.RegressionNetParams:
+		help = "check out simnet harness scripts at client/btc/test_harness\n" +
+			"README.md, src_harness.sh & ex.sh\n" +
+			"Then when goele starts navigate to client/btc/rpctest and use the\n" +
+			"minimalist rpc test client"
+	default:
+		help = "is ElectrumX server up and running?"
+	}
+	return help
+}
+
 func main() {
 	fmt.Println("Goele", client.GoeleVersion)
 	cfg, err := configure()
@@ -105,7 +119,7 @@ func main() {
 	ec.CreateNode(client.SingleNode)
 	err = ec.GetNode().Start()
 	if err != nil {
-		fmt.Println(err, " - exiting, \ncheckout client/btc/test_harness\nsource harness.sh + ex.sh  - ")
+		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
 		os.Exit(1)
 	}
 
@@ -132,8 +146,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// set up Notify for all our receive addresses and get any changes to the
-	// state of the transaction history from the node
+	// set up Notify for all our extant receive addresses and get any changes to
+	// the state of the transaction history from the node
 	err = ec.SyncWallet()
 	if err != nil {
 		ec.GetNode().Stop()

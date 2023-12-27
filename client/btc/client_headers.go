@@ -25,6 +25,8 @@ func (ec *BtcElectrumClient) SyncHeaders() error {
 func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	h := ec.clientHeaders
 
+	startPointHeight := h.startPoint
+
 	// 1. Read last stored blockchain_headers file for this network
 
 	b, err := h.ReadAllBytesFromFile()
@@ -39,16 +41,19 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	}
 	b = nil // gc
 
-	var maybeTip int64 = numHeaders - 1
+	var maybeTip int64 = startPointHeight + numHeaders - 1
 
 	// 2. Gather new block headers we did not have in file up to current tip
 
 	// Do not make block count too big or electrumX may throttle response
-	// as an anti ddos measure. Magic number 2016 from electrum code
-	const blockDelta = 20 // 20 dev 2016 pro
+	// as an anti ddos measure. But my experience is that after say 1500
+	// blocks the server disconnects. Need to find a way to down load full
+	// chain of headers from our startPoint (checkpoint) without disconnecting.
+	// Regtest no problem, testnet ~1500 at a time.
+	blockDelta := 512
 	var doneGathering = false
-	var startHeight = numHeaders
-	var blockCount = 20
+	var startHeight = startPointHeight + numHeaders
+	var blockCount = blockDelta
 
 	node := ec.GetNode()
 
@@ -83,7 +88,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 
 	for !doneGathering {
 
-		startHeight += blockDelta
+		startHeight += int64(blockDelta)
 
 		select {
 
@@ -92,7 +97,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 			node.Stop()
 			return nil
 
-		case <-time.After(time.Millisecond * 33):
+		case <-time.After(time.Millisecond * 1000):
 			hdrsRes, err := node.BlockHeaders(startHeight, blockCount)
 			if err != nil {
 				return err
@@ -130,14 +135,14 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	}
 
 	// 4. Store all headers in a map
-	err = h.Store(b2, 0)
+	err = h.Store(b2, startPointHeight)
 	if err != nil {
 		return err
 	}
-	h.hdrsTip = maybeTip
+	h.tip = maybeTip
 
 	// 5. Verify headers in headers map
-	fmt.Printf("starting verify at height %d\n", h.hdrsTip)
+	fmt.Printf("starting verify at height %d\n", h.tip)
 	err = h.VerifyAll()
 	if err != nil {
 		return err
@@ -145,7 +150,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	fmt.Println("header chain verified")
 
 	h.synced = true
-	fmt.Println("headers synced up to tip ", h.hdrsTip)
+	fmt.Println("headers synced up to tip ", h.tip)
 	ec.updateWalletTip()
 	return nil
 }
@@ -164,7 +169,7 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 	h := ec.clientHeaders
 
 	// local tip for calculation before storage
-	maybeTip := h.hdrsTip
+	maybeTip := h.tip
 
 	node := ec.GetNode()
 
@@ -222,7 +227,7 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 							}
 
 							// update tip / local tip / wallet tip
-							h.hdrsTip = x.Height
+							h.tip = x.Height
 							maybeTip = x.Height
 							ec.updateWalletTip()
 
@@ -264,7 +269,7 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 								}
 
 								// update tip / local tip
-								h.hdrsTip = x.Height
+								h.tip = x.Height
 								maybeTip = x.Height
 								ec.updateWalletTip()
 
@@ -286,5 +291,5 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 
 func (ec *BtcElectrumClient) Tip() (int64, bool) {
 	h := ec.clientHeaders
-	return h.hdrsTip, h.synced
+	return h.tip, h.synced
 }
