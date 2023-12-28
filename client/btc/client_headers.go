@@ -9,6 +9,7 @@ import (
 
 // SyncHeaders uodates the client headers and then subscribes for new update
 // tip notifications and listens for them
+// SyncHeaders is part of the ElectrumClient interface inmplementation
 func (ec *BtcElectrumClient) SyncHeaders() error {
 	err := ec.SyncClientHeaders()
 	if err != nil {
@@ -17,14 +18,14 @@ func (ec *BtcElectrumClient) SyncHeaders() error {
 	return ec.SubscribeClientHeaders()
 }
 
-// SyncClientHeaders reads blockchain_headers file, then gets any missing block from
-// end of file to current tip from server. The current set of headers is also
-// stored in headers map and the chain verified by checking previous block
+// SyncClientHeaders reads blockchain_headers file, then gets any missing block
+// from end of file to current tip from server. The current set of headers is
+// also stored in headers map and the chain verified by checking previous block
 // hashes backwards from local Tip.
-// SyncClientHeaders is part of the ElectrumClient interface inmplementation
 func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	h := ec.clientHeaders
 
+	// we start from a recent height for testnet/mainnet
 	startPointHeight := h.startPoint
 
 	// 1. Read last stored blockchain_headers file for this network
@@ -48,10 +49,9 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	// Do not make block count too big or electrumX may throttle response
 	// as an anti ddos measure. ElectrumX Doc.: "Recommended to be at least one
 	// bitcoin difficulty retarget period, i.e. 2016."
-	blockDelta := 2016
+	var blockCount = 2016
 	var doneGathering = false
 	var startHeight = startPointHeight + numHeaders
-	var blockCount = blockDelta
 
 	node := ec.GetNode()
 
@@ -77,7 +77,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 		fmt.Println(" Appended: ", nh, " headers at ", startHeight, " maybeTip ", maybeTip)
 	}
 
-	if count < blockDelta {
+	if count < blockCount {
 		fmt.Println("\nDone gathering")
 		doneGathering = true
 	}
@@ -86,7 +86,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 
 	for !doneGathering {
 
-		startHeight += int64(blockDelta)
+		startHeight += int64(blockCount)
 
 		select {
 
@@ -118,7 +118,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 				fmt.Println(" Appended: ", nh, " headers at ", startHeight, " maybeTip ", maybeTip)
 			}
 
-			if count < blockDelta {
+			if count < blockCount {
 				fmt.Println("\nDone gathering")
 				doneGathering = true
 			}

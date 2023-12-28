@@ -58,7 +58,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 	case "regtest", "simnet":
 		cfg.Params = &chaincfg.RegressionNetParams
 		cfg.TrustedPeer = electrumx.ServerAddr{
-			Net: "tcp", Addr: "127.0.0.1:53002",
+			Net: "ssl", Addr: "127.0.0.1:53002",
 		}
 		cfg.StoreEncSeed = true
 		cfg.Testing = true
@@ -126,7 +126,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// get up to date with client's copy of the needed blockchain headers
+	// get up to date with client's copy of the blockchain headers
 	fmt.Println("syncing headers")
 	err = ec.SyncHeaders()
 	if err != nil {
@@ -136,12 +136,13 @@ func main() {
 	}
 
 	// make the client's wallet
+
+	// for non-mainnet testing recreate a wallet with a known set of keys ..
 	var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
 	err = ec.RecreateWallet("abc", mnemonic)
 
-	//or
+	// or, more for production usage: load the client's wallet
 
-	// load the client's wallet
 	// err = ec.LoadWallet("abc")
 	if err != nil {
 		ec.GetNode().Stop()
@@ -149,8 +150,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// set up Notify for all our extant receive addresses and get any changes to
-	// the state of the transaction history from the node
+	// set up Notify for all our already given out receive addresses (getunusedaddress)
+	// and broadcasted change addresses in order to receive any changes to the state of
+	// the address history from the node
 	err = ec.SyncWallet()
 	if err != nil {
 		ec.GetNode().Stop()

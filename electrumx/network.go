@@ -85,6 +85,9 @@ func (sc *ServerConn) listen(ctx context.Context) {
 	defer sc.closeHeadersNotify()    // close the single headers notify channel
 	defer sc.closeScripthashNotify() // close the single scripthash notify channel
 
+	// make a reader with a buffer big enough to handle initial sync download
+	// of block headers from ElectrumX -> client in chunks of 2016 headers for
+	// each request. Chunks * Header size * safety margin.
 	reader := bufio.NewReaderSize((sc.conn), 2016*80*16)
 
 	for {
