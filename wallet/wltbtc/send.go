@@ -78,6 +78,7 @@ func (w *BtcElectrumWallet) gatherCoins(excludeUnconfirmed bool) map[coinset.Coi
 	tip := w.blockchainTip
 	utxos, _ := w.txstore.Utxos().GetAll()
 	m := make(map[coinset.Coin]*hdkeychain.ExtendedKey)
+	var c coinset.Coin
 	for _, u := range utxos {
 		if u.WatchOnly {
 			continue
@@ -92,7 +93,7 @@ func (w *BtcElectrumWallet) gatherCoins(excludeUnconfirmed bool) map[coinset.Coi
 		if u.AtHeight > 0 {
 			confirmations = tip - u.AtHeight
 		}
-		c := NewCoin(&u.Op.Hash, u.Op.Index, btcutil.Amount(u.Value), confirmations, u.ScriptPubkey)
+		c = NewCoin(&u.Op.Hash, u.Op.Index, btcutil.Amount(u.Value), confirmations, u.ScriptPubkey)
 		addr, err := w.ScriptToAddress(u.ScriptPubkey)
 		if err != nil {
 			continue

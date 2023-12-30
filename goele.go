@@ -66,7 +66,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		cfg.Params = &chaincfg.TestNet3Params
 		cfg.TrustedPeer = electrumx.ServerAddr{
 			// Net: "ssl", Addr: "testnet.aranguren.org:51002",
-			// Net: "tcp", Addr: "testnet.aranguren.org:51001", // ~1500 headers
+			// Net: "tcp", Addr: "testnet.aranguren.org:51001",
 			Net: "ssl", Addr: "blockstream.info:993",
 			// Net: "tcp", Addr: "blockstream.info:143",
 		}
