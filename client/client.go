@@ -18,7 +18,6 @@ package client
 // It is implemented for each coin asset client.
 
 import (
-	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
@@ -35,16 +34,11 @@ const (
 const (
 	// Electrum Wallet
 	GAP_LIMIT = 10
-	AGEDTX    = 3
 )
 
 type BroadcastParams struct {
-	Tx              *wire.MsgTx
-	PrevScripts     [][]byte
-	PrevInputValues []btcutil.Amount
-	TotalInput      btcutil.Amount
-	ChangeIndex     int // negative if no change
-	RedeemScripts   [][]byte
+	Tx          *wire.MsgTx
+	ChangeIndex int
 }
 
 type ElectrumClient interface {

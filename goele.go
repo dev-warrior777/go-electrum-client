@@ -162,7 +162,7 @@ func main() {
 		// }
 		//<- uncomment to create
 
-		// comment when doing initial creation_->
+		// comment out when doing initial creation_->
 		// load the client's wallet
 		// canyon trip truly ritual lonely quiz romance rose alone journey like bronze
 		err := ec.LoadWallet("abc")
@@ -171,7 +171,7 @@ func main() {
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}
-		//<- comment when doing initial creation
+		//<- comment out when doing initial creation
 
 	} else if net == "mainnet" {
 		// production usage: load the client's wallet
