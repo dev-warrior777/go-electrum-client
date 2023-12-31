@@ -4,11 +4,11 @@ package wltbtc
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/coinset"
-	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/btcutil/txsort"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -47,7 +47,8 @@ func (ss *secretSource) GetScript(address btcutil.Address) ([]byte, error) {
 	return txscript.PayToAddrScript(address)
 }
 
-type Coin struct {
+// satisfies coinset.Coin
+type unspentCoin struct {
 	TxHash       *chainhash.Hash
 	TxIndex      uint32
 	TxValue      btcutil.Amount
@@ -55,30 +56,29 @@ type Coin struct {
 	ScriptPubKey []byte
 }
 
-func (c *Coin) Hash() *chainhash.Hash { return c.TxHash }
-func (c *Coin) Index() uint32         { return c.TxIndex }
-func (c *Coin) Value() btcutil.Amount { return c.TxValue }
-func (c *Coin) PkScript() []byte      { return c.ScriptPubKey }
-func (c *Coin) NumConfs() int64       { return c.TxNumConfs }
-func (c *Coin) ValueAge() int64       { return int64(c.TxValue) * c.TxNumConfs }
+func (c *unspentCoin) Hash() *chainhash.Hash { return c.TxHash }
+func (c *unspentCoin) Index() uint32         { return c.TxIndex }
+func (c *unspentCoin) Value() btcutil.Amount { return c.TxValue }
+func (c *unspentCoin) PkScript() []byte      { return c.ScriptPubKey }
+func (c *unspentCoin) NumConfs() int64       { return c.TxNumConfs }
+func (c *unspentCoin) ValueAge() int64       { return int64(c.TxValue) * c.TxNumConfs }
 
-func NewCoin(txHash *chainhash.Hash, index uint32, value btcutil.Amount, numConfs int64, scriptPubKey []byte) coinset.Coin {
-	c := &Coin{
-		TxHash:       txHash,
+func newUnspentCoin(txHash *chainhash.Hash, index uint32, value btcutil.Amount, numConfs int64, scriptPubKey []byte) coinset.Coin {
+	unspent := &unspentCoin{
+		TxHash:       (*chainhash.Hash)(txHash.CloneBytes()),
 		TxIndex:      index,
 		TxValue:      value,
 		TxNumConfs:   numConfs,
 		ScriptPubKey: scriptPubKey,
 	}
-	return coinset.Coin(c)
+	return coinset.Coin(unspent)
 }
 
-// gatherCoins aggregates acceptable utxos into a map of hdkey keyed by coinset
-func (w *BtcElectrumWallet) gatherCoins(excludeUnconfirmed bool) map[coinset.Coin]*hdkeychain.ExtendedKey {
+// gatherCoins aggregates acceptable utxos into a alice of coinset.Coin's
+func (w *BtcElectrumWallet) gatherCoins(excludeUnconfirmed bool) []coinset.Coin {
 	tip := w.blockchainTip
 	utxos, _ := w.txstore.Utxos().GetAll()
-	m := make(map[coinset.Coin]*hdkeychain.ExtendedKey)
-	var c coinset.Coin
+	var unspentCoins []coinset.Coin
 	for _, u := range utxos {
 		if u.WatchOnly {
 			continue
@@ -93,18 +93,10 @@ func (w *BtcElectrumWallet) gatherCoins(excludeUnconfirmed bool) map[coinset.Coi
 		if u.AtHeight > 0 {
 			confirmations = tip - u.AtHeight
 		}
-		c = NewCoin(&u.Op.Hash, u.Op.Index, btcutil.Amount(u.Value), confirmations, u.ScriptPubkey)
-		addr, err := w.ScriptToAddress(u.ScriptPubkey)
-		if err != nil {
-			continue
-		}
-		key, err := w.keyManager.GetKeyForScript(addr.ScriptAddress())
-		if err != nil {
-			continue
-		}
-		m[c] = key
+		unspent := newUnspentCoin(&u.Op.Hash, u.Op.Index, btcutil.Amount(u.Value), confirmations, u.ScriptPubkey)
+		unspentCoins = append(unspentCoins, unspent)
 	}
-	return m
+	return unspentCoins
 }
 
 // Spend creates and signs a new transaction from wallet coins
@@ -136,20 +128,19 @@ func (w *BtcElectrumWallet) buildTx(
 		return -1, nil, wallet.ErrDustAmount
 	}
 
+	// check payto address
 	script, err := txscript.PayToAddrScript(address)
 	if err != nil {
-		return -1, nil, wallet.ErrDustAmount
+		return -1, nil, err
 	}
 
 	// create input source
-	coinMap := w.gatherCoins(true) // exclude unconfirmed
-	coins := make([]coinset.Coin, 0, len(coinMap))
-	for k := range coinMap {
-		coins = append(coins, k)
+	coins := w.gatherCoins(true)
+	for i, coin := range coins {
+		fmt.Println(i, coin.Hash().String(), coin.Index())
 	}
 
 	var prevScripts map[wire.OutPoint]*wire.TxOut
-	var keysByAddress map[string]*btcutil.WIF
 
 	inputSource := func(target btcutil.Amount) (
 		total btcutil.Amount,
@@ -163,7 +154,6 @@ func (w *BtcElectrumWallet) buildTx(
 			return total, inputs, []btcutil.Amount{}, scripts, wallet.ErrInsufficientFunds
 		}
 		prevScripts = make(map[wire.OutPoint]*wire.TxOut)
-		keysByAddress = make(map[string]*btcutil.WIF)
 		for _, c := range coins.Coins() {
 			total += c.Value()
 			outpoint := wire.NewOutPoint(c.Hash(), c.Index())
@@ -171,18 +161,6 @@ func (w *BtcElectrumWallet) buildTx(
 			in.Sequence = uint32(0xffffffff)
 			inputs = append(inputs, in)
 			prevScripts[*outpoint] = wire.NewTxOut(int64(c.Value()), c.PkScript())
-			key := coinMap[c]
-			addr, err := key.Address(w.params)
-			if err != nil {
-				continue
-			}
-			privKey, err := key.ECPrivKey()
-			if err != nil {
-				continue
-			}
-			wif, _ := btcutil.NewWIF(privKey, w.params, true)
-			keysByAddress[addr.EncodeAddress()] = wif
-			privKey.Zero()
 		}
 		return total, inputs, []btcutil.Amount{}, scripts, nil
 	}
@@ -213,7 +191,11 @@ func (w *BtcElectrumWallet) buildTx(
 
 	outputs := []*wire.TxOut{out}
 
-	authoredTx, err := txauthor.NewUnsignedTransaction(outputs, btcutil.Amount(feePerKB), inputSource, &changeOutputsSource)
+	authoredTx, err := txauthor.NewUnsignedTransaction(
+		outputs,
+		btcutil.Amount(feePerKB),
+		inputSource,
+		&changeOutputsSource)
 	if err != nil {
 		return -1, nil, err
 	}
@@ -245,7 +227,11 @@ func (w *BtcElectrumWallet) GetFeePerByte(feeLevel wallet.FeeLevel) int64 {
 	return w.feeProvider.GetFeePerByte(feeLevel)
 }
 
-func (w *BtcElectrumWallet) EstimateFee(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, feePerByte int64) int64 {
+func (w *BtcElectrumWallet) EstimateFee(
+	ins []wallet.TransactionInput,
+	outs []wallet.TransactionOutput,
+	feePerByte int64) int64 {
+
 	tx := new(wire.MsgTx)
 	for _, out := range outs {
 		scriptPubKey, _ := txscript.PayToAddrScript(out.Address)

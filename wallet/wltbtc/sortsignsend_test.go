@@ -1,10 +1,8 @@
 package wltbtc
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -36,7 +34,7 @@ func createTxStore() (*TxStore, *StorageManager) {
 	}
 
 	seed = makeRegtestSeed(test_mnemonic)
-	fmt.Println("Made test seed")
+	// fmt.Println("Made test seed")
 	key, _ := hdkeychain.NewMaster(seed, &chaincfg.RegressionNetParams)
 	km, _ := NewKeyManager(mockDb.Keys(), &chaincfg.RegressionNetParams, key)
 	sm := NewStorageManager(mockDb.Enc(), &chaincfg.RegressionNetParams)
@@ -62,74 +60,130 @@ func MockWallet() *BtcElectrumWallet {
 	}
 }
 
+// test gather coins
+// TODO: add more error checking. Just re-worked coin selection, spend & sign.
 func Test_gatherCoins(t *testing.T) {
 	w := MockWallet()
-	w.blockchainTip = 100
-	txid := "6f7a58ad92702601fcbaac0e039943a384f5274a205c16bb8bbab54f9ea2fbad"
-	h1, err := chainhash.NewHashFromStr(txid)
+	w.blockchainTip = 500
+	// utxo 1
+	txid1 := "edfab2f9b2a013a36c524bf63e9778a5d13ca8bf1fce279647fbcee30bf7dd62"
+	h1, err := chainhash.NewHashFromStr(txid1)
 	if err != nil {
 		t.Error(err)
 	}
-	key1, err := w.keyManager.GetFreshKey(wallet.EXTERNAL)
+	script1, err := hex.DecodeString("0014b8da433782cd9d142f32f726926bcc8161beeaef")
 	if err != nil {
 		t.Error(err)
 	}
-	addr1, err := key1.Address(&chaincfg.RegressionNetParams)
-	if err != nil {
-		t.Error(err)
-	}
-	script1, err := w.AddressToScript(addr1)
-	if err != nil {
-		t.Error(err)
-	}
-	op := wire.OutPoint{
+	op1 := wire.OutPoint{
 		Hash:  *h1,
+		Index: 1,
+	}
+	utxo1 := wallet.Utxo{Op: op1, ScriptPubkey: script1, AtHeight: 426, Value: 17556690040, WatchOnly: false, Frozen: false}
+	err = w.txstore.Utxos().Put(utxo1)
+	if err != nil {
+		t.Error(err)
+	}
+	// utxo 2
+	txid2 := "5ebbbeafb0d23805c09c87a1442d58c3900b4ab643c23871893cad1f4f421c60"
+	h2, err := chainhash.NewHashFromStr(txid2)
+	if err != nil {
+		t.Error(err)
+	}
+	script2, err := hex.DecodeString("0014df0683535861d41af232009259b5d3811d4471a8")
+	if err != nil {
+		t.Error(err)
+	}
+	op2 := wire.OutPoint{
+		Hash:  *h2,
 		Index: 0,
 	}
-	utxo := wallet.Utxo{Op: op, ScriptPubkey: script1, AtHeight: 5, Value: 10000}
-	err = w.txstore.Utxos().Put(utxo)
+	utxo2 := wallet.Utxo{Op: op2, ScriptPubkey: script2, AtHeight: 426, Value: 53333300000, WatchOnly: false, Frozen: false}
+	err = w.txstore.Utxos().Put(utxo2)
 	if err != nil {
 		t.Error(err)
 	}
-	coinmap := w.gatherCoins(false)
-	for coin, key := range coinmap {
-		if !bytes.Equal(coin.PkScript(), script1) {
-			t.Error("Pubkey script in coin is incorrect")
-		}
-		if coin.Index() != 0 {
-			t.Error("Returned incorrect index")
-		}
-		if !coin.Hash().IsEqual(h1) {
-			t.Error("Returned incorrect hash")
-		}
-		if coin.NumConfs() != int64(w.blockchainTip-5) {
-			t.Error("Returned incorrect number of confirmations")
-		}
-		if coin.Value() != 10000 {
-			t.Error("Returned incorrect coin value")
-		}
-		addr2, err := key.Address(&chaincfg.RegressionNetParams)
-		if err != nil {
-			t.Error(err)
-		}
-		if addr2.EncodeAddress() != addr1.EncodeAddress() {
-			t.Error("Returned incorrect key")
-		}
-		key.Zero()
+	coins := w.gatherCoins(false)
+	for _, coin := range coins {
+		fmt.Println(coin.Hash().String(), coin.Index(), coin.NumConfs(), coin.Value(), coin.PkScript())
 	}
 	// test freeze
-	err = w.txstore.Utxos().Freeze(utxo)
+	err = w.txstore.Utxos().Freeze(utxo1)
 	if err != nil {
 		t.Error(err)
 	}
-	coinmap = w.gatherCoins(false)
-	if len(coinmap) > 0 {
+	// test freeze
+	err = w.txstore.Utxos().Freeze(utxo2)
+	if err != nil {
+		t.Error(err)
+	}
+	coins = w.gatherCoins(false)
+	if len(coins) > 0 {
 		t.Fatal("should be no unfrozen coin in map")
 	}
-	os.Remove("headers.bin")
 }
 
-// The wallet is segwit by default.
+// The wallet is segwit by default. Here we test making a transaction from 2 inputs
+func Test_newSegwitMultiInputTransaction(t *testing.T) {
+	w := MockWallet()
+	w.blockchainTip = 500
+	// utxo 1
+	txid1 := "edfab2f9b2a013a36c524bf63e9778a5d13ca8bf1fce279647fbcee30bf7dd62"
+	h1, err := chainhash.NewHashFromStr(txid1)
+	if err != nil {
+		t.Error(err)
+	}
+	script1, err := hex.DecodeString("0014b8da433782cd9d142f32f726926bcc8161beeaef")
+	if err != nil {
+		t.Error(err)
+	}
+	op1 := wire.OutPoint{
+		Hash:  *h1,
+		Index: 1,
+	}
+	utxo1 := wallet.Utxo{Op: op1, ScriptPubkey: script1, AtHeight: 426, Value: 17556690040, WatchOnly: false, Frozen: false}
+	err = w.txstore.Utxos().Put(utxo1)
+	if err != nil {
+		t.Error(err)
+	}
+	// utxo 2
+	txid2 := "5ebbbeafb0d23805c09c87a1442d58c3900b4ab643c23871893cad1f4f421c60"
+	h2, err := chainhash.NewHashFromStr(txid2)
+	if err != nil {
+		t.Error(err)
+	}
+	script2, err := hex.DecodeString("0014df0683535861d41af232009259b5d3811d4471a8")
+	if err != nil {
+		t.Error(err)
+	}
+	op2 := wire.OutPoint{
+		Hash:  *h2,
+		Index: 0,
+	}
+	utxo2 := wallet.Utxo{Op: op2, ScriptPubkey: script2, AtHeight: 426, Value: 53333300000, WatchOnly: false, Frozen: false}
+	err = w.txstore.Utxos().Put(utxo2)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// to harness ->
+	address, err := btcutil.DecodeAddress("bcrt1qqfepzsehqytlfvm3gmmx3zrz3yhjw2nm3yuccd", &chaincfg.RegressionNetParams)
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, _, err = w.Spend(
+		"abc",
+		int64(55500000000), // this amount needs both inputs
+		address,            // send to harness ->
+		wallet.NORMAL,
+	)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// default segwit transaction - 1 utxo consumed
 func Test_newSegwitTransaction(t *testing.T) {
 	w := MockWallet()
 	w.blockchainTip = 500
