@@ -71,7 +71,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 			// Net: "tcp", Addr: "blockstream.info:143",
 		}
 		cfg.StoreEncSeed = true
-		cfg.Testing = true
+		// cfg.Testing = true
 	case "mainnet":
 		cfg.Params = &chaincfg.MainNetParams
 		cfg.TrustedPeer = electrumx.ServerAddr{
@@ -83,13 +83,15 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 	return cfg, nil
 }
 
-func configure() (*client.ClientConfig, error) {
+func configure() (string, *client.ClientConfig, error) {
 	coin := flag.String("coin", "btc", "coin name")
 	net := flag.String("net", "regtest", "network type; testnet, mainnet, regtest")
+	pass := flag.String("pass", "", "wallet password")
 	flag.Parse()
 	fmt.Println("coin:", *coin)
 	fmt.Println("net:", *net)
-	return makeBasicConfig(*coin, *net)
+	cfg, err := makeBasicConfig(*coin, *net)
+	return *pass, cfg, err
 }
 
 func checkSimnetHelp(cfg *client.ClientConfig) string {
@@ -108,12 +110,13 @@ func checkSimnetHelp(cfg *client.ClientConfig) string {
 
 func main() {
 	fmt.Println("Goele", client.GoeleVersion)
-	cfg, err := configure()
+	pass, cfg, err := configure()
 	if err != nil {
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
-	fmt.Println(cfg.Chain, cfg.Params.Name)
+	net := cfg.Params.Name
+	fmt.Println(net)
 
 	// make basic client
 	ec := btc.NewBtcElectrumClient(cfg)
@@ -137,17 +140,47 @@ func main() {
 
 	// make the client's wallet
 
-	// for non-mainnet testing recreate a wallet with a known set of keys ..
-	var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
-	err = ec.RecreateWallet("abc", mnemonic)
+	if net == "regtest" {
 
-	// or, more for production usage: load the client's wallet
+		// for non-mainnet testing recreate a wallet with a known set of keys ..
+		var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
+		err := ec.RecreateWallet("abc", mnemonic)
+		if err != nil {
+			ec.GetNode().Stop()
+			fmt.Println(err, " - exiting")
+			os.Exit(1)
+		}
 
-	// err = ec.LoadWallet("abc")
-	if err != nil {
-		ec.GetNode().Stop()
-		fmt.Println(err, " - exiting")
-		os.Exit(1)
+	} else if net == "testnet3" {
+
+		// uncomment to create ->
+		// err := ec.CreateWallet("abc")
+		// if err != nil {
+		// 	ec.GetNode().Stop()
+		// 	fmt.Println(err, " - exiting")
+		// 	os.Exit(1)
+		// }
+		//<- uncomment to create
+
+		// comment when doing initial creation_->
+		// load the client's wallet
+		// canyon trip truly ritual lonely quiz romance rose alone journey like bronze
+		err := ec.LoadWallet("abc")
+		if err != nil {
+			ec.GetNode().Stop()
+			fmt.Println(err, " - exiting")
+			os.Exit(1)
+		}
+		//<- comment when doing initial creation
+
+	} else if net == "mainnet" {
+		// production usage: load the client's wallet
+		err := ec.LoadWallet(pass)
+		if err != nil {
+			ec.GetNode().Stop()
+			fmt.Println(err, " - exiting")
+			os.Exit(1)
+		}
 	}
 
 	// set up Notify for all our already given out receive addresses (getunusedaddress)
