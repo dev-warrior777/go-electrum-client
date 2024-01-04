@@ -58,7 +58,8 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 	case "regtest", "simnet":
 		cfg.Params = &chaincfg.RegressionNetParams
 		cfg.TrustedPeer = electrumx.ServerAddr{
-			Net: "ssl", Addr: "127.0.0.1:53002",
+			Net: "ssl", Addr: "127.0.0.1:57002", // debug server
+			// Net: "ssl", Addr: "127.0.0.1:53002",
 		}
 		cfg.StoreEncSeed = true
 		cfg.Testing = true

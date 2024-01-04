@@ -155,7 +155,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 
 // SubscribeClientHeaders subscribes to new block tip notifications from the
 // electrumx server and handles them as they arrive. The client local 'blockhain
-// _headers file is appended and the headers map updated and verified.
+// _headers' file is appended and the headers map updated and verified.
 //
 // Note:
 // should a new block arrive quickly, perhaps while the server is still processing
