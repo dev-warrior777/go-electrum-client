@@ -156,6 +156,7 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 
 		fmt.Println("=== Waiting for address change notifications ===")
 
+	loop:
 		for {
 			select {
 
@@ -164,13 +165,12 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 				node.Stop()
 				return
 
-			case status := <-scripthashNotifyCh:
+			case status, ok := <-scripthashNotifyCh:
 				fmt.Printf("\n\n%s\n", "----------------------------------------")
 				fmt.Println("<-scripthashNotifyCh - # items left in buffer", len(scripthashNotifyCh))
-				fmt.Println("scripthash notify")
-				if status == nil {
-					fmt.Println("status is nil, ignoring...", status)
-					continue
+				if !ok {
+					fmt.Println("channel closed - exiting loop")
+					break loop
 				}
 				fmt.Println("Scripthash", status.Scripthash)
 				fmt.Println("Status", status.Status)
