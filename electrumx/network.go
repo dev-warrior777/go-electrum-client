@@ -99,7 +99,7 @@ func (sc *ServerConn) listen(ctx context.Context) {
 		msg, err := reader.ReadBytes(newline)
 		if err != nil {
 			if ctx.Err() == nil { // unexpected
-				sc.debug("ReadBytes: %v", err)
+				sc.debug("ReadBytes: %v - conn closed", err)
 			}
 			sc.cancel()
 			return
@@ -264,8 +264,8 @@ func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*Server
 		done:             make(chan struct{}),
 		debug:            logger,
 		respHandlers:     make(map[uint64]chan *response),
-		scripthashNotify: make(chan *ScripthashStatusResult, 16), // 64 bytes/slot
-		headersNotify:    make(chan *HeadersNotifyResult, 10),
+		scripthashNotify: make(chan *ScripthashStatusResult, 16), // 128 bytes/slot
+		headersNotify:    make(chan *HeadersNotifyResult, 16),    // 168 bytes/slot
 	}
 
 	// Wrap the context with a cancel function for internal shutdown, and so the

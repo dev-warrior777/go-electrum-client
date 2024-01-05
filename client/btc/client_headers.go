@@ -191,18 +191,24 @@ func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
 
 		fmt.Println("=== Waiting for headers ===")
 
+	loop:
 		for {
 			select {
 
 			case <-svrCtx.Done():
-				fmt.Println("Server shutdown - subscribe headers notify")
+				fmt.Println("Server shutdown - in headers notify")
 				node.Stop()
 				return
 
-			case <-hdrResNotifyCh:
+			case _, ok := <-hdrResNotifyCh:
+				if !ok {
+					fmt.Println("headers notify channel closed - exiting loop")
+					break loop
+				}
+
 				// read whatever is in the queue, usually one header at tip
 				for x := range hdrResNotifyCh {
-					fmt.Println("New Block: ", x.Height, x.Hex)
+					fmt.Println("\nNew Block: ", x.Height, x.Hex)
 					if x.Height > maybeTip {
 						n := x.Height - maybeTip
 						if n == 1 {

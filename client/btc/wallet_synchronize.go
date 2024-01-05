@@ -161,21 +161,21 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 			select {
 
 			case <-svrCtx.Done():
-				fmt.Println("Server shutdown - scripthash notify")
+				fmt.Println("Server shutdown - in scripthash notify")
 				node.Stop()
 				return
 
 			case status, ok := <-scripthashNotifyCh:
-				fmt.Printf("\n\n%s\n", "----------------------------------------")
-				fmt.Println("<-scripthashNotifyCh - # items left in buffer", len(scripthashNotifyCh))
 				if !ok {
-					fmt.Println("channel closed - exiting loop")
+					fmt.Println("scripthash notify channel closed - exiting loop")
 					break loop
 				}
-				fmt.Println("Scripthash", status.Scripthash)
-				fmt.Println("Status", status.Status)
+
+				fmt.Printf("\n%s\n", "----------------------------------------")
+				fmt.Println("Scripthash:", status.Scripthash)
+				fmt.Println("Status:", status.Status)
 				if status.Status == "" {
-					fmt.Println("status.Status is null", status.Status, " no history yet; ignoring...")
+					fmt.Println("status.Status is null no history yet; ignoring...")
 					continue
 				}
 
@@ -195,7 +195,7 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 				}
 				ec.dumpHistory(sub, history)
 
-				// update wallet db tx store
+				// add/update wallet db tx store
 				ec.addTxHistoryToWallet(history)
 			}
 		}

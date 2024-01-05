@@ -207,7 +207,8 @@ func (ec *BtcElectrumClient) RPCServe() error {
 		fmt.Println("rpc channel closed")
 	}()
 
-	fmt.Println("rpc http server Serve() start")
+	fmt.Println("=== rpc http server Serve() start - Ctl-c to stop ===")
+	fmt.Println("")
 	if err := srv.Serve(listener); err != http.ErrServerClosed {
 		// error closing listener
 		fmt.Printf("rpc http server Serve: %v\n", err)
