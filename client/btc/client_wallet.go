@@ -278,6 +278,54 @@ func (ec *BtcElectrumClient) UnusedAddress() (string, error) {
 	return address.String(), nil
 }
 
+// ChangeAddress gets a new unused wallet change address and subscribes for
+// ElectrumX address status notify events on the returned address.
+func (ec *BtcElectrumClient) ChangeAddress() (string, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		return "", ErrNoWallet
+	}
+	node := ec.GetNode()
+	if node == nil {
+		return "", ErrNoNode
+	}
+
+	address, err := w.GetUnusedAddress(wallet.CHANGE)
+	if err != nil {
+		return "", err
+	}
+	payToAddrScript, err := txscript.PayToAddrScript(address)
+	if err != nil {
+		return "", err
+	}
+
+	// wallet db
+	newSub := &wallet.Subscription{
+		PkScript:           hex.EncodeToString(payToAddrScript),
+		ElectrumScripthash: pkScriptToElectrumScripthash(payToAddrScript),
+		Address:            address.String(),
+	}
+	ec.dumpSubscription("adding/updating get change address subscription", newSub)
+	// insert or update
+	err = w.AddSubscription(newSub)
+	if err != nil {
+		return "", err
+	}
+
+	// request notifications from node
+	res, err := node.SubscribeScripthashNotify(newSub.ElectrumScripthash)
+	if err != nil {
+		w.RemoveSubscription(newSub.PkScript)
+		return "", err
+	}
+	if res == nil { // network error
+		w.RemoveSubscription(newSub.PkScript)
+		return "", errors.New("network: empty result")
+	}
+
+	return address.String(), nil
+}
+
 func (ec *BtcElectrumClient) Balance() (int64, int64, error) {
 	w := ec.GetWallet()
 	if w == nil {

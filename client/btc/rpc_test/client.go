@@ -26,6 +26,7 @@ func usage() {
 	fmt.Println("  getbalance", "\t\t\t\t Get wallet confirmed & unconfirmed balance")
 	fmt.Println("  listunspent", "\t\t\t\t List all wallet utxos")
 	fmt.Println("  getunusedaddress", "\t\t\t Get a new unused wallet receive address")
+	fmt.Println("  getchangeaddress", "\t\t\t Get a new unused wallet change address")
 	fmt.Println("  spend pw amount address feeType", "\t Make signed transaction from wallet utxos")
 	fmt.Println("  broadcast rawTx changeIndex", "\t\t Broadcast rawTx to ElectrumX")
 	fmt.Println("-------------------------------------------------------------")
@@ -135,6 +136,19 @@ func (c *cmd) getunusedaddress(client *rpc.Client) {
 	fmt.Println("address", address)
 }
 
+// getchangeaddress
+func (c *cmd) getchangeaddress(client *rpc.Client) {
+	var request = make(map[string]string)
+	var response = make(map[string]string)
+	err := client.Call("Ec.RPCChangeAddress", &request, &response)
+	if err != nil {
+		log.Fatal("Ec.RPCChangeAddress:", err)
+	}
+	// fmt.Printf("client response %v\n", response)
+	address := cast.ToString(response["address"])
+	fmt.Println("address", address)
+}
+
 // spend
 func (c *cmd) spend(client *rpc.Client) {
 	var request = make(map[string]string)
@@ -199,7 +213,7 @@ func main() {
 	}
 
 	switch c.cmd {
-	case "tip", "listunspent", "getunusedaddress", "getbalance":
+	case "tip", "listunspent", "getunusedaddress", "getchangeaddress", "getbalance":
 	// no params
 	case "echo":
 	// any number of params
@@ -259,6 +273,8 @@ func main() {
 		c.listunspent(client)
 	case "getunusedaddress":
 		c.getunusedaddress(client)
+	case "getchangeaddress":
+		c.getchangeaddress(client)
 	case "broadcast":
 		c.broadcast(client)
 	case "spend":
