@@ -108,6 +108,17 @@ func (e *Ec) RPCUnusedAddress(request map[string]string, response *map[string]st
 	return nil
 }
 
+// Get a new unused wallet change address
+func (e *Ec) RPCChangeAddress(request map[string]string, response *map[string]string) error {
+	r := *response
+	address, err := e.EleClient.ChangeAddress()
+	if err != nil {
+		return err
+	}
+	r["address"] = address
+	return nil
+}
+
 func (e *Ec) RPCSpend(request map[string]string, response *map[string]string) error {
 	r := *response
 	pw := cast.ToString(request["pw"])

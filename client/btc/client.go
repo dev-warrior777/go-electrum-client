@@ -155,6 +155,7 @@ func (ec *BtcElectrumClient) Close() {
 // Broadcast(*BroadcastParams) (string, error)
 // ListUnspent() (string, error)
 // UnusedAddress() (string, error)
+// ChangeAddress() (string, error)
 // Balance() (int64, int64, error)
 
 //////////////////////////////////////////////////////////////////////////////
