@@ -10,6 +10,7 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/electrumx/elxbtc"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
+	"github.com/dev-warrior777/go-electrum-client/wallet/bdb"
 	"github.com/dev-warrior777/go-electrum-client/wallet/db"
 	"github.com/dev-warrior777/go-electrum-client/wallet/wltbtc"
 )
@@ -93,11 +94,16 @@ func (ec *BtcElectrumClient) RecreateWallet(pw, mnenomic string) error {
 	}
 
 	// Select wallet datastore
-	sqliteDatastore, err := db.Create(cfg.DataDir)
+	boltDatastore, err := bdb.Create(cfg.DataDir)
 	if err != nil {
 		return err
 	}
-	cfg.DB = sqliteDatastore
+	cfg.DB = boltDatastore
+	// sqliteDatastore, err := db.Create(cfg.DataDir)
+	// if err != nil {
+	// 	return err
+	// }
+	// cfg.DB = sqliteDatastore
 
 	walletCfg := cfg.MakeWalletConfig()
 	ec.Wallet, err = wltbtc.RecreateElectrumWallet(walletCfg, pw, mnenomic)

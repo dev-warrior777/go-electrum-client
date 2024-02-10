@@ -17,6 +17,7 @@ require (
 
 require (
 	github.com/aead/siphash v1.0.1 // indirect
+	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.3 // indirect
 	github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23 // indirect
 )
