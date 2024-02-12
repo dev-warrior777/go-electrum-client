@@ -27,6 +27,7 @@ testdata/
 #test bin
 electrumx/elxbtc/cmd/main
 cmd/goele/goele
+wallet/cmd/boltdmp/bd
 
 #vscode
 .vscode/
