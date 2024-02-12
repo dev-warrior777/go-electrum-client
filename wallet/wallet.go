@@ -146,19 +146,6 @@ type ElectrumWallet interface {
 	// CPFP logic; rbf not supported
 	BumpFee(txid chainhash.Hash) (*wire.MsgTx, error)
 
-	// Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked
-	// escrow which releases using the timeoutKey.
-	// GenerateMultisigScript should deterministically create a redeem script and address from the information provided.
-	// This method should be strictly limited to taking the input data, combining it to produce the redeem script and
-	// address
-	GenerateMultisigScript(keys []hd.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hd.ExtendedKey) (addr btcutil.Address, redeemScript []byte, err error)
-
-	// Create a signature for a multisig transaction
-	CreateMultisigSignature(ins []TransactionInput, outs []TransactionOutput, key *hd.ExtendedKey, redeemScript []byte, feePerByte int64) ([]Signature, error)
-
-	// Combine signatures and optionally broadcast
-	Multisign(ins []TransactionInput, outs []TransactionOutput, sigs1 []Signature, sigs2 []Signature, redeemScript []byte, feePerByte int64, broadcast bool) ([]byte, error)
-
 	// Update the height of the tip of the headers chain & the blockchain sync status.
 	UpdateTip(newTip int64, synced bool)
 

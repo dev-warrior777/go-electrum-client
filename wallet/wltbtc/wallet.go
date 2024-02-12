@@ -479,19 +479,5 @@ func (w *BtcElectrumWallet) Close() {
 // CPFP logic - No rbf and never will be here!
 // func (w *BtcElectrumWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error)
 
-//////////////////////////////////
-// implementations in multisend.go
-
-// // Generate a multisig script from public keys. If a timeout is included the
-// // returned script should be a timelocked escrow which releases using the
-// // timeoutKey.
-// GenerateMultisigScript(keys []hdkeychain.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hdkeychain.ExtendedKey) (address btcutil.Address, redeemScript []byte, err error) {
-
-// // Create a signature for a multisig transaction
-// CreateMultisigSignature(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, key *hdkeychain.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]wallet.Signature, error)
-
-// // Combine signatures and optionally broadcast
-// Multisign(ins []wallet.TransactionInput, outs []wallet.TransactionOutput, sigs1 []wallet.Signature, sigs2 []wallet.Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error)
-
 // end interface impl
 /////////////////////

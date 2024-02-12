@@ -262,13 +262,17 @@ type Utxo struct {
 	// Output script
 	ScriptPubkey []byte
 
-	// If true this utxo will not be selected for spending. The primary
-	// purpose is track multisig UTXOs which must have separate handling
-	// to spend. [Multisig is currently only partially implemented]
+	// Previously the primary purpose is track multisig UTXOs which must have
+	// separate handling to spend. Currently unused.
+	// [multisig ideas in separate branch on github]
+	//
+	// Keeping for some future external Tx ideas. External meaning tx's created
+	// external to this wallet that we may want to ask the Electrum server to
+	// watch out for..
 	WatchOnly bool
 
 	// If true this utxo has been used in a new input by software outside the
-	// wallet; in an HTLC contract perhaps. It will not be selected for a new
+	// wallet; in an HTLC contract perhaps. Utxo will not be selected for a new
 	// wallet transaction while frozen.
 	//
 	// It is the outside software's responsibility to set this.
