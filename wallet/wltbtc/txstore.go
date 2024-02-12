@@ -115,7 +115,6 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 	PKscripts := make([][]byte, len(ts.adrs))
 	for i := range ts.adrs {
 		// Iterate through all our addresses
-		// TODO: This will need to test both segwit and legacy once segwit activates
 		PKscripts[i], err = txscript.PayToAddrScript(ts.adrs[i])
 		if err != nil {
 			ts.addrMutex.Unlock()
@@ -129,7 +128,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 	value := int64(0)
 	matchesWatchOnly := false
 	for i, txout := range tx.TxOut {
-		// Ignore the error here because the sender could have used and exotic script
+		// Ignore the error here because the sender could have used an exotic script
 		// for his change and we don't want to fail in that case.
 		for _, script := range PKscripts {
 			if bytes.Equal(txout.PkScript, script) { // new utxo found

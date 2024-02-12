@@ -187,6 +187,12 @@ func (m *mockKeyStore) GetAll() ([]wallet.KeyPath, error) {
 	return kp, nil
 }
 
+func (m *mockKeyStore) GetDbg() string {
+	var ret string = "TODO{}"
+	//
+	return ret
+}
+
 func (m *mockKeyStore) GetLookaheadWindows() map[wallet.KeyPurpose]int {
 	internalLastUsed := -1
 	externalLastUsed := -1
@@ -461,7 +467,7 @@ func TestStxo_IsEqual(t *testing.T) {
 		AtHeight:     400000,
 		Value:        1000000,
 	}
-	h2, err := chainhash.NewHashFromStr("1f64249abbf2fcc83fc060a64f69a91391e9f5d98c5d3135fe9716838283aa4c")
+	h2, _ := chainhash.NewHashFromStr("1f64249abbf2fcc83fc060a64f69a91391e9f5d98c5d3135fe9716838283aa4c")
 	s := &wallet.Stxo{
 		Utxo:        *u,
 		SpendHeight: 400001,
@@ -476,7 +482,7 @@ func TestStxo_IsEqual(t *testing.T) {
 	if s.IsEqual(&testStxo) {
 		t.Error("Failed to return stxos as not equal")
 	}
-	h3, err := chainhash.NewHashFromStr("3c5cea030a432ba9c8cf138a93f7b2e5b28263ea416894ee0bdf91bc31bb04f2")
+	h3, _ := chainhash.NewHashFromStr("3c5cea030a432ba9c8cf138a93f7b2e5b28263ea416894ee0bdf91bc31bb04f2")
 	testStxo = *s
 	testStxo.SpendTxid = *h3
 	if s.IsEqual(&testStxo) {

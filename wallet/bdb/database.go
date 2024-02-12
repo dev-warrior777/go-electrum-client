@@ -37,13 +37,24 @@ type BoltDatastore struct {
 	lock          *sync.RWMutex
 }
 
-func Create(repoPath string) (*BoltDatastore, error) {
-	dbPath := path.Join(repoPath, "wallet.bdb")
-	bdb, err := bolt.Open(dbPath, 0600, nil)
+func (s *BoltDatastore) Close() {
+	s.db.Close()
+}
+
+func Create(dbPath string, readOnly bool) (*BoltDatastore, error) {
+	dbPath = path.Join(dbPath, "wallet.bdb")
+	options := *bolt.DefaultOptions
+	if readOnly {
+		options.ReadOnly = true
+	}
+	bdb, err := bolt.Open(dbPath, 0600, &options)
 	if err != nil {
 		log.Fatal(err)
 	}
+	return dbSetup(bdb)
+}
 
+func dbSetup(bdb *bolt.DB) (*BoltDatastore, error) {
 	l := new(sync.RWMutex)
 	boltDB := &BoltDatastore{
 		cfg: &CfgDB{

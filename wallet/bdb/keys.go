@@ -1,13 +1,18 @@
 package bdb
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/boltdb/bolt"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -23,11 +28,7 @@ func (k *KeysDB) Put(scriptAddress []byte, keyPath wallet.KeyPath) error {
 		KeyIndex:      keyPath.Index,
 		Used:          false,
 	}
-	err := k.put(krec)
-	if err != nil {
-		return err
-	}
-	return nil
+	return k.put(krec)
 }
 
 func (k *KeysDB) MarkKeyAsUsed(scriptAddress []byte) error {
@@ -36,17 +37,13 @@ func (k *KeysDB) MarkKeyAsUsed(scriptAddress []byte) error {
 		return err
 	}
 	krec.Used = true
-	err = k.put(krec)
-	if err != nil {
-		return err
-	}
-	return nil
+	return k.put(krec)
 }
 
 // GetLastKeyIndex gets the last (highest) key index stored and whether it has been used.
 // If error or no records it will return -1 and error.
 func (k *KeysDB) GetLastKeyIndex(purpose wallet.KeyPurpose) (int, bool, error) {
-	krecList, err := k.getAll()
+	krecList, err := k.getAllSorted()
 	if err != nil {
 		return -1, false, err
 	}
@@ -62,9 +59,6 @@ func (k *KeysDB) GetLastKeyIndex(purpose wallet.KeyPurpose) (int, bool, error) {
 	if len(krecListPurpose) == 0 {
 		return -1, false, errors.New("no key records in db for purpose")
 	}
-	sort.Slice(krecListPurpose, func(i, j int) bool {
-		return krecListPurpose[i].KeyIndex < krecListPurpose[j].KeyIndex
-	})
 	lastRec := len(krecListPurpose) - 1
 	return krecListPurpose[lastRec].KeyIndex, krecListPurpose[lastRec].Used, nil
 }
@@ -82,12 +76,12 @@ func (k *KeysDB) GetPathForKey(scriptAddress []byte) (wallet.KeyPath, error) {
 
 func (k *KeysDB) GetUnused(purpose wallet.KeyPurpose) ([]int, error) {
 	var ret []int
-	krecList, err := k.getAll()
+	krecList, err := k.getAllSorted()
 	if err != nil {
 		return nil, err
 	}
 	for _, krec := range krecList {
-		if purpose == wallet.KeyPurpose(krec.Purpose) {
+		if purpose == wallet.KeyPurpose(krec.Purpose) && !krec.Used {
 			ret = append(ret, krec.KeyIndex)
 		}
 	}
@@ -96,7 +90,7 @@ func (k *KeysDB) GetUnused(purpose wallet.KeyPurpose) ([]int, error) {
 
 func (k *KeysDB) GetAll() ([]wallet.KeyPath, error) {
 	var ret []wallet.KeyPath
-	krecList, err := k.getAll()
+	krecList, err := k.getAllSorted()
 	if err != nil {
 		return nil, err
 	}
@@ -110,14 +104,57 @@ func (k *KeysDB) GetAll() ([]wallet.KeyPath, error) {
 	return ret, nil
 }
 
+func (k *KeysDB) GetDbg() string {
+	var ret string
+	krecList, err := k.getAllSorted()
+	if err != nil {
+		return ""
+	}
+	for _, krec := range krecList {
+		scriptAddress := hex.EncodeToString(krec.ScriptAddress)
+		var segwitAddrStr string
+		segwitAddress, swerr := btcutil.NewAddressWitnessPubKeyHash(
+			krec.ScriptAddress, &chaincfg.RegressionNetParams)
+		if swerr != nil {
+			segwitAddrStr = ""
+			fmt.Println(swerr)
+		} else {
+			segwitAddrStr = segwitAddress.String()
+		}
+		var purpose string
+		if krec.Purpose == int(wallet.EXTERNAL) {
+			purpose = "EXTERNAL"
+		} else {
+			purpose = "INTERNAL"
+		}
+		keyIndex := strconv.Itoa(krec.KeyIndex)
+		var used string
+		if krec.Used {
+			used = " ** USED **"
+		}
+		var sb strings.Builder
+		sb.WriteString(" Script Address: ")
+		sb.WriteString(scriptAddress)
+		sb.WriteString("  ")
+		sb.WriteString(segwitAddrStr)
+		sb.WriteString("\n")
+		sb.WriteString(" Key Purpose:    ")
+		sb.WriteString(purpose)
+		sb.WriteString("\n")
+		sb.WriteString(" Key Index:      ")
+		sb.WriteString(keyIndex)
+		sb.WriteString("\n")
+		sb.WriteString(used)
+		sb.WriteString("\n\n")
+		ret += sb.String()
+	}
+	return ret
+}
+
 func (k *KeysDB) GetLookaheadWindows() map[wallet.KeyPurpose]int {
 	windows := make(map[wallet.KeyPurpose]int)
-	krecList, err := k.getAll()
-	if err != nil {
-		reason := fmt.Sprintf("cannot get key list from db: %v", err)
-		panic(reason)
-	}
-	if len(krecList) == 0 {
+	krecList, err := k.getAllSorted()
+	if err != nil || len(krecList) == 0 {
 		windows[wallet.EXTERNAL] = 0
 		windows[wallet.INTERNAL] = 0
 		return windows
@@ -147,7 +184,6 @@ type keyRec struct {
 	Purpose       int    `json:"purpose"`
 	KeyIndex      int    `json:"key_index"`
 	Used          bool   `json:"used"`
-	IportedKey    []byte `json:"imported_key,omitempty"`
 }
 
 func (k *KeysDB) put(krec *keyRec) error {
@@ -198,7 +234,8 @@ func (k *KeysDB) get(scriptAddress []byte) (*keyRec, error) {
 	return &krec, e
 }
 
-func (k *KeysDB) getAll() ([]keyRec, error) {
+// getAllSorted returns all the key records sorted on KeyIndex
+func (k *KeysDB) getAllSorted() ([]keyRec, error) {
 	k.lock.RLock()
 	defer k.lock.RUnlock()
 
@@ -218,6 +255,11 @@ func (k *KeysDB) getAll() ([]keyRec, error) {
 			return nil
 		})
 		return nil
+	})
+
+	// Sort on KeyIndex
+	sort.Slice(krecList, func(i, j int) bool {
+		return krecList[i].KeyIndex < krecList[j].KeyIndex
 	})
 
 	return krecList, e

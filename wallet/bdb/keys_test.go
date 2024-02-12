@@ -43,12 +43,24 @@ func TestGetAll(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer teardownKdb()
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 50; i++ {
 		b := make([]byte, 20)
 		rand.Read(b)
 		// fmt.Println(hex.EncodeToString(b))
 		err := kdb.Put(b, wallet.KeyPath{
 			Purpose: wallet.EXTERNAL,
+			Index:   i,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	for i := 0; i < 50; i++ {
+		b := make([]byte, 20)
+		rand.Read(b)
+		// fmt.Println(hex.EncodeToString(b))
+		err := kdb.Put(b, wallet.KeyPath{
+			Purpose: wallet.INTERNAL,
 			Index:   i,
 		})
 		if err != nil {
@@ -109,7 +121,7 @@ func TestPutDuplicateKey(t *testing.T) {
 		Index:   0,
 	})
 	if err != nil {
-		// Unlike a relational db you can put using the same key.
+		// Unlike a relational db insert you can put using the same key.
 		t.Error("Expected No duplicate key error")
 	}
 }
@@ -137,7 +149,7 @@ func TestMarkKeyAsUsed(t *testing.T) {
 		t.Error(err)
 	}
 	if !used {
-		t.Errorf(`Expected 1 got %v`, used)
+		t.Errorf(`Expected used=true got %v`, used)
 	}
 }
 
@@ -234,6 +246,7 @@ func TestGetUnsed(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer teardownKdb()
+	var tenth []byte
 	for i := 0; i < 100; i++ {
 		b := make([]byte, 20)
 		rand.Read(b)
@@ -242,14 +255,32 @@ func TestGetUnsed(t *testing.T) {
 			Index:   i,
 		})
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
+		}
+		if i == 9 {
+			tenth = b
 		}
 	}
-	idx, err := kdb.GetUnused(wallet.INTERNAL)
+	i, err := kdb.GetUnused(wallet.INTERNAL)
 	if err != nil {
-		t.Error("Failed to fetch correct unused")
+		t.Error(err)
 	}
-	if len(idx) != 100 {
+	if len(i) != 100 {
+		t.Error("Failed to fetch correct number of unused")
+	}
+	err = kdb.MarkKeyAsUsed(tenth)
+	if err != nil {
+		t.Error(err)
+	}
+	i, err = kdb.GetUnused(wallet.INTERNAL)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(i) != 99 {
+		t.Error("Failed to fetch correct number of unused 2")
+	}
+	used, _ := kdb.isKeyUsed(tenth)
+	if !used {
 		t.Error("Failed to fetch correct unused")
 	}
 }
@@ -259,6 +290,16 @@ func TestGetLookaheadWindows(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer teardownKdb()
+
+	// test zero keys
+	var winZero = make(map[wallet.KeyPurpose]int)
+	winZero = kdb.GetLookaheadWindows()
+	if winZero[wallet.EXTERNAL] != 0 || winZero[wallet.INTERNAL] != 0 {
+		t.Fatal("no records failed - should return an un-empty map")
+	}
+
+	// test some keys - internal & external
+	var windows = make(map[wallet.KeyPurpose]int)
 	for i := 0; i < 100; i++ {
 		b := make([]byte, 20)
 		rand.Read(b)
@@ -269,7 +310,7 @@ func TestGetLookaheadWindows(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		if i < 50 {
+		if i < 33 {
 			kdb.MarkKeyAsUsed(b)
 		}
 		b = make([]byte, 20)
@@ -281,12 +322,12 @@ func TestGetLookaheadWindows(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		if i < 50 {
+		if i < 81 {
 			kdb.MarkKeyAsUsed(b)
 		}
 	}
-	windows := kdb.GetLookaheadWindows()
-	if windows[wallet.EXTERNAL] != 50 || windows[wallet.INTERNAL] != 50 {
+	windows = kdb.GetLookaheadWindows()
+	if windows[wallet.EXTERNAL] != 100-33 || windows[wallet.INTERNAL] != 100-81 {
 		t.Error("Fetched incorrect lookahead windows")
 	}
 }

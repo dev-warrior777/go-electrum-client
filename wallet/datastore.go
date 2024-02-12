@@ -158,9 +158,9 @@ type Txns interface {
 var ErrKeyImportNotImplemented = errors.New("key import not yet implemented")
 
 // Split off these imported key funcs from interface below. They need to be in
-// database encrypted blob storage.
+// database encrypted blob storage. Imported keys are Not implemented this cut.
 type ImportedKeys interface {
-	// Import a loose private key not part of the keychain
+	// Import a loose private key which is not part of the keychain
 	// ErKeyImportNotImplemented
 	ImportKey(scriptAddress []byte, key *btcec.PrivateKey) error
 
@@ -175,19 +175,20 @@ type ImportedKeys interface {
 // Keys provides a database interface for the wallet to:
 // - Track used keys by key path
 // - Manage the look ahead window.
-// - No HD keys are stored in the database. All HD keys are derived 'on the fly'
+//
+// No HD keys are stored in the database. All HD keys are derived 'on the fly'
 type Keys interface {
-	// Put a bip32 key path to the database
+	// Put a bip32 key path into the database
 	Put(hash160 []byte, keyPath KeyPath) error
 
-	// Mark the script as used
+	// Mark the key as used
 	MarkKeyAsUsed(scriptAddress []byte) error
 
 	// Fetch the last index for the given key purpose
 	// The bool should state whether the key has been used or not
 	GetLastKeyIndex(purpose KeyPurpose) (int, bool, error)
 
-	// Returns the first unused path for the given purpose
+	// Returns the path for the given key
 	GetPathForKey(scriptAddress []byte) (KeyPath, error)
 
 	// Get a list of unused key indexes for the given purpose
@@ -199,6 +200,9 @@ type Keys interface {
 	// Get the number of unused keys following the last used key
 	// for each key purpose.
 	GetLookaheadWindows() map[KeyPurpose]int
+
+	// Debug dump
+	GetDbg() string
 }
 
 // Subscriptions is used to track ElectrumX scriptHash status change

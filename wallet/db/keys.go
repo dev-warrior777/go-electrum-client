@@ -219,6 +219,14 @@ func (k *KeysDB) GetAll() ([]wallet.KeyPath, error) {
 	return ret, nil
 }
 
+// TODO: Implement dbg keys from bbolt keys
+// For now the `sqlite3` tool gives us this
+func (k *KeysDB) GetDbg() string {
+	var ret string = "TODO{}"
+	//
+	return ret
+}
+
 func (k *KeysDB) GetLookaheadWindows() map[wallet.KeyPurpose]int {
 	k.lock.RLock()
 	defer k.lock.RUnlock()

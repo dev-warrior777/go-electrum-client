@@ -93,8 +93,8 @@ func (ec *BtcElectrumClient) RecreateWallet(pw, mnenomic string) error {
 			"test will overwrite\n", cfg.DataDir)
 	}
 
-	// Select wallet datastore
-	boltDatastore, err := bdb.Create(cfg.DataDir)
+	// Select wallet datastore - false = RW database
+	boltDatastore, err := bdb.Create(cfg.DataDir, false)
 	if err != nil {
 		return err
 	}

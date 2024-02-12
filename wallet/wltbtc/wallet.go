@@ -15,7 +15,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcwallet/wallet/txrules"
-	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	"github.com/tyler-smith/go-bip39"
 )
@@ -159,12 +158,8 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 		fmt.Println("Created: ", w.creationDate)
 		fmt.Println(hex.EncodeToString(sm.store.Seed))
 		fmt.Println("Created Addresses:")
-		fmt.Println(" --- Receiving ---")
-		for i, adr := range w.txstore.adrs {
-			fmt.Printf("%d %v\n", i, adr)
-			if i == client.GAP_LIMIT-1 {
-				fmt.Println(" --- Change ---")
-			}
+		for _, adr := range w.txstore.adrs {
+			fmt.Printf("%v\n", adr)
 		}
 	}
 	return w, nil
@@ -215,12 +210,8 @@ func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrum
 		fmt.Println("Stored Creation Date: ", w.creationDate)
 		fmt.Println(hex.EncodeToString(sm.store.Seed))
 		fmt.Println("Loaded Addresses:")
-		fmt.Println(" --- Receiving ---")
-		for i, adr := range w.txstore.adrs {
-			fmt.Printf("%d %v\n", i, adr)
-			if i == client.GAP_LIMIT-1 {
-				fmt.Println(" --- Change ---")
-			}
+		for _, adr := range w.txstore.adrs {
+			fmt.Printf("%v\n", adr)
 		}
 	}
 

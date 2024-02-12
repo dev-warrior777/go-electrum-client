@@ -3,6 +3,7 @@ module github.com/dev-warrior777/go-electrum-client
 go 1.20
 
 require (
+	github.com/boltdb/bolt v1.3.1
 	github.com/btcsuite/btcd v0.23.4
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	github.com/btcsuite/btcd/btcutil v1.1.3
@@ -17,7 +18,6 @@ require (
 
 require (
 	github.com/aead/siphash v1.0.1 // indirect
-	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.3 // indirect
 	github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23 // indirect
 )
