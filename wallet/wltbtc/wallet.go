@@ -254,13 +254,14 @@ func (w *BtcElectrumWallet) IsDust(amount int64) bool {
 
 // GetAddress gets an address given a KeyPath.
 // It is used for Rescan and has no concept of gap-limit. It is expected that
-// keys are just temporarily used to generate addresses for rescan.
+// keys made here are just temporarily used to generate addresses for rescan.
 func (w *BtcElectrumWallet) GetAddress(kp *wallet.KeyPath /*, addressType*/) (btcutil.Address, error) {
 	key, err := w.keyManager.generateChildKey(kp.Purpose, uint32(kp.Index))
 	if err != nil {
 		return nil, err
 	}
 	address, err := key.Address(w.params)
+	key.Zero()
 	if err != nil {
 		return nil, err
 	}
