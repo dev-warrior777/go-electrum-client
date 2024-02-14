@@ -90,14 +90,6 @@ func RecreateElectrumWallet(config *wallet.WalletConfig, pw, mnemonic string) (*
 	return makeBtcElectrumWallet(config, pw, seed)
 }
 
-func LoadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrumWallet, error) {
-	if pw == "" {
-		return nil, ErrEmptyPassword
-	}
-
-	return loadBtcElectrumWallet(config, pw)
-}
-
 func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) (*BtcElectrumWallet, error) {
 
 	// dbg
@@ -153,7 +145,7 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 		return nil, err
 	}
 
-	// Debug: remove
+	// TODO: Debug: remove
 	if config.Params != &chaincfg.MainNetParams {
 		fmt.Println("Created: ", w.creationDate)
 		fmt.Println(hex.EncodeToString(sm.store.Seed))
@@ -163,6 +155,14 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 		}
 	}
 	return w, nil
+}
+
+func LoadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrumWallet, error) {
+	if pw == "" {
+		return nil, ErrEmptyPassword
+	}
+
+	return loadBtcElectrumWallet(config, pw)
 }
 
 func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrumWallet, error) {
@@ -205,7 +205,7 @@ func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrum
 		return nil, err
 	}
 
-	// Debug: remove
+	// TODO: Debug: remove
 	if config.Params != &chaincfg.MainNetParams {
 		fmt.Println("Stored Creation Date: ", w.creationDate)
 		fmt.Println(hex.EncodeToString(sm.store.Seed))
@@ -250,6 +250,26 @@ func (w *BtcElectrumWallet) CurrencyCode() string {
 func (w *BtcElectrumWallet) IsDust(amount int64) bool {
 	// This is a per mempool policy thing .. < 1000 sats for now
 	return btcutil.Amount(amount) < txrules.DefaultRelayFeePerKb
+}
+
+// GetAddress gets an address given a KeyPath.
+// It is used for Rescan and has no concept of gap-limit. It is expected that
+// keys are just temporarily used to generate addresses for rescan.
+func (w *BtcElectrumWallet) GetAddress(kp *wallet.KeyPath /*, addressType*/) (btcutil.Address, error) {
+	key, err := w.keyManager.generateChildKey(kp.Purpose, uint32(kp.Index))
+	if err != nil {
+		return nil, err
+	}
+	address, err := key.Address(w.params)
+	if err != nil {
+		return nil, err
+	}
+	script := address.ScriptAddress()
+	segwitAddress, err := btcutil.NewAddressWitnessPubKeyHash(script, w.params)
+	if err != nil {
+		return nil, err
+	}
+	return segwitAddress, nil
 }
 
 func (w *BtcElectrumWallet) GetUnusedAddress(purpose wallet.KeyPurpose) (btcutil.Address, error) {

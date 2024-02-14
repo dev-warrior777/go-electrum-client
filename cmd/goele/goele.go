@@ -72,7 +72,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 			// Net: "tcp", Addr: "blockstream.info:143",
 		}
 		cfg.StoreEncSeed = true
-		// cfg.Testing = true
+		cfg.Testing = true
 	case "mainnet":
 		cfg.Params = &chaincfg.MainNetParams
 		cfg.TrustedPeer = electrumx.ServerAddr{
@@ -146,6 +146,7 @@ func main() {
 		// for non-mainnet testing recreate a wallet with a known set of keys ..
 		var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
 		err := ec.RecreateWallet("abc", mnemonic)
+		// err := ec.LoadWallet("abc")
 		if err != nil {
 			ec.GetNode().Stop()
 			fmt.Println(err, " - exiting")
@@ -154,7 +155,16 @@ func main() {
 
 	} else if net == "testnet3" {
 
-		// uncomment to create ->
+		// err := ec.RecreateWallet("abc", "canyon trip truly ritual lonely quiz romance rose alone journey like bronze")
+		// if err != nil {
+		// 	ec.GetNode().Stop()
+		// 	fmt.Println(err, " - exiting")
+		// 	os.Exit(1)
+		// }
+
+		// Or
+
+		// uncomment to create new ->
 		// err := ec.CreateWallet("abc")
 		// if err != nil {
 		// 	ec.GetNode().Stop()

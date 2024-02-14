@@ -2,7 +2,6 @@ package btc
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path"
 
@@ -50,27 +49,57 @@ func (ec *BtcElectrumClient) GetNode() electrumx.ElectrumXNode {
 	return ec.Node
 }
 
+func (ec *BtcElectrumClient) walletExists() bool {
+	cfg := ec.ClientConfig
+	datadir := ec.ClientConfig.DataDir
+	var walletName = ""
+	switch cfg.DbType {
+	case client.DbTypeBolt:
+		walletName = "wallet.bdb"
+	case client.DbTypeSqlite:
+		walletName = "wallet.db"
+	}
+	if _, err := os.Stat(path.Join(datadir, walletName)); err != nil {
+		return false
+	}
+	return true
+}
+
+func (ec *BtcElectrumClient) getDatastore() error {
+	cfg := ec.ClientConfig
+	switch cfg.DbType {
+	case client.DbTypeBolt:
+		// Select a bbolt wallet datastore - false = RW database
+		boltDatastore, err := bdb.Create(cfg.DataDir, false)
+		if err != nil {
+			return err
+		}
+		cfg.DB = boltDatastore
+	case client.DbTypeSqlite:
+		// Select a sqlite wallet datastore
+		sqliteDatastore, err := db.Create(cfg.DataDir)
+		if err != nil {
+			return err
+		}
+		cfg.DB = sqliteDatastore
+	default:
+		return errors.New("unknown database type")
+	}
+	return nil
+}
+
 // CreateWallet makes a new wallet with a new seed. The password is to encrypt
 // stored xpub, xprv and other sensitive data.
 func (ec *BtcElectrumClient) CreateWallet(pw string) error {
-	cfg := ec.ClientConfig
-	datadir := ec.ClientConfig.DataDir
-	if _, err := os.Stat(path.Join(datadir, "wallet.db")); err == nil {
-		if !ec.ClientConfig.Testing {
-			return errors.New("wallet.db already exists")
-		}
-		fmt.Printf("a file wallet.db probably exists in the datadir: %s .. \n"+
-			"test will overwrite\n", cfg.DataDir)
+	if ec.walletExists() {
+		return errors.New("wallet already exists")
 	}
-
-	// Select wallet datastore
-	sqliteDatastore, err := db.Create(cfg.DataDir)
+	err := ec.getDatastore()
 	if err != nil {
 		return err
 	}
-	cfg.DB = sqliteDatastore
 
-	walletCfg := cfg.MakeWalletConfig()
+	walletCfg := ec.ClientConfig.MakeWalletConfig()
 
 	ec.Wallet, err = wltbtc.NewBtcElectrumWallet(walletCfg, pw)
 	if err != nil {
@@ -83,30 +112,22 @@ func (ec *BtcElectrumClient) CreateWallet(pw string) error {
 // The password is to encrypt the stored xpub, xprv and other sensitive data
 // and can be different from the original wallet's password.
 func (ec *BtcElectrumClient) RecreateWallet(pw, mnenomic string) error {
-	cfg := ec.ClientConfig
-	datadir := ec.ClientConfig.DataDir
-	if _, err := os.Stat(path.Join(datadir, "wallet.db")); err == nil {
-		if !ec.ClientConfig.Testing {
-			return errors.New("wallet.db already exists")
-		}
-		fmt.Printf("a file wallet.db probably exists in the datadir: %s .. \n"+
-			"test will overwrite\n", cfg.DataDir)
+	if ec.walletExists() {
+		//TODO: should we backup any wallet file that exists
+		return errors.New("wallet already exists")
 	}
-
-	// Select wallet datastore - false = RW database
-	boltDatastore, err := bdb.Create(cfg.DataDir, false)
+	err := ec.getDatastore()
 	if err != nil {
 		return err
 	}
-	cfg.DB = boltDatastore
-	// sqliteDatastore, err := db.Create(cfg.DataDir)
-	// if err != nil {
-	// 	return err
-	// }
-	// cfg.DB = sqliteDatastore
-
-	walletCfg := cfg.MakeWalletConfig()
+	walletCfg := ec.ClientConfig.MakeWalletConfig()
 	ec.Wallet, err = wltbtc.RecreateElectrumWallet(walletCfg, pw, mnenomic)
+	if err != nil {
+		return err
+	}
+	// Do a rescan as alhough we have a wallet structure with a keychain we
+	// do not have any transaction history
+	ec.RescanWallet()
 	if err != nil {
 		return err
 	}
@@ -116,16 +137,14 @@ func (ec *BtcElectrumClient) RecreateWallet(pw, mnenomic string) error {
 // LoadWallet loads an existing wallet. The password is required to decrypt
 // the stored xpub, xprv and other sensitive data
 func (ec *BtcElectrumClient) LoadWallet(pw string) error {
-	cfg := ec.ClientConfig
-
-	// Select wallet datastore
-	sqliteDatastore, err := db.Create(cfg.DataDir)
+	if !ec.walletExists() {
+		return errors.New("cannot find wallet")
+	}
+	err := ec.getDatastore()
 	if err != nil {
 		return err
 	}
-	cfg.DB = sqliteDatastore
-
-	walletCfg := cfg.MakeWalletConfig()
+	walletCfg := ec.ClientConfig.MakeWalletConfig()
 	ec.Wallet, err = wltbtc.LoadBtcElectrumWallet(walletCfg, pw)
 	if err != nil {
 		return err

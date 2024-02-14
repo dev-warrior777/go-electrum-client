@@ -44,7 +44,9 @@ func NewTxStore(params *chaincfg.Params, db wallet.Datastore, keyManager *KeyMan
 	return txs, nil
 }
 
-// PopulateAdrs just puts a bunch of adrs in ram; it doesn't touch the DB
+// PopulateAdrs makes a list of addresses from the key-index pairs we have in the
+// database. The key-pairs we have stored are returned in index order. PopulateAdrs
+// also makes a current list of transactions in the database. It never mutates the DB
 func (ts *TxStore) PopulateAdrs() {
 	keys := ts.keyManager.GetKeys()
 	ts.addrMutex.Lock()
@@ -73,7 +75,7 @@ func (ts *TxStore) PopulateAdrs() {
 	ts.txidsMutex.Unlock()
 }
 
-// AddTransaction puts a tx into the DB atomically.
+// AddTransaction puts a tx into the database atomically.
 func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.Time) (uint32, error) {
 	var hits uint32
 	var err error
@@ -110,12 +112,11 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 		}
 	}
 
-	// Generate PKscripts for all addresses
+	// Generate PKH scripts for all addresses in our list
 	ts.addrMutex.Lock()
-	PKscripts := make([][]byte, len(ts.adrs))
+	pkScripts := make([][]byte, len(ts.adrs))
 	for i := range ts.adrs {
-		// Iterate through all our addresses
-		PKscripts[i], err = txscript.PayToAddrScript(ts.adrs[i])
+		pkScripts[i], err = txscript.PayToAddrScript(ts.adrs[i])
 		if err != nil {
 			ts.addrMutex.Unlock()
 			return hits, err
@@ -130,7 +131,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 	for i, txout := range tx.TxOut {
 		// Ignore the error here because the sender could have used an exotic script
 		// for his change and we don't want to fail in that case.
-		for _, script := range PKscripts {
+		for _, script := range pkScripts {
 			if bytes.Equal(txout.PkScript, script) { // new utxo found
 				scriptAddress, _ := ts.extractScriptAddress(txout.PkScript)
 				ts.keyManager.MarkKeyAsUsed(scriptAddress)

@@ -36,5 +36,8 @@ __debug_bin*
 #kept spv related versions of files being changed
 *.spv
 
+#kept orig related versions of files being changed
+*.orig
+
 #rpc test
 client/btc/rpc_test/client

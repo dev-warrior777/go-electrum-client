@@ -15,7 +15,9 @@ import (
 )
 
 const (
-	appName = "goele"
+	appName      = "goele"
+	DbTypeBolt   = "bbolt"
+	DbTypeSqlite = "sqlite"
 )
 
 type ClientConfig struct {
@@ -33,6 +35,9 @@ type ClientConfig struct {
 
 	// Location of the data directory
 	DataDir string
+
+	// Database implementation type (bbolt or sqlite)
+	DbType string
 
 	// An implementation of the Datastore interface
 	DB wallet.Datastore
@@ -74,6 +79,7 @@ func NewDefaultConfig() *ClientConfig {
 		Params:               &chaincfg.MainNetParams,
 		UserAgent:            appName,
 		DataDir:              btcutil.AppDataDir(appName, false),
+		DbType:               DbTypeBolt,
 		DB:                   nil, // concrete impl
 		DisableExchangeRates: true,
 		RPCTestPort:          8888,
@@ -85,6 +91,7 @@ func (cc *ClientConfig) MakeWalletConfig() *wallet.WalletConfig {
 		Params:       cc.Params,
 		StoreEncSeed: cc.StoreEncSeed,
 		DataDir:      cc.DataDir,
+		DbType:       cc.DbType,
 		DB:           cc.DB,
 		LowFee:       cc.LowFee,
 		MediumFee:    cc.MediumFee,

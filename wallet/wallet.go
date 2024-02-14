@@ -21,6 +21,8 @@ type WalletConfig struct {
 	// Store the seed in encrypted storage
 	StoreEncSeed bool
 
+	DbType string
+
 	// Location of the data directory
 	DataDir string
 
@@ -55,6 +57,9 @@ type ElectrumWallet interface {
 
 	// Check if this amount is considered dust < 1000 sats/equivalent for now
 	IsDust(amount int64) bool
+
+	// GetAddress gets an address given a KeyPath. It is used for Rescan
+	GetAddress(kp *KeyPath) (btcutil.Address, error)
 
 	// GetUnusedAddress returns an address suitable for receiving payments.
 	// `purpose` specifies whether the address should be internal or external.
