@@ -1,8 +1,10 @@
 package btc
 
 import (
+	"encoding/hex"
 	"fmt"
 
+	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -15,19 +17,13 @@ func (ec *BtcElectrumClient) RescanWallet() error {
 		return ErrNoWallet
 	}
 
-	// hdrs := ec.clientHeaders
-
-	// We start from a recent height. For testnet/mainnet that is the lastest
-	// checkpoint, for regtest that is 0. Since all wallets have a birthday
-	// after this height we do not need to search any further back than this.
-	// startPointHeight := hdrs.startPoint
-	// endHeight := hdrs.tip
-
 	// highest key index we will try for now
 	highestKeyIndex := 100
+	historyHitIndex := 0
 
-	for purpose := 0; purpose < 2; purpose++ {
-		for keyIndex := 0; keyIndex <= highestKeyIndex; keyIndex++ {
+	for keyIndex := 0; keyIndex <= highestKeyIndex; keyIndex++ {
+		// flip-flop internal/external to improve locality
+		for purpose := 0; purpose < 2; purpose++ {
 			keyPath := &wallet.KeyPath{
 				Purpose: wallet.KeyPurpose(purpose),
 				Index:   keyIndex,
@@ -37,7 +33,55 @@ func (ec *BtcElectrumClient) RescanWallet() error {
 				fmt.Printf("bad address for: %d:%d\n", keyIndex, purpose)
 				continue
 			}
-			fmt.Printf("Address: %s Index:purpose %d:%d\n", address.String(), keyIndex, purpose)
+			scripthash, err := addressToElectrumScripthash(address)
+			if err != nil {
+				fmt.Printf("cannot make script hash for address: %s\n", address.String())
+				continue
+			}
+			fmt.Printf("%s %s  Index:purpose %d:%d\n", address.String(), scripthash, keyIndex, purpose)
+
+			history, err := ec.GetNode().GetHistory(scripthash)
+			if err != nil {
+				fmt.Printf("error: %v - for scripthash %s\n", scripthash, err)
+				continue
+			}
+			if len(history) == 0 {
+				// fmt.Printf("No history for script hash from node: %s\n", scripthash)
+				continue
+			}
+			// got history - update the highest hit index
+			historyHitIndex = keyIndex
+			for _, h := range history {
+				fmt.Println(" Height:", h.Height)
+				fmt.Println(" TxHash: ", h.TxHash)
+				fmt.Println(" Fee: ", h.Fee)
+			}
+			pkScriptBytes, err := w.AddressToScript(address)
+			if err != nil {
+				fmt.Printf("cannot make pkScript for address: %s\n", address.String())
+				continue
+			}
+			hex.EncodeToString(pkScriptBytes)
+			subscription := &wallet.Subscription{
+				PkScript:           hex.EncodeToString(pkScriptBytes),
+				ElectrumScripthash: scripthash,
+				Address:            address.String(),
+			}
+			err = w.AddSubscription(subscription)
+			if err != nil {
+				fmt.Printf("cannot add subscritpion for address: %s\n", address.String())
+				ec.dumpSubscription("failed to add", subscription)
+				continue
+			}
+			fmt.Printf("Added subscritpion for address: %s to wallet subscriptions\n", address.String())
+		}
+
+		// ** Experimental - if no more history hits for another GAP_LIMIT tries **
+		// consider the job done.
+		if keyIndex > historyHitIndex+client.GAP_LIMIT {
+			fmt.Printf("keyIndex: %d greater than highest history found index %d by GAP_LIMIT %d\n\n",
+				keyIndex, historyHitIndex, client.GAP_LIMIT)
+			break
 		}
 	}
 

@@ -144,9 +144,13 @@ func main() {
 	if net == "regtest" {
 
 		// for non-mainnet testing recreate a wallet with a known set of keys ..
-		var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
-		err := ec.RecreateWallet("abc", mnemonic)
-		// err := ec.LoadWallet("abc")
+		// var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
+		// err := ec.RecreateWallet("abc", mnemonic)
+		//
+		// ...therafter load said wallet; careful no params change in harness script
+		// that invalidate current wallet txs.
+		//
+		err := ec.LoadWallet("abc")
 		if err != nil {
 			ec.GetNode().Stop()
 			fmt.Println(err, " - exiting")
