@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
 )
 
 type positional []any
@@ -74,16 +73,6 @@ func prepareRequest(id uint64, method string, args any) ([]byte, error) {
 	if args == nil {
 		args = []json.RawMessage{}
 	}
-	// else {
-	// 	switch reflect.TypeOf(args).Kind() {
-	// 	case reflect.Interface, reflect.Pointer, reflect.Slice, reflect.Map:
-	// 		if reflect.ValueOf(args).IsNil() {
-	// 			args = []json.RawMessage{}
-	// 		}
-	// 	default:
-	// 	}
-	// }
-
 	switch rt := reflect.TypeOf(args); rt.Kind() {
 	case reflect.Struct, reflect.Slice:
 	case reflect.Ptr: // allow pointer to struct
@@ -105,22 +94,4 @@ func prepareRequest(id uint64, method string, args any) ([]byte, error) {
 		Params:  params,
 	}
 	return json.Marshal(req)
-}
-
-// floatString is for unmarshalling a string with a float like "123.34" directly
-// into a float64 instead of a string and then converting later.
-type floatString float64
-
-func (fs *floatString) UnmarshalJSON(b []byte) error {
-	// Try to strip the string contents out of quotes.
-	var str string
-	if err := json.Unmarshal(b, &str); err != nil {
-		return err // wasn't a string
-	}
-	fl, err := strconv.ParseFloat(str, 64)
-	if err != nil {
-		return err // The string didn't contain a float.
-	}
-	*fs = floatString(fl)
-	return nil
 }

@@ -117,8 +117,9 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 	sm.store.Xpub = mPubKey.String()
 	sm.store.ShaPw = chainhash.HashB([]byte(pw))
 	if config.StoreEncSeed {
-		sm.store.Seed = make([]byte, len(seed))
-		copy(sm.store.Seed, seed)
+		// sm.store.Seed = make([]byte, len(seed))
+		// copy(sm.store.Seed, seed)
+		sm.store.Seed = bytes.Clone(seed)
 	}
 	err = sm.Put(pw)
 	if err != nil {

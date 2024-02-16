@@ -77,7 +77,7 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 // Python console-like subset
 /////////////////////////////
 
-// Spend tries to create a new transaction to pay amount from the wallet to
+// Spend tries to create a new transaction to pay an amount from the wallet to
 // toAddress. It returns Tx & Txid as hex strings and the index of any change
 // output or -1 if none. The client needs to know the change address so it can
 // set up notification of change address status after ElectrumX later broadcasts
