@@ -36,5 +36,5 @@ For `sqlite3` has it's own viewing for tables and records.
 
 There is code to rescan for wallet transactions when re-creating a wallet from seed.
 
-The assumptions about GAP_LIMIT are *experimental* so please do not use for mainnet.
+The assumptions about GAP_LIMIT are _experimental_ so please do not use for mainnet.
 Tested on regtest and testnet.

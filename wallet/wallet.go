@@ -69,6 +69,11 @@ type ElectrumWallet interface {
 	// address.
 	GetUnusedAddress(purpose KeyPurpose) (btcutil.Address, error)
 
+	// GetUnusedLegacyAddress returns an address suitable for receiving payments
+	// from legacy wallets, exchanges, etc. It will only give out external addr-
+	// esses for receiving funds; not change addresses.
+	GetUnusedLegacyAddress() (btcutil.Address, error)
+
 	// Marks the address as used (involved in at least one transaction)
 	MarkAddressUsed(address btcutil.Address) error
 
@@ -161,6 +166,7 @@ type ElectrumWallet interface {
 // Errors
 var (
 	ErrDustAmount error = errors.New("amount is below network dust treshold")
+
 	// ErrInsufficientFunds is returned when the wallet is unable to send the
 	// amount specified due to the balance being too low
 	ErrInsufficientFunds = errors.New("ERROR_INSUFFICIENT_FUNDS")

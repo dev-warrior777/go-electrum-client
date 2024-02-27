@@ -117,8 +117,6 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 	sm.store.Xpub = mPubKey.String()
 	sm.store.ShaPw = chainhash.HashB([]byte(pw))
 	if config.StoreEncSeed {
-		// sm.store.Seed = make([]byte, len(seed))
-		// copy(sm.store.Seed, seed)
 		sm.store.Seed = bytes.Clone(seed)
 	}
 	err = sm.Put(pw)
@@ -289,8 +287,21 @@ func (w *BtcElectrumWallet) GetUnusedAddress(purpose wallet.KeyPurpose) (btcutil
 	if swerr != nil {
 		return nil, swerr
 	}
-
 	return segwitAddress, nil
+}
+
+// For receiving simple payments from legacy wallets only!
+func (w *BtcElectrumWallet) GetUnusedLegacyAddress() (btcutil.Address, error) {
+	key, err := w.keyManager.GetUnusedKey(wallet.RECEIVING)
+	if err != nil {
+		return nil, nil
+	}
+	addrP2PKH, err := key.Address(w.params)
+	key.Zero()
+	if err != nil {
+		return nil, nil
+	}
+	return addrP2PKH, nil
 }
 
 // Marks the address as used (involved in at least one transaction)
