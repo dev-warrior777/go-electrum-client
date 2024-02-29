@@ -16,6 +16,10 @@ func (ec *BtcElectrumClient) RescanWallet() error {
 	if w == nil {
 		return ErrNoWallet
 	}
+	node := ec.GetNode()
+	if node == nil {
+		return ErrNoNode
+	}
 
 	// highest key index we will try for now
 	highestKeyIndex := 100
@@ -40,7 +44,7 @@ func (ec *BtcElectrumClient) RescanWallet() error {
 			}
 			fmt.Printf("%s %s  Index:purpose %d:%d\n", address.String(), scripthash, keyIndex, purpose)
 
-			history, err := ec.GetNode().GetHistory(scripthash)
+			history, err := node.GetHistory(scripthash)
 			if err != nil {
 				fmt.Printf("error: %v - for scripthash %s\n", scripthash, err)
 				continue

@@ -807,6 +807,26 @@ func (sc *ServerConn) GetHistory(ctx context.Context, scripthash string) (Histor
 	return resp, nil
 }
 
+type ListUnspent struct {
+	Height int64  `json:"height"`
+	TxPos  int64  `json:"tx_pos"`
+	TxHash string `json:"tx_hash"`
+	Value  int64  `json:"value"` // satoshis
+}
+
+type ListUnspentResult []ListUnspent
+
+// GetListUnspent gets a list of [{height, txid tx_pos and value},...] for
+// the scripthash of an address of interest to the client
+func (sc *ServerConn) GetListUnspent(ctx context.Context, scripthash string) (ListUnspentResult, error) {
+	var resp ListUnspentResult
+	err := sc.Request(ctx, "blockchain.scripthash.listunspent", positional{scripthash}, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
 // ////////////////////////////////////////////////////////////////////////////
 // other wallet methods
 // ////////////////////

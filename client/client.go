@@ -57,6 +57,8 @@ type ElectrumClient interface {
 	//
 	SyncWallet() error
 	RescanWallet() error
+	ImportAndSweep(keys []string) error
+	//
 	Close()
 	//
 	// Simple RPC server for test only; not production

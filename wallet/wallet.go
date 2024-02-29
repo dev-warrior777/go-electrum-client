@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
-	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -151,7 +150,7 @@ type ElectrumWallet interface {
 	EstimateFee(ins []TransactionInput, outs []TransactionOutput, feePerByte int64) int64
 
 	// Build a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
-	SweepAddress(ins []TransactionInput, address btcutil.Address, key *hd.ExtendedKey, redeemScript []byte, feeLevel FeeLevel) (*wire.MsgTx, error)
+	// SweepAddress(ins []TransactionInput, address btcutil.Address, key *hd.ExtendedKey, redeemScript []byte, feeLevel FeeLevel) (*wire.MsgTx, error)
 
 	// CPFP logic; rbf not supported
 	BumpFee(txid chainhash.Hash) (*wire.MsgTx, error)
