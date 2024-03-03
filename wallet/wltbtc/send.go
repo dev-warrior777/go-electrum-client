@@ -137,7 +137,7 @@ func (w *BtcElectrumWallet) buildTx(
 	// create input source
 	coins := w.gatherCoins(true)
 	for i, coin := range coins {
-		fmt.Println(i, coin.Hash().String(), coin.Index())
+		fmt.Println(i, coin.Hash().String(), coin.Index(), coin.PkScript())
 	}
 
 	var prevScripts map[wire.OutPoint]*wire.TxOut

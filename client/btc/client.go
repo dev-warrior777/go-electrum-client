@@ -127,7 +127,7 @@ func (ec *BtcElectrumClient) RecreateWallet(pw, mnenomic string) error {
 	}
 	// Do a rescan as alhough we have a wallet structure with a keychain we
 	// do not have any transaction history
-	ec.RescanWallet()
+	err = ec.RescanWallet()
 	if err != nil {
 		return err
 	}

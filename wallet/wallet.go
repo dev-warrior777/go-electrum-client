@@ -1,7 +1,10 @@
 package wallet
 
 import (
+	"encoding/hex"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -152,6 +155,12 @@ type ElectrumWallet interface {
 	// Build a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
 	// SweepAddress(ins []TransactionInput, address btcutil.Address, key *hd.ExtendedKey, redeemScript []byte, feeLevel FeeLevel) (*wire.MsgTx, error)
 
+	// Build a transaction that sweeps all coins from a non-wallet private key
+	SweepCoins(coins []TransactionInput, feeLevel FeeLevel) (int, *wire.MsgTx, error)
+
+	// Build a transaction that sweeps all coins from a list of non-wallet private keya
+	// SweepCoins(ins []TransactionInput, feeLevel FeeLevel) ([]int, []*wire.MsgTx, error)
+
 	// CPFP logic; rbf not supported
 	BumpFee(txid chainhash.Hash) (*wire.MsgTx, error)
 
@@ -209,15 +218,44 @@ type TransactionOutput struct {
 	Address btcutil.Address
 	Value   int64
 	Index   uint32
-	OrderID string
 }
 
 type TransactionInput struct {
-	OutpointHash  []byte
-	OutpointIndex uint32
-	LinkedAddress btcutil.Address
+	Outpoint      *wire.OutPoint
+	Height        int64
 	Value         int64
-	OrderID       string
+	KeyPair       *btcutil.WIF
+	LinkedAddress btcutil.Address
+	RedeemScript  []byte
+}
+
+func (tin *TransactionInput) String() string {
+	var outPoint = ""
+	var linkedAddress = ""
+	var privkey string = ""
+	var pubkey string = ""
+	var redeemscript = ""
+	if tin.Outpoint != nil {
+		outPoint = tin.Outpoint.String()
+	}
+	if tin.LinkedAddress != nil {
+		linkedAddress = fmt.Sprintf("%s %x", tin.LinkedAddress.String(), tin.LinkedAddress.ScriptAddress())
+	}
+	if tin.KeyPair != nil {
+		privkey = hex.EncodeToString(tin.KeyPair.PrivKey.Serialize())
+		pubkey = hex.EncodeToString(tin.KeyPair.SerializePubKey())
+	}
+	if len(tin.RedeemScript) > 0 {
+		redeemscript = hex.EncodeToString(tin.RedeemScript)
+	}
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Outpoint:      %s\n", outPoint))
+	sb.WriteString(fmt.Sprintf("Height:        %d\n", tin.Height))
+	sb.WriteString(fmt.Sprintf("Value:         %d sats\n", tin.Value))
+	sb.WriteString(fmt.Sprintf("LinkedAddress: %s\n", linkedAddress))
+	sb.WriteString(fmt.Sprintf("KeyPair:       %s %s\n", privkey, pubkey))
+	sb.WriteString(fmt.Sprintf("RedeemScript:  %s\n", redeemscript))
+	return sb.String()
 }
 
 // This object contains a single signature for a multisig transaction. InputIndex specifies

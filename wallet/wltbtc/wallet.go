@@ -210,7 +210,7 @@ func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrum
 		fmt.Println(hex.EncodeToString(sm.store.Seed))
 		fmt.Println("Loaded Addresses:")
 		for _, adr := range w.txstore.adrs {
-			fmt.Printf("%v\n", adr)
+			fmt.Printf("%v  %s\n", adr, hex.EncodeToString(adr.ScriptAddress()))
 		}
 	}
 
@@ -502,9 +502,9 @@ func (w *BtcElectrumWallet) Close() {
 //////////////////////////////
 // implementations in sweep.go
 
-// // Build a transaction that sweeps all coins from an address. If it is a p2sh
-// // multisig then the redeemScript must be included.
 // SweepAddress(utxos []wallet.Utxo, address btcutil.Address, key *hdkeychain.ExtendedKey, redeemScript *[]byte, feeLevel wallet.FeeLevel) ([]byte, error)
+// Build a transaction that sweeps all coins from a non-wallet private key
+// SweepCoins(ins []TransactionInput, feeLevel FeeLevel) (int, *wire.MsgTx, error)
 
 ////////////////////////////////
 // implementations in bumpfee.go

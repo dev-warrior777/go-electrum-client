@@ -1,6 +1,8 @@
 package btc
 
 import (
+	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -9,191 +11,127 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-func (ec *BtcElectrumClient) getUtxosForPubKey(pubKey []byte) ([]utxoInfo, error) {
-	utxoList := make([]utxoInfo, 0, 1)
-	node := ec.GetNode()
-	if node == nil {
-		return utxoList, ErrNoNode
-	}
-	// make address p2pk
-	addressPubKey, err := btcutil.NewAddressPubKey(pubKey, ec.GetConfig().Params)
-	if err != nil {
-		return utxoList, err
-	}
-	// make scripthash
-	scripthash, err := addressToElectrumScripthash(addressPubKey)
-	if err != nil {
-		return utxoList, err
-	}
-	fmt.Printf("address: %s scriptHash: %s\n", addressPubKey.String(), scripthash)
-	// ask electrum
-	listUnspent, err := node.GetListUnspent(scripthash)
-	if err != nil {
-		return utxoList, err
-	}
-	for _, unspent := range listUnspent {
-		op, err := wire.NewOutPointFromString(
-			fmt.Sprintf("%s:%d", unspent.TxHash, unspent.TxPos))
-		if err != nil {
-			return utxoList, err
-		}
-		utxo := &wallet.Utxo{
-			Op:       *op,
-			AtHeight: unspent.Height,
-			Value:    unspent.Value,
-		}
-		utxoInfo := utxoInfo{
-			utxo:    utxo,
-			address: addressPubKey,
-		}
-		utxoList = append(utxoList, utxoInfo)
-	}
+func (ec *BtcElectrumClient) getPubKeyUtxos(keyPair *btcutil.WIF) ([]wallet.TransactionInput, error) {
+	utxoList := make([]wallet.TransactionInput, 0)
+	fmt.Println(keyPair)
 	return utxoList, nil
 }
 
-func (ec *BtcElectrumClient) getUtxosForPubKeyHash(pubKey []byte) ([]utxoInfo, error) {
-	utxoList := make([]utxoInfo, 0, 1)
+func (ec *BtcElectrumClient) getPubKeyHashUtxos(keyPair *btcutil.WIF) ([]wallet.TransactionInput, error) {
+	inputList := make([]wallet.TransactionInput, 0, 1)
+	pubKey := keyPair.SerializePubKey()
+
 	node := ec.GetNode()
 	if node == nil {
-		return utxoList, ErrNoNode
+		return inputList, ErrNoNode
 	}
 	// make address p2pkh
 	pkHash := btcutil.Hash160(pubKey)
 	addressPubKeyHash, err := btcutil.NewAddressPubKeyHash(pkHash, ec.GetConfig().Params)
 	if err != nil {
-		return utxoList, err
+		return inputList, err
 	}
 	// make scripthash
 	scripthash, err := addressToElectrumScripthash(addressPubKeyHash)
 	if err != nil {
 		fmt.Printf("cannot make script hash for address: %s\n", addressPubKeyHash.String())
-		return utxoList, err
+		return inputList, err
 	}
 	fmt.Printf("address: %s scriptHash: %s\n", addressPubKeyHash.String(), scripthash)
 	// ask electrum
 	listUnspent, err := node.GetListUnspent(scripthash)
 	if err != nil {
-		return utxoList, err
+		return inputList, err
 	}
 	for _, unspent := range listUnspent {
 		op, err := wire.NewOutPointFromString(
 			fmt.Sprintf("%s:%d", unspent.TxHash, unspent.TxPos))
 		if err != nil {
-			return utxoList, err
+			return inputList, err
 		}
-		utxo := &wallet.Utxo{
-			Op:       *op,
-			AtHeight: unspent.Height,
-			Value:    unspent.Value,
+		input := wallet.TransactionInput{
+			Outpoint:      op,
+			Height:        unspent.Height,
+			Value:         unspent.Value,
+			LinkedAddress: addressPubKeyHash,
+			RedeemScript:  []byte{},
+			KeyPair:       keyPair,
 		}
-		utxoInfo := utxoInfo{
-			utxo:    utxo,
-			address: addressPubKeyHash,
-		}
-		utxoList = append(utxoList, utxoInfo)
+		inputList = append(inputList, input)
 	}
+	return inputList, nil
+}
+
+func (ec *BtcElectrumClient) getWitnessPubKeyHashUtxos(keyPair *btcutil.WIF) ([]wallet.TransactionInput, error) {
+	utxoList := make([]wallet.TransactionInput, 0, 1)
+	fmt.Println(keyPair)
 	return utxoList, nil
 }
 
-func (ec *BtcElectrumClient) getUtxosForWitnessPubKeyHash(pubKey []byte) ([]utxoInfo, error) {
-	utxoList := make([]utxoInfo, 0, 1)
-	node := ec.GetNode()
-	if node == nil {
-		return utxoList, ErrNoNode
-	}
-	// make address p2wpkh
-	witnessProgram := btcutil.Hash160(pubKey)
-	addressWitnessPubKeyHash, err := btcutil.NewAddressWitnessPubKeyHash(witnessProgram, ec.GetConfig().Params)
-	if err != nil {
-		return utxoList, err
-	}
-	// make scripthash
-	scripthash, err := addressToElectrumScripthash(addressWitnessPubKeyHash)
-	if err != nil {
-		return utxoList, err
-	}
-	fmt.Printf("address: %s scriptHash: %s\n", addressWitnessPubKeyHash.String(), scripthash)
-	// ask electrum
-	listUnspent, err := node.GetListUnspent(scripthash)
-	if err != nil {
-		return utxoList, err
-	}
-	for _, unspent := range listUnspent {
-		op, err := wire.NewOutPointFromString(
-			fmt.Sprintf("%s:%d", unspent.TxHash, unspent.TxPos))
-		if err != nil {
-			return utxoList, err
-		}
-		utxo := &wallet.Utxo{
-			Op:       *op,
-			AtHeight: unspent.Height,
-			Value:    unspent.Value,
-		}
-		utxoInfo := utxoInfo{
-			utxo:    utxo,
-			address: addressWitnessPubKeyHash,
-		}
-		utxoList = append(utxoList, utxoInfo)
-	}
-	return utxoList, nil
-}
+func (ec *BtcElectrumClient) getUtxos(keyPair *btcutil.WIF) ([]wallet.TransactionInput, error) {
+	inputList := make([]wallet.TransactionInput, 0, 1)
 
-func (ec *BtcElectrumClient) getUtxos(pubKey []byte) ([]utxoInfo, error) {
-	utxoList := make([]utxoInfo, 0, 1)
-
-	// P2PK
-	p2pkUtxoList, err := ec.getUtxosForPubKey(pubKey)
+	// P2PK - including satoshi's coins maybe
+	p2pkInputList, err := ec.getPubKeyUtxos(keyPair)
 	if err != nil {
-		return utxoList, err
+		return inputList, err
 	}
-	fmt.Printf("found %d P2PK utxos\n", len(p2pkUtxoList))
-	utxoList = append(utxoList, p2pkUtxoList...)
+	fmt.Printf("found %d P2PK utxos\n", len(p2pkInputList))
+	inputList = append(inputList, p2pkInputList...)
 
 	// P2PKH
-	p2pkhUtxoList, err := ec.getUtxosForPubKeyHash(pubKey)
+	p2pkhInputList, err := ec.getPubKeyHashUtxos(keyPair)
 	if err != nil {
-		return utxoList, err
+		return inputList, err
 	}
-	fmt.Printf("found %d P2PKH utxos\n", len(p2pkhUtxoList))
-	utxoList = append(utxoList, p2pkhUtxoList...)
+	fmt.Printf("found %d P2PKH utxos\n", len(p2pkhInputList))
+	inputList = append(inputList, p2pkhInputList...)
 
 	// P2WPKH
-	p2wpkhUtxoList, err := ec.getUtxosForWitnessPubKeyHash(pubKey)
+	p2wpkhInputList, err := ec.getWitnessPubKeyHashUtxos(keyPair)
 	if err != nil {
-		return utxoList, err
+		return inputList, err
 	}
-	fmt.Printf("found %d P2WPKH utxos\n", len(p2wpkhUtxoList))
-	utxoList = append(utxoList, p2wpkhUtxoList...)
+	fmt.Printf("found %d P2WPKH utxos\n", len(p2wpkhInputList))
+	inputList = append(inputList, p2wpkhInputList...)
 
-	return utxoList, nil
-}
-
-type utxoInfo struct {
-	utxo    *wallet.Utxo    // utxo we will spend with spend key imported
-	address btcutil.Address // address & address type that electrumX stores
+	return inputList, nil
 }
 
 // ImportAndSweep imports privkeys from other wallets and builds a transaction that
 // sweeps their funds into our wallet.
-func (ec *BtcElectrumClient) ImportAndSweep(importedKeys []string) error {
+func (ec *BtcElectrumClient) ImportAndSweep(importedKeyPairs []string) error {
 	w := ec.GetWallet()
 	if w == nil {
 		return ErrNoWallet
 	}
-	if len(importedKeys) <= 0 {
+	if len(importedKeyPairs) <= 0 {
 		return errors.New("no keys")
 	}
-	for _, k := range importedKeys {
-		fmt.Printf("trying: %s\n", k)
-
+	for _, k := range importedKeyPairs {
 		wif, err := btcutil.DecodeWIF(k)
 		if err != nil {
 			fmt.Printf("warning cannot decode WIF from string: %s\n", k)
 			continue
 		}
-		pubKey := wif.SerializePubKey()
 
-		ec.getUtxos(pubKey)
+		inputs, err := ec.getUtxos(wif)
+		if err != nil {
+			fmt.Printf("warning cannot get utxos for pubkey: %s\n",
+				hex.EncodeToString(wif.SerializePubKey()))
+			continue
+		}
+		// for now just do one tx/key - later aggregate in wallet.SweepCoins.
+		_, tx, err := w.SweepCoins(inputs, wallet.NORMAL)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			continue
+		}
+		var sweepBuf bytes.Buffer
+		sweepBuf.Grow(tx.SerializeSize())
+		tx.Serialize(&sweepBuf)
+		fmt.Printf("Sweep Tx:      %x\n\n", sweepBuf.Bytes())
+		fmt.Printf("Sweep TxHash: (%v):\n", tx.TxHash())
 	}
 
 	return nil
