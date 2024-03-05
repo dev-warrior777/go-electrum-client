@@ -32,6 +32,10 @@ There is a utility `bd` to dump the goele structures in `wallet.bdb`.
 
 For `sqlite3` has it's own viewing for tables and records.
 
+## BIP39
+
+Goele uses BIP39 for wallet seeds. ELectrum uses it's own seed derivation.
+
 ## Rescan
 
 There is code to rescan for wallet transactions when re-creating a wallet from seed.

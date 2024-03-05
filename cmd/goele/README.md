@@ -1,10 +1,10 @@
 # The Goele BTC Test App
 
-The `goele` app can be used for functional testing of the `go-electrum-client` library. The app  loads a BTC regtest client wallet by default. Testnet can also be used. 
+The `goele` app can be used for functional testing of the `go-electrum-client` library. The app  loads a BTC regtest client wallet by default. Testnet can also be used.
 
 Wallets are at `/home/<user>/.config/goele/btc/<network>`. Regtest wallets should be deleted as necessary to synchronize txs with the a newly started harness.
 
-Use the harness scripts at `client/btc/test_harness`. When goele starts navigate to `client/btc/rpctest` and use the rpc test client.
+Use the harness scripts at `client/btc/test_harness`. When goele starts please navigate to `client/btc/rpctest` and use the rpc test client.
 
 ## RPC Test client
 

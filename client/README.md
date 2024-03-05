@@ -1,3 +1,3 @@
-**Package client**
+# Package client
 
-The interface between an electrum wallet and the node(s) it connects to
+The client is the interface between an electrum wallet and the node(s) it connects to.

@@ -1,4 +1,4 @@
 
-# Package btc
+# Package elxbtc
 
-BTC electrumX server.
+BTC ElectrumX connection(s) and RPC methods.
