@@ -147,7 +147,7 @@ func main() {
 		// var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
 		// err := ec.RecreateWallet("abc", mnemonic)
 		//
-		// ...therafter load said wallet; careful no params change in harness script
+		// ...therafter load the wallet; careful no params change in harness script
 		// that invalidate current wallet txs.
 		//
 		err := ec.LoadWallet("abc")

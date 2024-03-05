@@ -150,21 +150,15 @@ type ElectrumWallet interface {
 	Spend(pw string, amount int64, toAddress btcutil.Address, feeLevel FeeLevel) (int, *wire.MsgTx, error)
 
 	// Calculates the estimated size of the transaction and returns the total fee for the given feePerByte
-	EstimateFee(ins []TransactionInput, outs []TransactionOutput, feePerByte int64) int64
-
-	// Build a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
-	// SweepAddress(ins []TransactionInput, address btcutil.Address, key *hd.ExtendedKey, redeemScript []byte, feeLevel FeeLevel) (*wire.MsgTx, error)
+	EstimateFee(ins []InputInfo, outs []TransactionOutput, feePerByte int64) int64
 
 	// Build a transaction that sweeps all coins from a non-wallet private key
-	SweepCoins(coins []TransactionInput, feeLevel FeeLevel) (int, *wire.MsgTx, error)
-
-	// Build a transaction that sweeps all coins from a list of non-wallet private keya
-	// SweepCoins(ins []TransactionInput, feeLevel FeeLevel) ([]int, []*wire.MsgTx, error)
+	SweepCoins(coins []InputInfo, feeLevel FeeLevel, maxTxInputs int) ([]*wire.MsgTx, error)
 
 	// CPFP logic; rbf not supported
 	BumpFee(txid chainhash.Hash) (*wire.MsgTx, error)
 
-	// Update the height of the tip of the headers chain & the blockchain sync status.
+	// Update the height of the tip from the headers chain & the blockchain sync status.
 	UpdateTip(newTip int64, synced bool)
 
 	// Cleanly disconnect from the wallet
@@ -173,7 +167,7 @@ type ElectrumWallet interface {
 
 // Errors
 var (
-	ErrDustAmount error = errors.New("amount is below network dust treshold")
+	ErrDustAmount error = errors.New("amount is below network dust threshold")
 
 	// ErrInsufficientFunds is returned when the wallet is unable to send the
 	// amount specified due to the balance being too low
@@ -220,7 +214,7 @@ type TransactionOutput struct {
 	Index   uint32
 }
 
-type TransactionInput struct {
+type InputInfo struct {
 	Outpoint      *wire.OutPoint
 	Height        int64
 	Value         int64
@@ -229,38 +223,31 @@ type TransactionInput struct {
 	RedeemScript  []byte
 }
 
-func (tin *TransactionInput) String() string {
+func (info *InputInfo) String() string {
 	var outPoint = ""
 	var linkedAddress = ""
 	var privkey string = ""
 	var pubkey string = ""
 	var redeemscript = ""
-	if tin.Outpoint != nil {
-		outPoint = tin.Outpoint.String()
+	if info.Outpoint != nil {
+		outPoint = info.Outpoint.String()
 	}
-	if tin.LinkedAddress != nil {
-		linkedAddress = fmt.Sprintf("%s %x", tin.LinkedAddress.String(), tin.LinkedAddress.ScriptAddress())
+	if info.LinkedAddress != nil {
+		linkedAddress = fmt.Sprintf("%s %x", info.LinkedAddress.String(), info.LinkedAddress.ScriptAddress())
 	}
-	if tin.KeyPair != nil {
-		privkey = hex.EncodeToString(tin.KeyPair.PrivKey.Serialize())
-		pubkey = hex.EncodeToString(tin.KeyPair.SerializePubKey())
+	if info.KeyPair != nil {
+		privkey = hex.EncodeToString(info.KeyPair.PrivKey.Serialize())
+		pubkey = hex.EncodeToString(info.KeyPair.SerializePubKey())
 	}
-	if len(tin.RedeemScript) > 0 {
-		redeemscript = hex.EncodeToString(tin.RedeemScript)
+	if len(info.RedeemScript) > 0 {
+		redeemscript = hex.EncodeToString(info.RedeemScript)
 	}
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Outpoint:      %s\n", outPoint))
-	sb.WriteString(fmt.Sprintf("Height:        %d\n", tin.Height))
-	sb.WriteString(fmt.Sprintf("Value:         %d sats\n", tin.Value))
+	sb.WriteString(fmt.Sprintf("Height:        %d\n", info.Height))
+	sb.WriteString(fmt.Sprintf("Value:         %d sats\n", info.Value))
 	sb.WriteString(fmt.Sprintf("LinkedAddress: %s\n", linkedAddress))
 	sb.WriteString(fmt.Sprintf("KeyPair:       %s %s\n", privkey, pubkey))
 	sb.WriteString(fmt.Sprintf("RedeemScript:  %s\n", redeemscript))
 	return sb.String()
-}
-
-// This object contains a single signature for a multisig transaction. InputIndex specifies
-// the index for which this signature applies.
-type Signature struct {
-	InputIndex uint32
-	Signature  []byte
 }

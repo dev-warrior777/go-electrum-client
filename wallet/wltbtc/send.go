@@ -228,7 +228,7 @@ func (w *BtcElectrumWallet) GetFeePerByte(feeLevel wallet.FeeLevel) int64 {
 }
 
 func (w *BtcElectrumWallet) EstimateFee(
-	ins []wallet.TransactionInput,
+	ins []wallet.InputInfo,
 	outs []wallet.TransactionOutput,
 	feePerByte int64) int64 {
 
