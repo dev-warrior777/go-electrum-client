@@ -1,7 +1,6 @@
 package wltbtc
 
 import (
-	"bytes"
 	"encoding/hex"
 	"errors"
 	"sort"
@@ -147,25 +146,6 @@ func (m *mockKeyStore) GetPathForKey(scriptAddress []byte) (wallet.KeyPath, erro
 		return wallet.KeyPath{}, errors.New("key does not exist")
 	}
 	return key.path, nil
-}
-
-func (m *mockKeyStore) GetKey(scriptAddress []byte) (*btcec.PrivateKey, error) {
-	for _, k := range m.keys {
-		if k.path.Index == -1 && bytes.Equal(scriptAddress, k.scriptAddress) {
-			return k.key, nil
-		}
-	}
-	return nil, errors.New("not found")
-}
-
-func (m *mockKeyStore) GetImported() ([]*btcec.PrivateKey, error) {
-	var keys []*btcec.PrivateKey
-	for _, k := range m.keys {
-		if k.path.Index == -1 {
-			keys = append(keys, k.key)
-		}
-	}
-	return keys, nil
 }
 
 func (m *mockKeyStore) GetUnused(purpose wallet.KeyPurpose) ([]int, error) {

@@ -14,12 +14,11 @@ import (
 // Encrypted storage for btc. Stored as an encrypted blob in database.
 
 type Storage struct {
-	Version  string   `json:"version"`
-	Xprv     string   `json:"xprv"`
-	Xpub     string   `json:"xpub"`
-	ShaPw    []byte   `json:"shapw"`
-	Seed     []byte   `json:"seed,omitempty"`
-	Imported [][]byte `json:"imported,omitempty"`
+	Version string `json:"version"`
+	Xprv    string `json:"xprv"`
+	Xpub    string `json:"xpub"`
+	ShaPw   []byte `json:"shapw"`
+	Seed    []byte `json:"seed,omitempty"`
 }
 
 // String returns the string representation of the Storage but only of the
@@ -42,9 +41,6 @@ func (s *Storage) blank() {
 	s.Xpub = ""
 	zero(s.ShaPw)
 	zero(s.Seed)
-	for _, imp := range s.Imported {
-		zero(imp)
-	}
 	// runtime.GC()
 }
 

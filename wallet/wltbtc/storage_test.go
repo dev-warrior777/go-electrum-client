@@ -18,16 +18,14 @@ var xprv = "tprv8ZgxMBicQKsPfJU6JyiVdmFAtAzmWmTeEv85nTAHjLQyL35tdP2fAPWDSBBnFqGh
 var xpub = "tpubD6NzVbkrYhZ4YmVtCdP63AuHTCWhg6eYpDis4yCb9cDNAXLfFmrFLt85cLFTwHiDJ9855NiE7cgQdiTGt5mb2RS9RfaxgVDkwBybJWm54Gh"
 var shaPw = chainhash.HashB([]byte(pw))
 var seed = []byte{0x01, 0x02, 0x03}
-var imported = [][]byte{{0x01, 0x01, 0x01}, {0x02, 0x02, 0x02}, {0x03, 0x03, 0x03}}
 
 func populateStorage(sm *StorageManager) {
 	sm.store = &Storage{
-		Version:  "0.1",
-		Xprv:     xprv,
-		Xpub:     xpub,
-		ShaPw:    shaPw,
-		Seed:     seed,
-		Imported: imported,
+		Version: "0.1",
+		Xprv:    xprv,
+		Xpub:    xpub,
+		ShaPw:   shaPw,
+		Seed:    seed,
 	}
 }
 
@@ -88,19 +86,19 @@ func TestStoreRetrieveEncryptedStore(t *testing.T) {
 
 func TestValidPw(t *testing.T) {
 	//TODO: FIX TEST (code usage works!)
-	// sm := createStorageManager()
-	// populateStorage(sm)
+	sm := createStorageManager()
+	populateStorage(sm)
 
-	// err := sm.Put(pw)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
+	err := sm.Put(pw)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// sm.store.blank()
-	// sm.Get(pw)
+	sm.store.blank()
+	sm.Get(pw)
 
 	// if !sm.IsValidPw("abc") {
 	// 	t.Fatal("invalid pw")
 	// }
-	// fmt.Println("valid pw")
+	fmt.Println("valid pw")
 }

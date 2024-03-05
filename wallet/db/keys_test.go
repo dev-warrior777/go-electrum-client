@@ -1,14 +1,12 @@
 package db
 
 import (
-	"bytes"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
 	"sync"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -72,70 +70,6 @@ func TestPutKey(t *testing.T) {
 	}
 	if used != 0 {
 		t.Errorf(`Expected 0 got %d`, used)
-	}
-}
-
-func TestKeysDB_GetImported(t *testing.T) {
-	key, err := btcec.NewPrivateKey()
-	if err != nil {
-		t.Error(err)
-	}
-	err = kdb.ImportKey([]byte("fsdfa"), key)
-	if err != nil {
-		t.Error(err)
-	}
-
-	keys, err := kdb.GetImported()
-	if err != nil {
-		t.Error(err)
-	}
-	if len(keys) != 1 {
-		t.Error("Failed to return imported key")
-	}
-	if !bytes.Equal(key.Serialize(), keys[0].Serialize()) {
-		t.Error("Returned incorrect key")
-	}
-}
-
-func TestImportKey(t *testing.T) {
-	key, err := btcec.NewPrivateKey()
-	if err != nil {
-		t.Error(err)
-	}
-	var b []byte
-	for i := 0; i < 32; i++ {
-		b = append(b, 0xff)
-	}
-	err = kdb.ImportKey(b, key)
-	if err != nil {
-		t.Error(err)
-	}
-	stmt, _ := kdb.db.Prepare("select scriptAddress, purpose, used, key from keys where scriptAddress=?")
-	defer stmt.Close()
-
-	var scriptAddress string
-	var purpose int
-	var used int
-	var keyHex string
-	err = stmt.QueryRow(hex.EncodeToString(b)).Scan(&scriptAddress, &purpose, &used, &keyHex)
-	if err != nil {
-		t.Error(err)
-	}
-	if scriptAddress != hex.EncodeToString(b) {
-		t.Errorf(`Expected %s got %s`, hex.EncodeToString(b), scriptAddress)
-	}
-	if purpose != -1 {
-		t.Errorf(`Expected -1 got %d`, purpose)
-	}
-	if used != 1 {
-		t.Errorf(`Expected 0 got %d`, used)
-	}
-	keyBytes, err := hex.DecodeString(keyHex)
-	if err != nil {
-		t.Error(err)
-	}
-	if !bytes.Equal(key.Serialize(), keyBytes) {
-		t.Errorf(`Expected %s got %s`, hex.EncodeToString(b), hex.EncodeToString(keyBytes))
 	}
 }
 
@@ -225,28 +159,6 @@ func TestGetPathForKey(t *testing.T) {
 	}
 	if path.Index != 15 || path.Purpose != wallet.EXTERNAL {
 		t.Error("Returned incorrect key path")
-	}
-}
-
-func TestGetKey(t *testing.T) {
-	key, err := btcec.NewPrivateKey()
-	if err != nil {
-		t.Error(err)
-	}
-	var b []byte
-	for i := 0; i < 32; i++ {
-		b = append(b, 0xee)
-	}
-	err = kdb.ImportKey(b, key)
-	if err != nil {
-		t.Error(err)
-	}
-	k, err := kdb.GetKey(b)
-	if err != nil {
-		t.Error(err)
-	}
-	if !bytes.Equal(key.Serialize(), k.Serialize()) {
-		t.Error("Failed to return imported key")
 	}
 }
 

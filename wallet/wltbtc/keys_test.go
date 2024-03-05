@@ -1,15 +1,11 @@
 package wltbtc
 
 import (
-	"bytes"
 	"encoding/hex"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
@@ -234,67 +230,5 @@ func TestKeyManager_GetKeys(t *testing.T) {
 		if key == nil {
 			t.Error("Incorrectly returned nil key")
 		}
-	}
-}
-
-func TestKeyManager_GetKeyForScript(t *testing.T) {
-	t.Log(wallet.ErrKeyImportNotImplemented)
-	if true {
-		return
-	}
-	// Old test
-	masterPrivKey, err := hdkeychain.NewKeyFromString("xprv9s21ZrQH143K25QhxbucbDDuQ4naNntJRi4KUfWT7xo4EKsHt2QJDu7KXp1A3u7Bi1j8ph3EGsZ9Xvz9dGuVrtHHs7pXeTzjuxBrCmmhgC6")
-	if err != nil {
-		t.Error(err)
-	}
-	mock := &mockKeyStore{make(map[string]*keyStoreEntry)}
-	km, err := NewKeyManager(mock, &chaincfg.MainNetParams, masterPrivKey)
-	if err != nil {
-		t.Error(err)
-	}
-	addr, err := btcutil.DecodeAddress("17rxURoF96VhmkcEGCj5LNQkmN9HVhWb7F", &chaincfg.MainNetParams)
-	if err != nil {
-		t.Error(err)
-	}
-	key, err := km.GetKeyForScript(addr.ScriptAddress())
-	if err != nil {
-		t.Error(err)
-	}
-	if key == nil {
-		t.Error("Returned key is nil")
-	}
-	testAddr, err := key.Address(&chaincfg.MainNetParams)
-	if err != nil {
-		t.Error(err)
-	}
-	if testAddr.String() != addr.String() {
-		t.Error("Returned incorrect key")
-	}
-	importKey, err := btcec.NewPrivateKey()
-	if err != nil {
-		t.Error(err)
-	}
-	importAddr, err := key.Address(&chaincfg.MainNetParams)
-	if err != nil {
-		t.Error(err)
-	}
-	importScript, err := txscript.PayToAddrScript(importAddr)
-	if err != nil {
-		t.Error(err)
-	}
-	// err = km.datastore.ImportKey(importScript, importKey)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
-	retKey, err := km.GetKeyForScript(importScript)
-	if err != nil {
-		t.Error(err)
-	}
-	retECKey, err := retKey.ECPrivKey()
-	if err != nil {
-		t.Error(err)
-	}
-	if !bytes.Equal(retECKey.Serialize(), importKey.Serialize()) {
-		t.Error("Failed to return imported key")
 	}
 }

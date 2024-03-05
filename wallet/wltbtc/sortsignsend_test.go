@@ -18,7 +18,7 @@ import (
 
 var test_mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
 
-func makeRegtestSeed(mnemonic string) []byte {
+func makeRegtestSeed() []byte {
 	return bip39.NewSeed(test_mnemonic, "")
 }
 
@@ -33,7 +33,7 @@ func createTxStore() (*TxStore, *StorageManager) {
 		&mockSubscriptionsStore{make(map[string]*wallet.Subscription)},
 	}
 
-	seed = makeRegtestSeed(test_mnemonic)
+	seed = makeRegtestSeed()
 	// fmt.Println("Made test seed")
 	key, _ := hdkeychain.NewMaster(seed, &chaincfg.RegressionNetParams)
 	km, _ := NewKeyManager(mockDb.Keys(), &chaincfg.RegressionNetParams, key)
@@ -49,7 +49,6 @@ func MockWallet() *BtcElectrumWallet {
 	storageMgr.store.Xpub = "tpubD6NzVbkrYhZ4YmVtCdP63AuHTCWhg6eYpDis4yCb9cDNAXLfFmrFLt85cLFTwHiDJ9855NiE7cgQdiTGt5mb2RS9RfaxgVDkwBybJWm54Gh"
 	storageMgr.store.ShaPw = chainhash.HashB([]byte(pw))
 	storageMgr.store.Seed = []byte{0x01, 0x02, 0x03}
-	storageMgr.store.Imported = [][]byte{{0x01, 0x01, 0x01}, {0x02, 0x02, 0x02}, {0x03, 0x03, 0x03}}
 
 	return &BtcElectrumWallet{
 		txstore:        txstore,
@@ -61,7 +60,6 @@ func MockWallet() *BtcElectrumWallet {
 }
 
 // test gather coins
-// TODO: add more error checking. Just re-worked coin selection, spend & sign.
 func Test_gatherCoins(t *testing.T) {
 	w := MockWallet()
 	w.blockchainTip = 500
@@ -247,7 +245,7 @@ func Test_newSegwitTransaction(t *testing.T) {
 
 // The wallet is segwit by default. But we may want to spend from a legacy address
 // we previously passed to an entity (CEX?) that does not yet send to segwit bech32
-// addresses. Hopefully never!
+// addresses. Hopefully never though!
 func Test_newLegacyTransaction(t *testing.T) {
 	w := MockWallet()
 	w.blockchainTip = 500

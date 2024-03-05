@@ -138,27 +138,6 @@ func (km *KeyManager) GetKeyForScript(scriptAddress []byte) (*hd.ExtendedKey, er
 		return nil, err
 	}
 	return km.generateChildKey(keyPath.Purpose, uint32(keyPath.Index))
-
-	// --------------------------------------------------------------------------
-	// We don't store imported keys so going to the db gets you nothing (for now)
-	// --------------------------------------------------------------------------
-	//
-	// if err != nil {
-	// 	key, err := km.datastore.GetKey(scriptAddress)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	hdKey := hd.NewExtendedKey(
-	// 		km.params.HDPrivateKeyID[:],
-	// 		key.Serialize(),
-	// 		make([]byte, 32),
-	// 		[]byte{0x00, 0x00, 0x00, 0x00},
-	// 		0,
-	// 		0,
-	// 		true)
-	// 	return hdKey, nil
-	// }
-	// return km.generateChildKey(keyPath.Purpose, uint32(keyPath.Index))
 }
 
 // Mark the given key as used and extend the lookahead window

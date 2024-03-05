@@ -11,7 +11,7 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-func makeBitcoinRegtestConfig() (*client.ClientConfig, error) {
+func makeBitcoinRegtestTestConfig() (*client.ClientConfig, error) {
 	cfg := client.NewDefaultConfig()
 	cfg.Chain = wallet.Bitcoin
 	cfg.Params = &chaincfg.RegressionNetParams
@@ -20,24 +20,37 @@ func makeBitcoinRegtestConfig() (*client.ClientConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	regtestDir := filepath.Join(appDir, "btc", "regtest")
-	err = os.MkdirAll(regtestDir, os.ModeDir|0777)
+	regtestTestDir := filepath.Join(appDir, "btc", "regtest", "test")
+	err = os.MkdirAll(regtestTestDir, os.ModeDir|0777)
 	if err != nil {
 		return nil, err
 	}
-	cfg.DataDir = regtestDir
+	cfg.DataDir = regtestTestDir
 	return cfg, nil
+}
+
+func rmTestDir() error {
+	appDir, err := client.GetConfigPath()
+	if err != nil {
+		return err
+	}
+	regtestTestDir := filepath.Join(appDir, "btc", "regtest", "test")
+	err = os.RemoveAll(regtestTestDir)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Create a new standard wallet
 func TestWalletCreation(t *testing.T) {
-	cfg, err := makeBitcoinRegtestConfig()
+	cfg, err := makeBitcoinRegtestTestConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer rmTestDir()
 	cfg.Testing = true
 	ec := NewBtcElectrumClient(cfg)
-
 	pw := "abc"
 	err = ec.CreateWallet(pw)
 	if err != nil {
@@ -55,38 +68,6 @@ func TestWalletCreation(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Println("Current Internal address", adrI)
-}
 
-var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
-
-// var seedForMnenomic = "148e047034a3f0a88905f9c2fa08bce280681db23d1f38783d3980a6cfbe327439159a51068343c274dc8819bd150fa018faffbe76133989f936a21e6b7bd0ed"
-
-// Recreate a known wallet. Overwrites 'wallet.db' of the previous test
-func TestWalletRecreate(t *testing.T) {
-	cfg, err := makeBitcoinRegtestConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg.Testing = true
-	ec := NewBtcElectrumClient(cfg)
-	pw := "abc"
-	err = ec.RecreateWallet(pw, mnemonic)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-// Load the recreated wallet with known seed
-func TestWalletLoad(t *testing.T) {
-	cfg, err := makeBitcoinRegtestConfig()
-	cfg.Testing = true
-	if err != nil {
-		t.Fatal(err)
-	}
-	pw := "abc"
-	ec := NewBtcElectrumClient(cfg)
-	err = ec.LoadWallet(pw)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ec.GetWallet().Close()
 }

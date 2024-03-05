@@ -2,10 +2,8 @@ package wallet
 
 import (
 	"bytes"
-	"errors"
 	"time"
 
-	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -155,23 +153,6 @@ type Txns interface {
 	Delete(txid chainhash.Hash) error
 }
 
-var ErrKeyImportNotImplemented = errors.New("key import not yet implemented")
-
-// Split off these imported key funcs from interface below. They need to be in
-// database encrypted blob storage. Imported keys are Not implemented this cut.
-type ImportedKeys interface {
-	// Import a loose private key which is not part of the keychain
-	// ErKeyImportNotImplemented
-	ImportKey(scriptAddress []byte, key *btcec.PrivateKey) error
-
-	// Returns an imported private key given a script address
-	// ErKeyImportNotImplemented
-	GetKey(scriptAddress []byte) (*btcec.PrivateKey, error)
-
-	// Returns all imported keys - ErKeyImportNotImplemented
-	GetImported() ([]*btcec.PrivateKey, error)
-}
-
 // Keys provides a database interface for the wallet to:
 // - Track used keys by key path
 // - Manage the look ahead window.
@@ -256,13 +237,13 @@ type Utxo struct {
 	// Block height where this tx was confirmed, 0 for unconfirmed
 	AtHeight int64
 
-	// The higher the better
+	// Coin value
 	Value int64
 
 	// Output script
 	ScriptPubkey []byte
 
-	// Previously the primary purpose is track multisig UTXOs which must have
+	// The primary purpose is track multisig UTXOs which must have
 	// separate handling to spend. Currently unused.
 	// [multisig ideas in separate branch on github]
 	//
@@ -311,7 +292,7 @@ type Stxo struct {
 	// When it used to be a UTXO
 	Utxo Utxo
 
-	// The height at which it met its demise
+	// The height at which it was spent
 	SpendHeight int64
 
 	// The tx that consumed it

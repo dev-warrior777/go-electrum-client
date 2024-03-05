@@ -5,11 +5,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/rand"
 	"strconv"
 	"sync"
 
-	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -28,25 +26,6 @@ func (k *KeysDB) Put(scriptAddress []byte, keyPath wallet.KeyPath) error {
 	stmt, _ := tx.Prepare("insert into keys(scriptAddress, purpose, keyIndex, used) values(?,?,?,?)")
 	defer stmt.Close()
 	_, err = stmt.Exec(hex.EncodeToString(scriptAddress), int(keyPath.Purpose), keyPath.Index, 0)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-	tx.Commit()
-	return nil
-}
-
-func (k *KeysDB) ImportKey(scriptAddress []byte, key *btcec.PrivateKey) error {
-	k.lock.Lock()
-	defer k.lock.Unlock()
-	tx, err := k.db.Begin()
-	if err != nil {
-		return err
-	}
-	index := rand.Uint32()
-	stmt, _ := tx.Prepare("insert into keys(scriptAddress, purpose, keyIndex, used, key) values(?,?,?,?,?)")
-	defer stmt.Close()
-	_, err = stmt.Exec(hex.EncodeToString(scriptAddress), -1, index, 1, hex.EncodeToString(key.Serialize()))
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -122,54 +101,6 @@ func (k *KeysDB) GetPathForKey(scriptAddress []byte) (wallet.KeyPath, error) {
 		Index:   index,
 	}
 	return p, nil
-}
-
-func (k *KeysDB) GetKey(scriptAddress []byte) (*btcec.PrivateKey, error) {
-	k.lock.RLock()
-	defer k.lock.RUnlock()
-
-	stmt, err := k.db.Prepare("select key from keys where scriptAddress=? and purpose=-1")
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-	var keyHex string
-	err = stmt.QueryRow(hex.EncodeToString(scriptAddress)).Scan(&keyHex)
-	if err != nil {
-		return nil, errors.New("key not found")
-	}
-	keyBytes, err := hex.DecodeString(keyHex)
-	if err != nil {
-		return nil, err
-	}
-	key, _ := btcec.PrivKeyFromBytes(keyBytes)
-	return key, nil
-}
-
-func (k *KeysDB) GetImported() ([]*btcec.PrivateKey, error) {
-	k.lock.RLock()
-	defer k.lock.RUnlock()
-	var ret []*btcec.PrivateKey
-	stm := "select key from keys where purpose=-1"
-	rows, err := k.db.Query(stm)
-	if err != nil {
-		return ret, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var keyHex []byte
-		err = rows.Scan(&keyHex)
-		if err != nil {
-			return ret, err
-		}
-		keyBytes, err := hex.DecodeString(string(keyHex))
-		if err != nil {
-			return ret, err
-		}
-		priv, _ := btcec.PrivKeyFromBytes(keyBytes)
-		ret = append(ret, priv)
-	}
-	return ret, nil
 }
 
 func (k *KeysDB) GetUnused(purpose wallet.KeyPurpose) ([]int, error) {
