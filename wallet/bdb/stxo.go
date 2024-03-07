@@ -6,7 +6,6 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -38,7 +37,7 @@ func (s *StxoDB) GetAll() ([]wallet.Stxo, error) {
 	}
 	ret := []wallet.Stxo{}
 	for _, srec := range srecList {
-		outPoint, err := wire.NewOutPointFromString(srec.OutPoint)
+		outPoint, err := NewOutPointFromString(srec.OutPoint)
 		if err != nil {
 			return nil, err
 		}

@@ -41,7 +41,7 @@ func (u *UtxoDB) Get(op *wire.OutPoint) (wallet.Utxo, error) {
 	if err != nil {
 		return utxo, err
 	}
-	outPoint, err := wire.NewOutPointFromString(urec.OutPoint)
+	outPoint, err := NewOutPointFromString(urec.OutPoint)
 	if err != nil {
 		return utxo, err
 	}
@@ -62,7 +62,7 @@ func (u *UtxoDB) GetAll() ([]wallet.Utxo, error) {
 		return nil, err
 	}
 	for _, urec := range urecList {
-		outPoint, err := wire.NewOutPointFromString(urec.OutPoint)
+		outPoint, err := NewOutPointFromString(urec.OutPoint)
 		if err != nil {
 			return nil, err
 		}

@@ -1,4 +1,4 @@
-package wltbtc
+package bdb
 
 import (
 	"errors"

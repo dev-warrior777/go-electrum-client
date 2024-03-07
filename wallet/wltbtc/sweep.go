@@ -1,8 +1,6 @@
 package wltbtc
 
 import (
-	"bytes"
-	"encoding/hex"
 	"fmt"
 	"os"
 
@@ -15,8 +13,7 @@ import (
 )
 
 var (
-	verify    = true
-	stepDebug = false
+	verify = true
 )
 
 // Build (one or more) segwit transaction that sweeps all coins owned by a
@@ -129,8 +126,7 @@ func (w *BtcElectrumWallet) SweepCoins(
 
 	if verify {
 		for idx := range sweepTx.TxIn {
-			// Use the Debug Stepper OR the Execute option. NOT both with same egine instance
-			e, err := txscript.NewDebugEngine(
+			e, err := txscript.NewEngine(
 				// previous output pubkey script (from input)
 				prevOutScripts[idx],
 				// sweep transaction
@@ -141,92 +137,17 @@ func (w *BtcElectrumWallet) SweepCoins(
 				nil, //txscript.NewSigCache(10),
 				nil, //txscript.NewTxSigHashes(sweepTx, prevOutFetcher),
 				prevOutValues[idx],
-				prevOutFetcher,
-				nil)
+				prevOutFetcher)
 			if err != nil {
 				panic(err)
 			}
-			if stepDebug {
-				stepDebugScript(e)
-			} else {
-				err = e.Execute()
-				if err != nil {
-					fmt.Printf("Engine Error: %v\n", err)
-					os.Exit(1)
-				}
+			err = e.Execute()
+			if err != nil {
+				fmt.Printf("Engine Error: %v\n", err)
+				os.Exit(1)
 			}
 		}
 	}
 	sweepTxs = append(sweepTxs, sweepTx)
 	return sweepTxs, nil
-}
-
-func stepDebugScript(e *txscript.Engine) {
-	fmt.Println("Script 0")
-	fmt.Println(e.DisasmScript(0))
-	fmt.Println("Script 1")
-	fmt.Println(e.DisasmScript(1))
-	fmt.Printf("End Scripts\n============\n\n")
-
-	for {
-		fmt.Println("---------------------------- STACK --------------------------")
-		stk := e.GetStack()
-		for i, item := range stk {
-			if len(item) > 0 {
-				fmt.Printf("%d %v\n", i, hex.EncodeToString(item))
-			} else {
-				fmt.Printf("%d %s\n", i, "<null>")
-			}
-		}
-		fmt.Println("-------------------------- ALT STACK ------------------------")
-		astk := e.GetAltStack()
-		for i, item := range astk {
-			if len(item) > 0 {
-				fmt.Printf("%d %v\n", i, hex.EncodeToString(item))
-			} else {
-				fmt.Printf("%d %s\n", i, "<null>")
-			}
-		}
-		fmt.Println("--------------------------- Next Op -------------------------")
-		fmt.Println(e.DisasmPC())
-		fmt.Println("===========")
-		script, err := e.DisasmScript(2)
-		if err == nil {
-			fmt.Printf("script 2: \n%s\n", script)
-		}
-		fmt.Println("..........")
-
-		// STEP
-		done, err := e.Step()
-		if err != nil {
-			fmt.Printf("Engine Error: %v\n", err)
-			os.Exit(2)
-		}
-
-		if done {
-			fmt.Println("----------------------- Last STACK ------------------------")
-			stkerr := false
-			stkerrtxt := ""
-			stk = e.GetStack()
-			for i, item := range stk {
-				fmt.Println(i, hex.EncodeToString(item))
-				if i == 0 && !bytes.Equal(item, []byte{0x01}) {
-					stkerr = true
-					stkerrtxt += "ToS Not '1'"
-				}
-				if i > 0 {
-					stkerr = true
-					stkerrtxt += " too many stack items left on stack"
-				}
-			}
-			if stkerr {
-				fmt.Println(stkerrtxt)
-				os.Exit(3)
-			}
-			fmt.Println("--------------------- End Last STACK ------------------------")
-
-			// senang
-			break
-		}
-	}
 }
