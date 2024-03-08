@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -57,7 +56,7 @@ func (ec *BtcElectrumClient) getPubKeyHashUtxos(keyPair *btcutil.WIF) ([]wallet.
 		return inputList, err
 	}
 	for _, unspent := range listUnspent {
-		op, err := wire.NewOutPointFromString(
+		op, err := wallet.NewOutPointFromString(
 			fmt.Sprintf("%s:%d", unspent.TxHash, unspent.TxPos))
 		if err != nil {
 			return inputList, err
@@ -100,7 +99,7 @@ func (ec *BtcElectrumClient) getWitnessPubKeyHashUtxos(keyPair *btcutil.WIF) ([]
 		return inputList, err
 	}
 	for _, unspent := range listUnspent {
-		op, err := wire.NewOutPointFromString(
+		op, err := wallet.NewOutPointFromString(
 			fmt.Sprintf("%s:%d", unspent.TxHash, unspent.TxPos))
 		if err != nil {
 			return inputList, err

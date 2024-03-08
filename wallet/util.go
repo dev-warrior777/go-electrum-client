@@ -1,4 +1,4 @@
-package bdb
+package wallet
 
 import (
 	"errors"

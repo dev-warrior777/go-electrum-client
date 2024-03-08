@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/boltdb/bolt"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -42,7 +41,7 @@ func TestUtxoPut(t *testing.T) {
 	}
 	defer teardownUxdb()
 	outPointStr := "b721c368f9ddb1d6d0d225fdb22e8f2b4b9f0fed160ea6ae80270b7849c2d62e:0"
-	outPoint, err := wire.NewOutPointFromString(outPointStr)
+	outPoint, err := wallet.NewOutPointFromString(outPointStr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +90,7 @@ func TestUtxoGetAll(t *testing.T) {
 	}
 	defer teardownUxdb()
 	outPointStr := "b721c368f9ddb1d6d0d225fdb22e8f2b4b9f0fed160ea6ae80270b7849c2d62e:0"
-	outPoint, err := wire.NewOutPointFromString(outPointStr)
+	outPoint, err := wallet.NewOutPointFromString(outPointStr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +145,7 @@ func TestSetWatchOnlyUtxo(t *testing.T) {
 	}
 	defer teardownUxdb()
 	outPointStr := "b721c368f9ddb1d6d0d225fdb22e8f2b4b9f0fed160ea6ae80270b7849c2d62e:0"
-	outPoint, err := wire.NewOutPointFromString(outPointStr)
+	outPoint, err := wallet.NewOutPointFromString(outPointStr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +186,7 @@ func TestFreezeUnFreezeUtxo(t *testing.T) {
 	}
 	defer teardownUxdb()
 	outPointStr := "b721c368f9ddb1d6d0d225fdb22e8f2b4b9f0fed160ea6ae80270b7849c2d62e:0"
-	outPoint, err := wire.NewOutPointFromString(outPointStr)
+	outPoint, err := wallet.NewOutPointFromString(outPointStr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +240,7 @@ func TestDeleteUtxo(t *testing.T) {
 	}
 	defer teardownUxdb()
 	outPointStr := "b721c368f9ddb1d6d0d225fdb22e8f2b4b9f0fed160ea6ae80270b7849c2d62e:0"
-	outPoint, err := wire.NewOutPointFromString(outPointStr)
+	outPoint, err := wallet.NewOutPointFromString(outPointStr)
 	if err != nil {
 		t.Fatal(err)
 	}

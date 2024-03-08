@@ -37,7 +37,7 @@ func (s *StxoDB) GetAll() ([]wallet.Stxo, error) {
 	}
 	ret := []wallet.Stxo{}
 	for _, srec := range srecList {
-		outPoint, err := NewOutPointFromString(srec.OutPoint)
+		outPoint, err := wallet.NewOutPointFromString(srec.OutPoint)
 		if err != nil {
 			return nil, err
 		}
