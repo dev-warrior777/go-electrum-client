@@ -42,14 +42,15 @@ type BroadcastParams struct {
 }
 
 type ElectrumClient interface {
+	Start() error
+	Stop()
 	GetConfig() *ClientConfig
 	GetWallet() wallet.ElectrumWallet
 	GetNode() electrumx.ElectrumXNode
 	//
-	CreateNode(nodeType NodeType)
+	// CreateNode(nodeType NodeType)
 	//
-	SyncHeaders() error
-	SubscribeClientHeaders() error
+	// SyncHeaders() error
 	//
 	CreateWallet(pw string) error
 	RecreateWallet(pw, mnenomic string) error
@@ -57,19 +58,20 @@ type ElectrumClient interface {
 	//
 	SyncWallet() error
 	RescanWallet() error
-	ImportAndSweep(keys []string) error
+	ImportAndSweep(wifKeyPairs []string) error
 	//
-	Close()
+	CloseWallet()
 	//
-	// Simple RPC server for test only; not production
-	RPCServe() error
-	// Small subset of electrum python console-like methods
+	// Small subset of electrum methods
 	Tip() (int64, bool)
 	Spend(pw string, amount int64, toAddress string, feeLevel wallet.FeeLevel) (int, string, string, error)
 	Broadcast(*BroadcastParams) (string, error)
 	ListUnspent() ([]wallet.Utxo, error)
+	FreezeUTXO(txid string, out uint32) error
+	UnfreezeUTXO(txid string, out uint32) error
 	UnusedAddress() (string, error)
 	ChangeAddress() (string, error)
 	Balance() (int64, int64, error)
+	FeeRate(confTarget int64) (int64, error)
 	//...
 }

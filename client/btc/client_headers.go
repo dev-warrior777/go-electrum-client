@@ -7,22 +7,22 @@ import (
 	"time"
 )
 
-// SyncHeaders uodates the client headers and then subscribes for new update
+// syncHeaders uodates the client headers and then subscribes for new update
 // tip notifications and listens for them
-// SyncHeaders is part of the ElectrumClient interface inmplementation
-func (ec *BtcElectrumClient) SyncHeaders() error {
-	err := ec.SyncClientHeaders()
+// syncHeaders is part of the ElectrumClient interface inmplementation
+func (ec *BtcElectrumClient) syncHeaders() error {
+	err := ec.syncClientHeaders()
 	if err != nil {
 		return err
 	}
-	return ec.SubscribeClientHeaders()
+	return ec.subscribeClientHeaders()
 }
 
-// SyncClientHeaders reads blockchain_headers file, then gets any missing block
+// syncClientHeaders reads blockchain_headers file, then gets any missing block
 // from end of file to current tip from server. The current set of headers is
 // also stored in headers map and the chain verified by checking previous block
 // hashes backwards from local Tip.
-func (ec *BtcElectrumClient) SyncClientHeaders() error {
+func (ec *BtcElectrumClient) syncClientHeaders() error {
 	h := ec.clientHeaders
 
 	// we start from a recent height for testnet/mainnet
@@ -153,7 +153,7 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 	return nil
 }
 
-// SubscribeClientHeaders subscribes to new block tip notifications from the
+// subscribeClientHeaders subscribes to new block tip notifications from the
 // electrumx server and handles them as they arrive. The client local 'blockhain
 // _headers' file is appended and the headers map updated and verified.
 //
@@ -162,8 +162,8 @@ func (ec *BtcElectrumClient) SyncClientHeaders() error {
 // prior blocks, the server may only notify of the most recent chain tip. The
 // protocol does not guarantee notification of all intermediate block headers.
 //
-// SubscribeClientHeaders is part of the ElectrumClient interface implementation
-func (ec *BtcElectrumClient) SubscribeClientHeaders() error {
+// subscribeClientHeaders is part of the ElectrumClient interface implementation
+func (ec *BtcElectrumClient) subscribeClientHeaders() error {
 	h := ec.clientHeaders
 
 	// local tip for calculation before storage

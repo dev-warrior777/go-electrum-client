@@ -122,20 +122,11 @@ func main() {
 	// make basic client
 	ec := btc.NewBtcElectrumClient(cfg)
 
-	// make the client's node
-	ec.CreateNode(client.SingleNode)
-	err = ec.GetNode().Start()
+	// start client, create node & sync headers
+	err = ec.Start()
 	if err != nil {
+		ec.Stop()
 		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
-		os.Exit(1)
-	}
-
-	// get up to date with client's copy of the blockchain headers
-	fmt.Println("syncing headers")
-	err = ec.SyncHeaders()
-	if err != nil {
-		ec.GetNode().Stop()
-		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
 
@@ -203,22 +194,20 @@ func main() {
 	// the address history from the node
 	err = ec.SyncWallet()
 	if err != nil {
-		ec.GetNode().Stop()
+		ec.Stop()
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
 
 	// for testing only
-	err = ec.RPCServe()
+	err = btc.RPCServe(ec)
 	if err != nil {
-		ec.GetNode().Stop()
+		ec.Stop()
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
 
 	// SIGINT kills the node server(s) & test rpc server
 
-	sc := ec.GetNode().GetServerConn().SvrConn
-	<-sc.Done()
-	ec.Close()
+	ec.Stop()
 }

@@ -333,3 +333,37 @@ func (ec *BtcElectrumClient) Balance() (int64, int64, error) {
 	}
 	return w.Balance()
 }
+
+func (ec *BtcElectrumClient) FreezeUTXO(txid string, out uint32) error {
+	w := ec.GetWallet()
+	if w == nil {
+		return ErrNoWallet
+	}
+	op, err := wallet.NewOutPoint(txid, out)
+	if err != nil {
+		return err
+	}
+	return w.FreezeUTXO(op)
+}
+
+func (ec *BtcElectrumClient) UnfreezeUTXO(txid string, out uint32) error {
+	w := ec.GetWallet()
+	if w == nil {
+		return ErrNoWallet
+	}
+	op, err := wallet.NewOutPoint(txid, out)
+	if err != nil {
+		return err
+	}
+	return w.UnFreezeUTXO(op)
+}
+
+func (ec *BtcElectrumClient) FeeRate(confTarget int64) (int64, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		// go server?
+		return 0, ErrNoWallet
+	}
+	// for now just return default fee rate of 1000
+	return 1000, nil
+}

@@ -146,6 +146,12 @@ type ElectrumWallet interface {
 	// List all unspent outputs in the wallet
 	ListUnspent() ([]Utxo, error)
 
+	// Set the utxo as temporarily unspendable
+	FreezeUTXO(op *wire.OutPoint) error
+
+	// Set the utxo as spendable againrce chd
+	UnFreezeUTXO(op *wire.OutPoint) error
+
 	// Make a new spending transaction
 	Spend(pw string, amount int64, toAddress btcutil.Address, feeLevel FeeLevel) (int, *wire.MsgTx, error)
 

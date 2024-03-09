@@ -3,6 +3,7 @@ package btc
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -12,12 +13,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	"github.com/spf13/cast"
 )
 
-// RPC Server For testing only. Goele is golang code intended to be used
-// directly by other golang projects; for example a lite trading wallet.
+// RPC Server For testing only. Not production.
 
 // RPC Service methods
 type Ec struct {
@@ -172,9 +173,13 @@ const (
 	RpcDefaultPort = 8888
 )
 
-func (ec *BtcElectrumClient) RPCServe() error {
+func RPCServe(electrumClient client.ElectrumClient) error {
+	btcElectrumClient, ok := electrumClient.(*BtcElectrumClient)
+	if !ok {
+		return errors.New("electrumClient is not an instance of BtcElectrumClient")
+	}
 	rpc_ip := RpcDefaultIP
-	rpc_port := ec.GetConfig().RPCTestPort
+	rpc_port := electrumClient.GetConfig().RPCTestPort
 	if rpc_port == 0 {
 		rpc_port = RpcDefaultPort
 	}
@@ -183,6 +188,7 @@ func (ec *BtcElectrumClient) RPCServe() error {
 	if err != nil {
 		return err
 	}
+
 	listener, err := net.ListenTCP("tcp", addr)
 	if err != nil {
 		return err
@@ -193,7 +199,7 @@ func (ec *BtcElectrumClient) RPCServe() error {
 	// 	func (e *Ec) RPCMethod(request map[string]string, response *map[string]string) error
 	//
 	rpcservice := &Ec{
-		EleClient: ec,
+		EleClient: btcElectrumClient,
 	}
 	err = rpc.Register(rpcservice)
 	if err != nil {

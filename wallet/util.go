@@ -32,3 +32,11 @@ func NewOutPointFromString(outpoint string) (*wire.OutPoint, error) {
 		Index: uint32(outputIndex),
 	}, nil
 }
+
+func NewOutPoint(txid string, out uint32) (*wire.OutPoint, error) {
+	hash, err := chainhash.NewHashFromStr(txid)
+	if err != nil {
+		return nil, err
+	}
+	return wire.NewOutPoint(hash, out), nil
+}

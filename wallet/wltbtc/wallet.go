@@ -475,6 +475,32 @@ func (w *BtcElectrumWallet) ListUnspent() ([]wallet.Utxo, error) {
 	return w.txstore.Utxos().GetAll()
 }
 
+func (w *BtcElectrumWallet) FreezeUTXO(op *wire.OutPoint) error {
+	utxos, err := w.txstore.Utxos().GetAll()
+	if err != nil {
+		return err
+	}
+	for _, utxo := range utxos {
+		if utxo.Op.Hash.IsEqual(&op.Hash) && utxo.Op.Index == op.Index {
+			return w.txstore.Utxos().Freeze(utxo)
+		}
+	}
+	return errors.New("utxo not found")
+}
+
+func (w *BtcElectrumWallet) UnFreezeUTXO(op *wire.OutPoint) error {
+	utxos, err := w.txstore.Utxos().GetAll()
+	if err != nil {
+		return err
+	}
+	for _, utxo := range utxos {
+		if utxo.Op.Hash.IsEqual(&op.Hash) && utxo.Op.Index == op.Index {
+			return w.txstore.Utxos().UnFreeze(utxo)
+		}
+	}
+	return errors.New("utxo not found")
+}
+
 // Update the wallet's view of the blockchain
 func (w *BtcElectrumWallet) UpdateTip(newTip int64, synced bool) {
 	w.blockchainTip = newTip

@@ -2,6 +2,7 @@ package btc
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path"
 
@@ -88,6 +89,25 @@ func (ec *BtcElectrumClient) getDatastore() error {
 	return nil
 }
 
+func (ec *BtcElectrumClient) Start() error {
+	ec.createNode(client.SingleNode)
+	err := ec.Node.Start()
+	if err != nil {
+		return err
+	}
+	return ec.syncHeaders()
+}
+
+func (ec *BtcElectrumClient) Stop() {
+	fmt.Printf("client.Stopping\n")
+	ec.CloseWallet()
+	node := ec.GetNode()
+	if node != nil {
+		node.Stop()
+	}
+	fmt.Printf("client.Stop\n")
+}
+
 // CreateWallet makes a new wallet with a new seed. The password is to encrypt
 // stored xpub, xprv and other sensitive data.
 func (ec *BtcElectrumClient) CreateWallet(pw string) error {
@@ -134,6 +154,15 @@ func (ec *BtcElectrumClient) RecreateWallet(pw, mnenomic string) error {
 	return nil
 }
 
+// createNode creates a single unconnected ElectrumX node
+func (ec *BtcElectrumClient) createNode(_ client.NodeType) {
+	nodeCfg := ec.GetConfig().MakeNodeConfig()
+	n := elxbtc.NewSingleNode(nodeCfg)
+	ec.Node = n
+}
+
+// client interface
+
 // LoadWallet loads an existing wallet. The password is required to decrypt
 // the stored xpub, xprv and other sensitive data
 func (ec *BtcElectrumClient) LoadWallet(pw string) error {
@@ -152,14 +181,7 @@ func (ec *BtcElectrumClient) LoadWallet(pw string) error {
 	return nil
 }
 
-// CreateNode creates a single unconnected ElectrumX node
-func (ec *BtcElectrumClient) CreateNode(_ client.NodeType) {
-	nodeCfg := ec.GetConfig().MakeNodeConfig()
-	n := elxbtc.NewSingleNode(nodeCfg)
-	ec.Node = n
-}
-
-func (ec *BtcElectrumClient) Close() {
+func (ec *BtcElectrumClient) CloseWallet() {
 	w := ec.GetWallet()
 	if w != nil {
 		w.Close()
@@ -168,14 +190,10 @@ func (ec *BtcElectrumClient) Close() {
 
 // Interface methods in client_headers.go
 //
-// SyncHeaders() error
 // Tip() (int64, bool)
 
-// Interface method in rpc.go
-//
 // Interface methods in client_wallet.go
 //
-// SyncWallet() error
 // Spend(amount int64, toAddress string, feeLevel wallet.FeeLevel, broadcast bool) (string, string, error)
 // Broadcast(*BroadcastParams) (string, error)
 // ListUnspent() (string, error)
