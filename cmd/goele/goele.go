@@ -131,53 +131,32 @@ func main() {
 	}
 
 	// make the client's wallet
+	//
+	// - for regtest/testnet testing recreate a wallet with a known set of keys.
+	// - use the mkwallet and  tools to create, recreate a wallet at the
+	//   configured location
+	// - use the rmwallet tool to remove a wallet from the configured location.
+	//   regtest & testnet only
 
 	if net == "regtest" {
 
-		// for non-mainnet testing recreate a wallet with a known set of keys ..
-		// var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
-		// err := ec.RecreateWallet("abc", mnemonic)
-		//
-		// ...therafter load the wallet; careful no params change in harness script
-		// that invalidate current wallet txs.
-		//
-		err := ec.LoadWallet("abc")
+		mnemonic := "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
+		err := ec.RecreateWallet("abc", mnemonic)
 		if err != nil {
-			ec.GetNode().Stop()
+			ec.Stop()
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}
 
 	} else if net == "testnet3" {
 
-		// err := ec.RecreateWallet("abc", "canyon trip truly ritual lonely quiz romance rose alone journey like bronze")
-		// if err != nil {
-		// 	ec.GetNode().Stop()
-		// 	fmt.Println(err, " - exiting")
-		// 	os.Exit(1)
-		// }
-
-		// Or
-
-		// uncomment to create new ->
-		// err := ec.CreateWallet("abc")
-		// if err != nil {
-		// 	ec.GetNode().Stop()
-		// 	fmt.Println(err, " - exiting")
-		// 	os.Exit(1)
-		// }
-		//<- uncomment to create
-
-		// comment out when doing initial creation_->
-		// load the client's wallet
-		// canyon trip truly ritual lonely quiz romance rose alone journey like bronze
-		err := ec.LoadWallet("abc")
+		mnemonic := "canyon trip truly ritual lonely quiz romance rose alone journey like bronze"
+		err := ec.RecreateWallet("abc", mnemonic)
 		if err != nil {
 			ec.GetNode().Stop()
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}
-		//<- comment out when doing initial creation
 
 	} else if net == "mainnet" {
 		// production usage: load the client's wallet

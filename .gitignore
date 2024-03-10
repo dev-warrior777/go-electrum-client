@@ -27,7 +27,10 @@ testdata/
 #test bin
 electrumx/elxbtc/cmd/main
 cmd/goele/goele
+cmd/mkwallet/mkwallet
+cmd/rmwallet/rmwallet
 wallet/cmd/boltdmp/bd
+client/btc/rpc_test/client
 
 #vscode
 .vscode/
@@ -38,6 +41,3 @@ __debug_bin*
 
 #kept orig related versions of files being changed
 *.orig
-
-#rpc test
-client/btc/rpc_test/client

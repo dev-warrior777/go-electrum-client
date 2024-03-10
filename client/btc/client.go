@@ -161,7 +161,7 @@ func (ec *BtcElectrumClient) createNode(_ client.NodeType) {
 	ec.Node = n
 }
 
-// client interface
+// client interface implementation
 
 // LoadWallet loads an existing wallet. The password is required to decrypt
 // the stored xpub, xprv and other sensitive data
@@ -200,5 +200,7 @@ func (ec *BtcElectrumClient) CloseWallet() {
 // UnusedAddress() (string, error)
 // ChangeAddress() (string, error)
 // Balance() (int64, int64, error)
+// FreezeUTXO((txid string, out uint32) error
+// UnFreezeUTXO((txid string, out uint32) error
 
 //////////////////////////////////////////////////////////////////////////////
