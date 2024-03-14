@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/dev-warrior777/go-electrum-client/client"
-	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
 var (
@@ -18,22 +16,18 @@ var (
 	// electrum wallet regtest
 	ab           = "bcrt1q3fx029uese6mrhvq68u4l6me49refj8maqxvfv"
 	abScripthash = "02c21ac0ef859617cbb7ae68943b9af8fb99699d32ea35cb449384aac17b93d5"
+	// electrumX regtest
+	aWSH           = "bcrt1qdql55es0t6afs9gy9th2magjncahp0fxhs4jkn20mqjt4hjyjesqvp5ls8"
+	aWSHScripthash = "c27062c2d7439f6b583704f576478141490a2197e6052bbde14851f24ac0e8b5"
 )
 
-func AddrToElectrumScripthash(addr string, network *chaincfg.Params) (string, error) {
-	cfg := client.NewDefaultConfig()
-	cfg.Chain = wallet.Bitcoin
-	cfg.Params = network
-	return addrToElectrumScripthash(addr, network)
-}
-
 func TestElectrumScripthash(t *testing.T) {
-	_, err := AddrToElectrumScripthash("", &chaincfg.MainNetParams)
+	_, err := addrToElectrumScripthash("", &chaincfg.MainNetParams)
 	if err == nil {
 		t.Fatal(err)
 	}
 
-	shGen, err := AddrToElectrumScripthash(bgen, &chaincfg.MainNetParams)
+	shGen, err := addrToElectrumScripthash(bgen, &chaincfg.MainNetParams)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +35,7 @@ func TestElectrumScripthash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sh1, err := AddrToElectrumScripthash(a1, &chaincfg.RegressionNetParams)
+	sh1, err := addrToElectrumScripthash(a1, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,11 +43,19 @@ func TestElectrumScripthash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	shb, err := AddrToElectrumScripthash(ab, &chaincfg.RegressionNetParams)
+	shb, err := addrToElectrumScripthash(ab, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if shb != abScripthash {
+		t.Fatal(err)
+	}
+
+	shWSH, err := addrToElectrumScripthash(aWSH, &chaincfg.RegressionNetParams)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if shWSH != aWSHScripthash {
 		t.Fatal(err)
 	}
 }

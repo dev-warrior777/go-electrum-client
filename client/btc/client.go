@@ -203,4 +203,8 @@ func (ec *BtcElectrumClient) CloseWallet() {
 // FreezeUTXO((txid string, out uint32) error
 // UnFreezeUTXO((txid string, out uint32) error
 
+// Interface methods in client_node.go
+//
+//
+//
 //////////////////////////////////////////////////////////////////////////////

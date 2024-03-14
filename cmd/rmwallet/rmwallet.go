@@ -18,6 +18,8 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
+const blockchain_headers = "blockchain_headers"
+
 var (
 	coins = []string{"btc"} // add as implemented
 	nets  = []string{"testnet", "regtest", "simnet"}
@@ -98,6 +100,17 @@ func main() {
 	}
 	if askForConfirmation("remove?") {
 		os.Remove(wallet)
+	}
+	if cfg.Params == &chaincfg.RegressionNetParams {
+		headers := path.Join(cfg.DataDir, blockchain_headers)
+		fmt.Println(headers)
+		if _, err := os.Stat(headers); errors.Is(err, os.ErrNotExist) {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		if askForConfirmation("remove?") {
+			os.Remove(headers)
+		}
 	}
 }
 
