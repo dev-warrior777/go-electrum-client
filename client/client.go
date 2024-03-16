@@ -64,6 +64,7 @@ type ElectrumClient interface {
 	//
 	// Small subset of electrum methods
 	Tip() (int64, bool)
+	GetBlockHeader(height int64) *wire.BlockHeader
 	Spend(pw string, amount int64, toAddress string, feeLevel wallet.FeeLevel) (int, string, string, error)
 	Broadcast(*BroadcastParams) (string, error)
 	ListUnspent() ([]wallet.Utxo, error)

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/btcsuite/btcd/wire"
 )
 
 // syncHeaders uodates the client headers and then subscribes for new update
@@ -293,7 +295,19 @@ func (ec *BtcElectrumClient) subscribeClientHeaders() error {
 	return nil
 }
 
+// ElectrumClient interface
+
+// Tip returns the (local) block headers tip height and client headers sync status.
 func (ec *BtcElectrumClient) Tip() (int64, bool) {
 	h := ec.clientHeaders
 	return h.tip, h.synced
+}
+
+// GetBlockHeader returns the (local) block header for height. If out of range will
+// return nil.
+func (ec *BtcElectrumClient) GetBlockHeader(height int64) *wire.BlockHeader {
+	h := ec.clientHeaders
+	h.hdrsMtx.Lock()
+	defer h.hdrsMtx.Unlock()
+	return h.hdrs[height]
 }

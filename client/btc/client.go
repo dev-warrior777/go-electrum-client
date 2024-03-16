@@ -89,6 +89,15 @@ func (ec *BtcElectrumClient) getDatastore() error {
 	return nil
 }
 
+// createNode creates a single unconnected ElectrumX node
+func (ec *BtcElectrumClient) createNode(_ client.NodeType) {
+	nodeCfg := ec.GetConfig().MakeNodeConfig()
+	n := elxbtc.NewSingleNode(nodeCfg)
+	ec.Node = n
+}
+
+// client interface implementation
+
 func (ec *BtcElectrumClient) Start() error {
 	ec.createNode(client.SingleNode)
 	err := ec.Node.Start()
@@ -154,15 +163,6 @@ func (ec *BtcElectrumClient) RecreateWallet(pw, mnenomic string) error {
 	return nil
 }
 
-// createNode creates a single unconnected ElectrumX node
-func (ec *BtcElectrumClient) createNode(_ client.NodeType) {
-	nodeCfg := ec.GetConfig().MakeNodeConfig()
-	n := elxbtc.NewSingleNode(nodeCfg)
-	ec.Node = n
-}
-
-// client interface implementation
-
 // LoadWallet loads an existing wallet. The password is required to decrypt
 // the stored xpub, xprv and other sensitive data
 func (ec *BtcElectrumClient) LoadWallet(pw string) error {
@@ -191,6 +191,7 @@ func (ec *BtcElectrumClient) CloseWallet() {
 // Interface methods in client_headers.go
 //
 // Tip() (int64, bool)
+// GetBlockHeader(height int64) *wire.BlockHeader
 
 // Interface methods in client_wallet.go
 //

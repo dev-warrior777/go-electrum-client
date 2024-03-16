@@ -34,7 +34,7 @@ type Headers struct {
 	net *chaincfg.Params
 	// decoded headers stored by height
 	hdrsMtx    sync.RWMutex
-	hdrs       map[int64]wire.BlockHeader
+	hdrs       map[int64]*wire.BlockHeader
 	startPoint int64
 	tip        int64
 	synced     bool
@@ -43,7 +43,7 @@ type Headers struct {
 func NewHeaders(cfg *client.ClientConfig) *Headers {
 	filePath := filepath.Join(cfg.DataDir, HEADER_FILE_NAME)
 	hdrsMapInitSize := 2 * ELECTRUM_MAGIC_NUMHDR //4032
-	hdrsMap := make(map[int64]wire.BlockHeader, hdrsMapInitSize)
+	hdrsMap := make(map[int64]*wire.BlockHeader, hdrsMapInitSize)
 	hdrs := Headers{
 		hdrFilePath: filePath,
 		net:         cfg.Params,
@@ -71,18 +71,10 @@ func getStartPointHeight(cfg *client.ClientConfig) int64 {
 
 func (h *Headers) ClearMap() {
 	h.hdrs = nil // gc
-	h.hdrs = make(map[int64]wire.BlockHeader)
+	h.hdrs = make(map[int64]*wire.BlockHeader)
 }
 
-func (h *Headers) Tip() int64 {
-	return h.tip
-}
-
-func (h *Headers) Synced() bool {
-	return h.synced
-}
-
-// Get the 'blockchin_headers' file size. Error is returned unexamined as
+// Get the 'blockchain_headers' file size. Error is returned unexamined as
 // we assume the file exists and ENOENT will not be valid.
 func (h *Headers) StatFileSize() (int64, error) {
 	fi, err := os.Stat(h.hdrFilePath)
@@ -178,7 +170,7 @@ func (h *Headers) Store(b []byte, startHeight int64) error {
 	defer h.hdrsMtx.Unlock()
 	var i int64
 	for i = 0; i < numHdrs; i++ {
-		blkHdr := wire.BlockHeader{}
+		blkHdr := &wire.BlockHeader{}
 		err := blkHdr.Deserialize(rdr)
 		if err != nil {
 			return err

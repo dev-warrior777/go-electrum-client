@@ -103,7 +103,7 @@ func TestAppendHeaders(t *testing.T) {
 	h := Headers{
 		hdrFilePath: path.Join("/tmp", fname),
 		net:         &chaincfg.RegressionNetParams,
-		hdrs:        make(map[int64]wire.BlockHeader),
+		hdrs:        make(map[int64]*wire.BlockHeader),
 		tip:         0,
 		synced:      false,
 	}
