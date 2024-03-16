@@ -2,6 +2,7 @@ package btc
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -152,6 +153,7 @@ func (ec *BtcElectrumClient) syncClientHeaders() error {
 	h.synced = true
 	fmt.Println("headers synced up to tip ", h.tip)
 	ec.updateWalletTip()
+	ec.tipChanged()
 	return nil
 }
 
@@ -232,10 +234,11 @@ func (ec *BtcElectrumClient) subscribeClientHeaders() error {
 								panic("could not store header in map")
 							}
 
-							// update tip / local tip / wallet tip
+							// update tip / local tip / wallet tip /  notify listener
 							h.tip = x.Height
 							maybeTip = x.Height
 							ec.updateWalletTip()
+							ec.tipChanged()
 
 							// verify added header back from new tip
 							h.VerifyFromTip(2, false)
@@ -274,10 +277,11 @@ func (ec *BtcElectrumClient) subscribeClientHeaders() error {
 									panic("could not store headers in map")
 								}
 
-								// update tip / local tip
+								// update tip / local tip / wallet tip / notify listener
 								h.tip = x.Height
 								maybeTip = x.Height
 								ec.updateWalletTip()
+								ec.tipChanged()
 
 								// verify added headers back from new tip
 								h.VerifyFromTip(int64(count+1), false)
@@ -310,4 +314,24 @@ func (ec *BtcElectrumClient) GetBlockHeader(height int64) *wire.BlockHeader {
 	h.hdrsMtx.Lock()
 	defer h.hdrsMtx.Unlock()
 	return h.hdrs[height]
+}
+
+func (ec *BtcElectrumClient) RegisterTipChangeNotify(tipChange func(int64)) error {
+	h := ec.clientHeaders
+	if !h.synced {
+		return errors.New("header chain is not synced")
+	}
+	h.tipChange = tipChange
+	return nil
+}
+
+func (ec *BtcElectrumClient) UnegisterTipChangeNotify() {
+	ec.clientHeaders.tipChange = nil
+}
+
+func (ec *BtcElectrumClient) tipChanged() {
+	h := ec.clientHeaders
+	if h.tipChange != nil {
+		h.tipChange(h.tip)
+	}
 }

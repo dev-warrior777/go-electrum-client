@@ -1,6 +1,7 @@
 package btc
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"testing"
@@ -30,7 +31,7 @@ func TestNodeCreate(t *testing.T) {
 		t.Fatal("client is not a *BtcElectrumClient")
 	}
 	ec.createNode(client.SingleNode)
-	err := ec.Node.Start()
+	err := ec.Node.Start(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

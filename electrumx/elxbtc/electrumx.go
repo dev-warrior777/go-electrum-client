@@ -27,7 +27,7 @@ func NewSingleNode(cfg *electrumx.NodeConfig) *SingleNode {
 	return &n
 }
 
-func (s *SingleNode) Start() error {
+func (s *SingleNode) Start(parent context.Context) error {
 	trustedServer := s.Config.TrustedPeer
 	if trustedServer == nil {
 		return errors.New("SingleNode requires a trusted ElectrumX server")
@@ -61,9 +61,9 @@ func (s *SingleNode) Start() error {
 
 	// Our context shared with client for cancellation
 	// pro TODO:
-	// ctx, cancel := context.WithCancel(context.Background())
+	// ctx, cancel := context.WithCancel(parent)
 	// dev
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := signal.NotifyContext(parent, os.Interrupt)
 
 	sc, err := electrumx.ConnectServer(ctx, addr, opts)
 	if err != nil {

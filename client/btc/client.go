@@ -1,6 +1,7 @@
 package btc
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -98,9 +99,9 @@ func (ec *BtcElectrumClient) createNode(_ client.NodeType) {
 
 // client interface implementation
 
-func (ec *BtcElectrumClient) Start() error {
+func (ec *BtcElectrumClient) Start(ctx context.Context) error {
 	ec.createNode(client.SingleNode)
-	err := ec.Node.Start()
+	err := ec.Node.Start(ctx)
 	if err != nil {
 		return err
 	}
@@ -192,6 +193,8 @@ func (ec *BtcElectrumClient) CloseWallet() {
 //
 // Tip() (int64, bool)
 // GetBlockHeader(height int64) *wire.BlockHeader
+// RegisterTipChangeNotify(tipChange func(height int64)) error
+// UnegisterTipChangeNotify()
 
 // Interface methods in client_wallet.go
 //
@@ -206,6 +209,6 @@ func (ec *BtcElectrumClient) CloseWallet() {
 
 // Interface methods in client_node.go
 //
-//
+// GetAddressHistory(addr string) (electrumx.HistoryResult, error)
 //
 //////////////////////////////////////////////////////////////////////////////

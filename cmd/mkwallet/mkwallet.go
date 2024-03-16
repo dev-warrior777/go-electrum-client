@@ -3,6 +3,7 @@ package main
 // Run create or recreate a wallet for testing
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -168,7 +169,7 @@ func main() {
 	}
 
 	// start client, create node & sync headers
-	err = ec.Start()
+	err = ec.Start(context.Background())
 	if err != nil {
 		ec.Stop()
 		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))

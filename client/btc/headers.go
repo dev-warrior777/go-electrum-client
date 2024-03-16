@@ -38,6 +38,7 @@ type Headers struct {
 	startPoint int64
 	tip        int64
 	synced     bool
+	tipChange  func(int64)
 }
 
 func NewHeaders(cfg *client.ClientConfig) *Headers {
@@ -51,6 +52,7 @@ func NewHeaders(cfg *client.ClientConfig) *Headers {
 		startPoint:  getStartPointHeight(cfg),
 		tip:         0,
 		synced:      false,
+		tipChange:   nil,
 	}
 	return &hdrs
 }

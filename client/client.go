@@ -18,6 +18,8 @@ package client
 // It is implemented for each coin asset client.
 
 import (
+	"context"
+
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
@@ -39,18 +41,19 @@ const (
 type BroadcastParams struct {
 	Tx          *wire.MsgTx
 	ChangeIndex int
+	//...
 }
 
 type ElectrumClient interface {
-	Start() error
+	Start(ctx context.Context) error
 	Stop()
+	//
 	GetConfig() *ClientConfig
 	GetWallet() wallet.ElectrumWallet
 	GetNode() electrumx.ElectrumXNode
 	//
-	// CreateNode(nodeType NodeType)
-	//
-	// SyncHeaders() error
+	RegisterTipChangeNotify(tipChange func(height int64)) error
+	UnegisterTipChangeNotify()
 	//
 	CreateWallet(pw string) error
 	RecreateWallet(pw, mnenomic string) error

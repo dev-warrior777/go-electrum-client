@@ -55,7 +55,7 @@ var Mainnet Network = "mainnet"
 var DebugMode bool
 
 type ElectrumXNode interface {
-	Start() error
+	Start(ctx context.Context) error
 	Stop()
 	GetServerConn() *ElectrumXSvrConn
 	GetHeadersNotify() (<-chan *HeadersNotifyResult, error)
