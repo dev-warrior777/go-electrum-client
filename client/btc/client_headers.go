@@ -325,7 +325,7 @@ func (ec *BtcElectrumClient) RegisterTipChangeNotify(tipChange func(int64)) erro
 	return nil
 }
 
-func (ec *BtcElectrumClient) UnegisterTipChangeNotify() {
+func (ec *BtcElectrumClient) UnregisterTipChangeNotify() {
 	ec.clientHeaders.tipChange = nil
 }
 

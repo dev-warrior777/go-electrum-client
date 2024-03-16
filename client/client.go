@@ -53,7 +53,7 @@ type ElectrumClient interface {
 	GetNode() electrumx.ElectrumXNode
 	//
 	RegisterTipChangeNotify(tipChange func(height int64)) error
-	UnegisterTipChangeNotify()
+	UnregisterTipChangeNotify()
 	//
 	CreateWallet(pw string) error
 	RecreateWallet(pw, mnenomic string) error
