@@ -77,7 +77,9 @@ type ElectrumClient interface {
 	ChangeAddress() (string, error)
 	Balance() (int64, int64, error)
 	FeeRate(confTarget int64) (int64, error)
+	//pass thru
 	GetAddressHistory(addr string) (electrumx.HistoryResult, error)
+	GetRawTransaction(txid string) ([]byte, error)
 	//...
 
 }
