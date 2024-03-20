@@ -332,6 +332,6 @@ func (ec *BtcElectrumClient) UnregisterTipChangeNotify() {
 func (ec *BtcElectrumClient) tipChanged() {
 	h := ec.clientHeaders
 	if h.tipChange != nil {
-		h.tipChange(h.tip)
+		go h.tipChange(h.tip)
 	}
 }
