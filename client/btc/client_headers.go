@@ -316,22 +316,22 @@ func (ec *BtcElectrumClient) GetBlockHeader(height int64) *wire.BlockHeader {
 	return h.hdrs[height]
 }
 
-func (ec *BtcElectrumClient) RegisterTipChangeNotify(tipChange func(int64)) error {
+func (ec *BtcElectrumClient) RegisterTipChangeNotify() (<-chan int64, error) {
 	h := ec.clientHeaders
 	if !h.synced {
-		return errors.New("header chain is not synced")
+		return nil, errors.New("header chain is not synced")
 	}
-	h.tipChange = tipChange
-	return nil
+	h.tipChange = make(chan int64, 1)
+	return h.tipChange, nil
 }
-
 func (ec *BtcElectrumClient) UnregisterTipChangeNotify() {
+	close(ec.clientHeaders.tipChange)
 	ec.clientHeaders.tipChange = nil
 }
 
 func (ec *BtcElectrumClient) tipChanged() {
 	h := ec.clientHeaders
 	if h.tipChange != nil {
-		go h.tipChange(h.tip)
+		h.tipChange <- h.tip
 	}
 }

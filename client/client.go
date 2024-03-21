@@ -41,6 +41,7 @@ const (
 type BroadcastParams struct {
 	Tx          *wire.MsgTx
 	ChangeIndex int
+	ownVouts    []int
 	//...
 }
 
@@ -52,7 +53,7 @@ type ElectrumClient interface {
 	GetWallet() wallet.ElectrumWallet
 	GetNode() electrumx.ElectrumXNode
 	//
-	RegisterTipChangeNotify(tipChange func(height int64)) error
+	RegisterTipChangeNotify() (<-chan int64, error)
 	UnregisterTipChangeNotify()
 	//
 	CreateWallet(pw string) error

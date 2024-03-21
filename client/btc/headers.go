@@ -38,7 +38,7 @@ type Headers struct {
 	startPoint int64
 	tip        int64
 	synced     bool
-	tipChange  func(int64)
+	tipChange  chan int64
 }
 
 func NewHeaders(cfg *client.ClientConfig) *Headers {
