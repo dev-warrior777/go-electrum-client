@@ -6,22 +6,9 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
-// Return the transaction history of any address. Note: This is a
-// walletless server query, results are not checked by SPV.
-func (ec *BtcElectrumClient) GetAddressHistory(addr string) (electrumx.HistoryResult, error) {
-	node := ec.GetNode()
-	if node == nil {
-		return nil, ErrNoNode
-	}
-	scripthash, err := addrToElectrumScripthash(addr, ec.GetConfig().Params)
-	if err != nil {
-		return nil, err
-	}
-	return node.GetHistory(scripthash)
-}
+// Note: The below are walletless server queries, results are not checked by SPV.
 
-// Return the raw transaction bytes of any txid. Note: This is a
-// walletless server query, results are not checked by SPV.
+// Return the raw transaction bytes for a txid.
 func (ec *BtcElectrumClient) GetRawTransaction(txid string) ([]byte, error) {
 	node := ec.GetNode()
 	if node == nil {
@@ -32,4 +19,30 @@ func (ec *BtcElectrumClient) GetRawTransaction(txid string) ([]byte, error) {
 		return nil, err
 	}
 	return hex.DecodeString(txStr)
+}
+
+// Return the transaction info for a txid.
+func (ec *BtcElectrumClient) GetTransaction(txid string) (*electrumx.GetTransactionResult, error) {
+	node := ec.GetNode()
+	if node == nil {
+		return nil, ErrNoNode
+	}
+	res, err := node.GetTransaction(txid)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// Return the transaction history of any address.
+func (ec *BtcElectrumClient) GetAddressHistory(addr string) (electrumx.HistoryResult, error) {
+	node := ec.GetNode()
+	if node == nil {
+		return nil, ErrNoNode
+	}
+	scripthash, err := addrToElectrumScripthash(addr, ec.GetConfig().Params)
+	if err != nil {
+		return nil, err
+	}
+	return node.GetHistory(scripthash)
 }

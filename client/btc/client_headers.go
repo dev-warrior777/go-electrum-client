@@ -307,7 +307,7 @@ func (ec *BtcElectrumClient) Tip() (int64, bool) {
 	return h.tip, h.synced
 }
 
-// GetBlockHeader returns the (local) block header for height. If out of range will
+// GetBlockHeader returns the client's block header for height. If out of range will
 // return nil.
 func (ec *BtcElectrumClient) GetBlockHeader(height int64) *wire.BlockHeader {
 	h := ec.clientHeaders
@@ -316,17 +316,42 @@ func (ec *BtcElectrumClient) GetBlockHeader(height int64) *wire.BlockHeader {
 	return h.hdrs[height]
 }
 
+// GetBlockHeaders returns the client's block headers for the requested range.
+// If startHeight > tip or startHeight+count > tip will return error.
+// return nil.
+func (ec *BtcElectrumClient) GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error) {
+	h := ec.clientHeaders
+	h.hdrsMtx.Lock()
+	defer h.hdrsMtx.Unlock()
+	if startHeight > h.tip {
+		return nil, errors.New("requested start height > tip")
+	}
+	blkEndRange := startHeight + count
+	if blkEndRange > h.tip {
+		return nil, errors.New("requested range exceeds the tip")
+	}
+	var headers = make([]*wire.BlockHeader, 0, 3)
+	for i := startHeight; i < blkEndRange; i++ {
+		headers = append(headers, h.hdrs[i])
+	}
+	return headers, nil
+}
+
 func (ec *BtcElectrumClient) RegisterTipChangeNotify() (<-chan int64, error) {
 	h := ec.clientHeaders
 	if !h.synced {
-		return nil, errors.New("header chain is not synced")
+		return nil, errors.New("client's header chain is not synced")
 	}
 	h.tipChange = make(chan int64, 1)
 	return h.tipChange, nil
 }
+
 func (ec *BtcElectrumClient) UnregisterTipChangeNotify() {
-	close(ec.clientHeaders.tipChange)
-	ec.clientHeaders.tipChange = nil
+	h := ec.clientHeaders
+	if h.tipChange != nil {
+		close(ec.clientHeaders.tipChange)
+		ec.clientHeaders.tipChange = nil
+	}
 }
 
 func (ec *BtcElectrumClient) tipChanged() {

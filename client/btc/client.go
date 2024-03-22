@@ -193,6 +193,7 @@ func (ec *BtcElectrumClient) CloseWallet() {
 //
 // Tip() (int64, bool)
 // GetBlockHeader(height int64) *wire.BlockHeader
+// GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error)
 // RegisterTipChangeNotify(tipChange func(height int64)) error
 // UnegisterTipChangeNotify()
 
@@ -209,6 +210,8 @@ func (ec *BtcElectrumClient) CloseWallet() {
 
 // Interface methods in client_node.go
 //
+// GetTransaction(txid string) (*electrumx.GetTransactionResult, error)
+// GetRawTransaction(txid string) ([]byte, error)
 // GetAddressHistory(addr string) (electrumx.HistoryResult, error)
 //
 //////////////////////////////////////////////////////////////////////////////
