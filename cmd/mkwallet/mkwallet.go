@@ -20,7 +20,7 @@ import (
 
 var (
 	coins = []string{"btc"} // add as implemented
-	nets  = []string{"mainnet", "testnet", "regtest", "simnet"}
+	nets  = []string{"mainnet", "testnet", "testnet3", "regtest", "simnet"}
 )
 
 func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
@@ -65,7 +65,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		}
 		cfg.StoreEncSeed = true
 		cfg.Testing = true
-	case "testnet":
+	case "testnet", "testnet3":
 		cfg.Params = &chaincfg.TestNet3Params
 		cfg.TrustedPeer = electrumx.ServerAddr{
 			// Net: "ssl", Addr: "testnet.aranguren.org:51002",
@@ -180,8 +180,9 @@ func main() {
 
 	if net == "regtest" {
 		// for non-mainnet testing recreate a wallet with a known set of keys ..
-		var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
-		err := ec.RecreateWallet("abc", mnemonic)
+		// var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
+		// err := ec.RecreateWallet(pass, mnemonic)
+		err := ec.RecreateWallet(pass, seed)
 		if err != nil {
 			ec.GetNode().Stop()
 			fmt.Println(err, " - exiting")
@@ -189,7 +190,8 @@ func main() {
 		}
 	} else if net == "testnet3" {
 		// for non-mainnet testing recreate a wallet with a known set of keys ..
-		err := ec.RecreateWallet("abc", "canyon trip truly ritual lonely quiz romance rose alone journey like bronze")
+		// err := ec.RecreateWallet("abc", "canyon trip truly ritual lonely quiz romance rose alone journey like bronze")
+		err := ec.RecreateWallet(pass, seed)
 		if err != nil {
 			fmt.Println(err)
 		}
