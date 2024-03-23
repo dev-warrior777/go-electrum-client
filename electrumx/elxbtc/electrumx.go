@@ -200,6 +200,14 @@ func (s *SingleNode) Broadcast(rawTx string) (string, error) {
 	return server.SvrConn.Broadcast(server.SvrCtx, rawTx)
 }
 
+func (s *SingleNode) EstimateFeeRate(confTarget int64) (int64, error) {
+	server := s.Server
+	if !server.Running {
+		return 0, ErrServerNotRunning
+	}
+	return server.SvrConn.EstimateFee(server.SvrCtx, confTarget)
+}
+
 // /////////////////////////////////////////////////////////////////////////////
 // Helpers
 // ///////

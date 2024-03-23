@@ -359,10 +359,12 @@ func (ec *BtcElectrumClient) UnfreezeUTXO(txid string, out uint32) error {
 }
 
 func (ec *BtcElectrumClient) FeeRate(confTarget int64) (int64, error) {
-	w := ec.GetWallet()
-	if w == nil {
-		// go server?
-		return 0, ErrNoWallet
+	node := ec.GetNode()
+	if node != nil {
+		feeRate, _ := node.EstimateFeeRate(confTarget)
+		if feeRate != -1 {
+			return feeRate, nil
+		}
 	}
 	// for now just return default fee rate of 1000
 	return 1000, nil

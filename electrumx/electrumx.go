@@ -68,6 +68,7 @@ type ElectrumXNode interface {
 	GetListUnspent(scripthash string) (ListUnspentResult, error)
 	GetTransaction(txid string) (*GetTransactionResult, error)
 	GetRawTransaction(txid string) (string, error)
+	EstimateFeeRate(confTarget int64) (int64, error)
 	//
 	Broadcast(rawTx string) (string, error)
 }

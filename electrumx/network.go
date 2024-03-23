@@ -841,3 +841,18 @@ func (sc *ServerConn) Broadcast(ctx context.Context, rawTx string) (string, erro
 	}
 	return resp, nil
 }
+
+// estimated transaction fee in coin units per kilobyte, as a floating point number string.
+// If the daemon does not have enough information to make an estimate, the integer -1
+// is returned.
+func (sc *ServerConn) EstimateFee(ctx context.Context, confTarget int64) (int64, error) {
+	var resp float64
+	err := sc.Request(ctx, "blockchain.estimatefee", positional{confTarget}, &resp)
+	if err != nil {
+		return 0, err
+	}
+	if resp == -1 {
+		return -1, errors.New("server cannot estimate a feerate")
+	}
+	return int64(resp * 1e8), nil
+}
