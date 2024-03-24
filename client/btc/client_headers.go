@@ -313,6 +313,8 @@ func (ec *BtcElectrumClient) GetBlockHeader(height int64) *wire.BlockHeader {
 	h := ec.clientHeaders
 	h.hdrsMtx.Lock()
 	defer h.hdrsMtx.Unlock()
+	// return nil for now. If there is a need for blocks before the last checkpoint
+	// consider making a server call
 	return h.hdrs[height]
 }
 
@@ -323,6 +325,11 @@ func (ec *BtcElectrumClient) GetBlockHeaders(startHeight, count int64) ([]*wire.
 	h := ec.clientHeaders
 	h.hdrsMtx.Lock()
 	defer h.hdrsMtx.Unlock()
+	if h.startPoint > startHeight {
+		// error for now. If there is a need for blocks before the last checkpoint
+		// consider making a server call
+		return nil, errors.New("requested start height < start of stored blocks")
+	}
 	if startHeight > h.tip {
 		return nil, errors.New("requested start height > tip")
 	}
