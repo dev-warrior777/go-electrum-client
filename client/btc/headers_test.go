@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
@@ -104,6 +105,7 @@ func TestAppendHeaders(t *testing.T) {
 		hdrFilePath: path.Join("/tmp", fname),
 		net:         &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
+		bhdrs:       make(map[chainhash.Hash]int64),
 		tip:         0,
 		synced:      false,
 	}
@@ -308,4 +310,31 @@ func TestMapIter(t *testing.T) {
 	}
 	h.tip = numHeaders - 1
 	h.DumpAll()
+}
+
+func TestStoreHashes(t *testing.T) {
+	cfg, _ := makeRegtestConfig()
+	h := NewHeaders(cfg)
+	err := h.Store(hdrFileReg, 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+	numBytes := int64(len(hdrFileReg))
+	numHeaders, err := h.BytesToNumHdrs(numBytes)
+	if err != nil {
+		log.Fatal(err)
+	}
+	h.tip = numHeaders - 1
+	var i int64
+	for i = 0; i <= h.tip; i++ {
+		hdr := h.hdrs[i]
+		if hdr == nil {
+			log.Fatalf("nil header returned from map at %d", i)
+		}
+		blkHash := hdr.BlockHash()
+		height := h.bhdrs[blkHash]
+		if i != height {
+			t.Errorf("height mismatch: wanted %d got %d", i, height)
+		}
+	}
 }

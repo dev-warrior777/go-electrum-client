@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/client"
 )
@@ -35,6 +36,7 @@ type Headers struct {
 	// decoded headers stored by height
 	hdrsMtx    sync.RWMutex
 	hdrs       map[int64]*wire.BlockHeader
+	bhdrs      map[chainhash.Hash]int64
 	startPoint int64
 	tip        int64
 	synced     bool
@@ -45,10 +47,12 @@ func NewHeaders(cfg *client.ClientConfig) *Headers {
 	filePath := filepath.Join(cfg.DataDir, HEADER_FILE_NAME)
 	hdrsMapInitSize := 2 * ELECTRUM_MAGIC_NUMHDR //4032
 	hdrsMap := make(map[int64]*wire.BlockHeader, hdrsMapInitSize)
+	bhdrsMap := make(map[chainhash.Hash]int64, hdrsMapInitSize)
 	hdrs := Headers{
 		hdrFilePath: filePath,
 		net:         cfg.Params,
 		hdrs:        hdrsMap,
+		bhdrs:       bhdrsMap,
 		startPoint:  getStartPointHeight(cfg),
 		tip:         0,
 		synced:      false,
@@ -71,9 +75,12 @@ func getStartPointHeight(cfg *client.ClientConfig) int64 {
 	return startAtHeight
 }
 
+// Only for TEST in headers_test.go
 func (h *Headers) ClearMap() {
-	h.hdrs = nil // gc
-	h.hdrs = make(map[int64]*wire.BlockHeader)
+	h.hdrs = nil
+	h.bhdrs = nil
+	h.hdrs = make(map[int64]*wire.BlockHeader, 10)
+	h.bhdrs = make(map[chainhash.Hash]int64, 10)
 }
 
 // Get the 'blockchain_headers' file size. Error is returned unexamined as
@@ -179,6 +186,8 @@ func (h *Headers) Store(b []byte, startHeight int64) error {
 		}
 		at := startHeight + i
 		h.hdrs[at] = blkHdr
+		blkHash := blkHdr.BlockHash()
+		h.bhdrs[blkHash] = at
 	}
 	return nil
 }

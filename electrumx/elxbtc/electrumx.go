@@ -70,6 +70,7 @@ func (s *SingleNode) Start(parent context.Context) error {
 		cancel()
 		return err
 	}
+
 	s.Server = &electrumx.ElectrumXSvrConn{
 		SvrConn: sc,
 		SvrCtx:  ctx,
@@ -90,6 +91,26 @@ func (s *SingleNode) Start(parent context.Context) error {
 		return errors.New("wrong genesis hash for Bitcoin")
 	}
 	fmt.Println("Genesis correct: ", "0x"+feats.Genesis)
+
+	// now server is up check if we have required functions like GetTransaction
+	// which is not supported fully on at least one server .. maybe more.
+	switch network {
+	case "testnet", "testnet3":
+		txid := "581d837b8bcca854406dc5259d1fb1e0d314fcd450fb2d4654e78c48120e0135"
+		_, err := sc.GetTransaction(ctx, txid)
+		if err != nil {
+			cancel()
+			return err
+		}
+	case "mainnet":
+		txid := "f53a8b83f85dd1ce2a6ef4593e67169b90aaeb402b3cf806b37afc634ef71fbc"
+		_, err := sc.GetTransaction(ctx, txid)
+		if err != nil {
+			cancel()
+			return err
+		}
+		// ignore regtest
+	}
 
 	return nil
 }

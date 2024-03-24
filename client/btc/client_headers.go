@@ -307,8 +307,8 @@ func (ec *BtcElectrumClient) Tip() (int64, bool) {
 	return h.tip, h.synced
 }
 
-// GetBlockHeader returns the client's block header for height. If out of range will
-// return nil.
+// GetBlockHeader returns the client's block header for height. If out of range
+// will return nil.
 func (ec *BtcElectrumClient) GetBlockHeader(height int64) *wire.BlockHeader {
 	h := ec.clientHeaders
 	h.hdrsMtx.Lock()
@@ -319,8 +319,8 @@ func (ec *BtcElectrumClient) GetBlockHeader(height int64) *wire.BlockHeader {
 }
 
 // GetBlockHeaders returns the client's block headers for the requested range.
-// If startHeight > tip or startHeight+count > tip will return error.
-// return nil.
+// If startHeight < startPoint or startHeight > tip or startHeight+count > tip
+// will return error.
 func (ec *BtcElectrumClient) GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error) {
 	h := ec.clientHeaders
 	h.hdrsMtx.Lock()
