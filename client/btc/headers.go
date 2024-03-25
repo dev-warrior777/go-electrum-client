@@ -36,7 +36,7 @@ type Headers struct {
 	// decoded headers stored by height
 	hdrsMtx    sync.RWMutex
 	hdrs       map[int64]*wire.BlockHeader
-	bhdrs      map[chainhash.Hash]int64
+	blkHdrs    map[chainhash.Hash]int64
 	startPoint int64
 	tip        int64
 	synced     bool
@@ -52,7 +52,7 @@ func NewHeaders(cfg *client.ClientConfig) *Headers {
 		hdrFilePath: filePath,
 		net:         cfg.Params,
 		hdrs:        hdrsMap,
-		bhdrs:       bhdrsMap,
+		blkHdrs:     bhdrsMap,
 		startPoint:  getStartPointHeight(cfg),
 		tip:         0,
 		synced:      false,
@@ -73,14 +73,6 @@ func getStartPointHeight(cfg *client.ClientConfig) int64 {
 		startAtHeight = int64(823000)
 	}
 	return startAtHeight
-}
-
-// Only for TEST in headers_test.go
-func (h *Headers) ClearMap() {
-	h.hdrs = nil
-	h.bhdrs = nil
-	h.hdrs = make(map[int64]*wire.BlockHeader, 10)
-	h.bhdrs = make(map[chainhash.Hash]int64, 10)
 }
 
 // Get the 'blockchain_headers' file size. Error is returned unexamined as
@@ -187,7 +179,7 @@ func (h *Headers) Store(b []byte, startHeight int64) error {
 		at := startHeight + i
 		h.hdrs[at] = blkHdr
 		blkHash := blkHdr.BlockHash()
-		h.bhdrs[blkHash] = at
+		h.blkHdrs[blkHash] = at
 	}
 	return nil
 }
@@ -246,4 +238,12 @@ func (h *Headers) BytesToNumHdrs(numBytes int64) (int64, error) {
 			"invalid bytes length - not a multiple of header size")
 	}
 	return numBytes / HEADER_SIZE, nil
+}
+
+// Only for TEST in headers_test.go
+func (h *Headers) ClearMaps() {
+	h.hdrs = nil
+	h.blkHdrs = nil
+	h.hdrs = make(map[int64]*wire.BlockHeader, 10)
+	h.blkHdrs = make(map[chainhash.Hash]int64, 10)
 }

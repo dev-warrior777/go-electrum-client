@@ -105,7 +105,7 @@ func TestAppendHeaders(t *testing.T) {
 		hdrFilePath: path.Join("/tmp", fname),
 		net:         &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
-		bhdrs:       make(map[chainhash.Hash]int64),
+		blkHdrs:     make(map[chainhash.Hash]int64),
 		tip:         0,
 		synced:      false,
 	}
@@ -262,34 +262,34 @@ func TestStore(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	h.ClearMap()
+	h.ClearMaps()
 	err = h.Store(hdr3, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
-	h.ClearMap()
+	h.ClearMaps()
 	err = h.Store(hdr3, 100)
 	if err != nil {
 		log.Fatal(err)
 	}
-	h.ClearMap()
+	h.ClearMaps()
 	err = h.Store(hdr, 0)
 	if err != nil {
 		log.Fatal("error expected")
 	}
-	h.ClearMap()
+	h.ClearMaps()
 	err = h.Store(hdr3, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 	// extra bytes are ignored
-	h.ClearMap()
+	h.ClearMaps()
 	err = h.Store(hdrBadLenMore, 0)
 	if err == nil {
 		log.Fatal("error expected")
 	}
 	// less than expected size is not ignored
-	h.ClearMap()
+	h.ClearMaps()
 	err = h.Store(hdrBadLenLess, 0)
 	if err == nil {
 		log.Fatal("error expected")
@@ -332,7 +332,7 @@ func TestStoreHashes(t *testing.T) {
 			log.Fatalf("nil header returned from map at %d", i)
 		}
 		blkHash := hdr.BlockHash()
-		height := h.bhdrs[blkHash]
+		height := h.blkHdrs[blkHash]
 		if i != height {
 			t.Errorf("height mismatch: wanted %d got %d", i, height)
 		}

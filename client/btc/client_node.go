@@ -46,3 +46,15 @@ func (ec *BtcElectrumClient) GetAddressHistory(addr string) (electrumx.HistoryRe
 	}
 	return node.GetHistory(scripthash)
 }
+
+func (ec *BtcElectrumClient) GetAddressUnspent(addr string) (electrumx.ListUnspentResult, error) {
+	node := ec.GetNode()
+	if node == nil {
+		return nil, ErrNoNode
+	}
+	scripthash, err := addrToElectrumScripthash(addr, ec.GetConfig().Params)
+	if err != nil {
+		return nil, err
+	}
+	return node.GetListUnspent(scripthash)
+}

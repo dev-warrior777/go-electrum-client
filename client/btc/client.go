@@ -201,7 +201,7 @@ func (ec *BtcElectrumClient) CloseWallet() {
 //
 // Spend(amount int64, toAddress string, feeLevel wallet.FeeLevel, broadcast bool) (string, string, error)
 // Broadcast(*BroadcastParams) (string, error)
-// ListUnspent() (string, error)
+// ListUnspent() ([]wallet.Utxo, error)
 // UnusedAddress() (string, error)
 // ChangeAddress() (string, error)
 // Balance() (int64, int64, error)
@@ -213,5 +213,6 @@ func (ec *BtcElectrumClient) CloseWallet() {
 // GetTransaction(txid string) (*electrumx.GetTransactionResult, error)
 // GetRawTransaction(txid string) ([]byte, error)
 // GetAddressHistory(addr string) (electrumx.HistoryResult, error)
+// GetAddressUnspent(addr string) (electrumx.ListUnspentResult, error)
 //
 //////////////////////////////////////////////////////////////////////////////

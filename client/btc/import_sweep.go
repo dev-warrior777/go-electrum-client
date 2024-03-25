@@ -50,7 +50,7 @@ func (ec *BtcElectrumClient) getPubKeyHashUtxos(keyPair *btcutil.WIF) ([]wallet.
 	if err != nil {
 		return inputList, err
 	}
-	// ask electrum
+	// ask electrumX
 	listUnspent, err := node.GetListUnspent(scripthash)
 	if err != nil {
 		return inputList, err

@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -342,6 +343,12 @@ func (ec *BtcElectrumClient) GetBlockHeaders(startHeight, count int64) ([]*wire.
 		headers = append(headers, h.hdrs[i])
 	}
 	return headers, nil
+}
+
+func (ec *BtcElectrumClient) GetHeaderForBlockHash(blkHash *chainhash.Hash) *wire.BlockHeader {
+	h := ec.clientHeaders
+	height := h.blkHdrs[*blkHash]
+	return ec.GetBlockHeader(height)
 }
 
 func (ec *BtcElectrumClient) RegisterTipChangeNotify() (<-chan int64, error) {

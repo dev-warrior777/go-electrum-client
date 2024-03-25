@@ -84,6 +84,7 @@ type ElectrumClient interface {
 	GetTransaction(txid string) (*electrumx.GetTransactionResult, error)
 	GetRawTransaction(txid string) ([]byte, error)
 	GetAddressHistory(addr string) (electrumx.HistoryResult, error)
+	GetAddressUnspent(addr string) (electrumx.ListUnspentResult, error)
 	//...
 
 }
