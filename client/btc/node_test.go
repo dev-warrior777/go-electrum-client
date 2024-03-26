@@ -20,10 +20,10 @@ func TestNodeCreate(t *testing.T) {
 	cfg.Params = &chaincfg.TestNet3Params
 	cfg.DataDir = path.Join(cfg.DataDir, "btc/testnet")
 	cfg.TrustedPeer = electrumx.ServerAddr{
-		// Net: "ssl", Addr: "testnet.aranguren.org:51002",
+		Net: "ssl", Addr: "testnet.aranguren.org:51002",
 		// Net: "tcp", Addr: "testnet.aranguren.org:51001",
 		// Net: "ssl", Addr: "blockstream.info:993",
-		Net: "tcp", Addr: "blockstream.info:143",
+		// Net: "tcp", Addr: "blockstream.info:143",
 	}
 	c := NewBtcElectrumClient(cfg)
 	ec, ok := c.(*BtcElectrumClient)

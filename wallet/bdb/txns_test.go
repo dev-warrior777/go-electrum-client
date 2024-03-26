@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/wire"
+	bolt "go.etcd.io/bbolt"
 )
 
 var txdb *TxnsDB

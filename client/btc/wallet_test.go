@@ -56,7 +56,7 @@ func TestWalletCreation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("made a btcWallet", ec.GetWallet())
+	fmt.Println("made a btcWallet")
 
 	adr, err := ec.GetWallet().GetUnusedAddress(wallet.EXTERNAL)
 	if err != nil {

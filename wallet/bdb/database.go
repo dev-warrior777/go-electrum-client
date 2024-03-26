@@ -7,8 +7,8 @@ import (
 	"path"
 	"sync"
 
-	"github.com/boltdb/bolt"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
+	bolt "go.etcd.io/bbolt"
 )
 
 // This database is a BoltDb implementation of Datastore.

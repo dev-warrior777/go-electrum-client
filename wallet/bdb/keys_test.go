@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/boltdb/bolt"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
+	bolt "go.etcd.io/bbolt"
 )
 
 var kdb *KeysDB

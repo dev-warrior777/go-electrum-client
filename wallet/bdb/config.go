@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/boltdb/bolt"
+	bolt "go.etcd.io/bbolt"
 )
 
 type CfgDB struct {

@@ -8,10 +8,10 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
+	bolt "go.etcd.io/bbolt"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/nacl/secretbox"
 )

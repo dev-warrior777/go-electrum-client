@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
+	bolt "go.etcd.io/bbolt"
 )
 
 type StxoDB struct {

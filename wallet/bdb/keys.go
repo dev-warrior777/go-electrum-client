@@ -10,10 +10,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
+	bolt "go.etcd.io/bbolt"
 )
 
 type KeysDB struct {
