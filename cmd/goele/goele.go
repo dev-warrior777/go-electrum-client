@@ -3,6 +3,7 @@ package main
 // Run goele as an app for testing
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -66,9 +67,9 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 	case "testnet":
 		cfg.Params = &chaincfg.TestNet3Params
 		cfg.TrustedPeer = electrumx.ServerAddr{
-			// Net: "ssl", Addr: "testnet.aranguren.org:51002",
+			Net: "ssl", Addr: "testnet.aranguren.org:51002",
 			// Net: "tcp", Addr: "testnet.aranguren.org:51001",
-			Net: "ssl", Addr: "blockstream.info:993",
+			// Net: "ssl", Addr: "blockstream.info:993",
 			// Net: "tcp", Addr: "blockstream.info:143",
 		}
 		cfg.StoreEncSeed = true
@@ -77,6 +78,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		cfg.Params = &chaincfg.MainNetParams
 		cfg.TrustedPeer = electrumx.ServerAddr{
 			Net: "ssl", Addr: "elx.bitske.com:50002",
+			// Net: "ssl", Addr: "blockstream.info:700",
 		}
 		cfg.StoreEncSeed = false
 		cfg.Testing = false
@@ -123,11 +125,39 @@ func main() {
 	ec := btc.NewBtcElectrumClient(cfg)
 
 	// start client, create node & sync headers
-	err = ec.Start()
+	err = ec.Start(context.Background())
 	if err != nil {
 		ec.Stop()
 		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
 		os.Exit(1)
+	}
+
+	feeRate, _ := ec.FeeRate(6)
+	fmt.Println(feeRate)
+
+	history, err := ec.GetAddressHistory("bcrt1qdql55es0t6afs9gy9th2magjncahp0fxhs4jkn20mqjt4hjyjesqvp5ls8")
+	if err != nil {
+		ec.Stop()
+		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
+		os.Exit(1)
+	}
+	for _, h := range history {
+		fmt.Println(" Height: ", h.Height)
+		fmt.Println(" TxHash: ", h.TxHash)
+		fmt.Println(" Fee:    ", h.Fee)
+	}
+
+	addrUnspent, err := ec.GetAddressUnspent("bcrt1qy7agjj62epx0ydnqskgwlcfwu52xjtpj36hr0d")
+	if err != nil {
+		ec.Stop()
+		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
+		os.Exit(1)
+	}
+	for _, u := range addrUnspent {
+		fmt.Println(" Height: ", u.Height)
+		fmt.Println(" TxHash: ", u.TxHash)
+		fmt.Println(" TxPos:  ", u.TxPos)
+		fmt.Println(" Value:  ", u.Value)
 	}
 
 	// make the client's wallet
@@ -140,8 +170,9 @@ func main() {
 
 	if net == "regtest" {
 
-		mnemonic := "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
-		err := ec.RecreateWallet("abc", mnemonic)
+		// mnemonic := "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
+		// err := ec.RecreateWallet("abc", mnemonic)
+		err := ec.LoadWallet("abc")
 		if err != nil {
 			ec.Stop()
 			fmt.Println(err, " - exiting")
@@ -150,8 +181,9 @@ func main() {
 
 	} else if net == "testnet3" {
 
-		mnemonic := "canyon trip truly ritual lonely quiz romance rose alone journey like bronze"
-		err := ec.RecreateWallet("abc", mnemonic)
+		// mnemonic := "canyon trip truly ritual lonely quiz romance rose alone journey like bronze"
+		// err := ec.RecreateWallet("abc", mnemonic)
+		ec.LoadWallet("abc")
 		if err != nil {
 			ec.GetNode().Stop()
 			fmt.Println(err, " - exiting")
@@ -162,7 +194,7 @@ func main() {
 		// production usage: load the client's wallet
 		err := ec.LoadWallet(pass)
 		if err != nil {
-			ec.GetNode().Stop()
+			ec.Stop()
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}
@@ -177,6 +209,20 @@ func main() {
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
+
+	address, err := ec.UnusedAddress()
+	if err != nil {
+		ec.Stop()
+		fmt.Println(err, " - exiting")
+		os.Exit(1)
+	}
+	wif, err := ec.GetPrivKeyForAddress("abc", address)
+	if err != nil {
+		ec.Stop()
+		fmt.Println(err, " - exiting")
+		os.Exit(1)
+	}
+	fmt.Println(wif)
 
 	// for testing only
 	err = btc.RPCServe(ec)

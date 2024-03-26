@@ -76,6 +76,10 @@ type ElectrumWallet interface {
 	// esses for receiving funds; not change addresses.
 	GetUnusedLegacyAddress() (btcutil.Address, error)
 
+	// GetPrivKeyForAddress gets the wallet private key-pair as a WIF given an
+	// wallet address and the wallet password.
+	GetPrivKeyForAddress(pw string, address btcutil.Address) (string, error)
+
 	// Marks the address as used (involved in at least one transaction)
 	MarkAddressUsed(address btcutil.Address) error
 

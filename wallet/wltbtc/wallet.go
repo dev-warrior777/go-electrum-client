@@ -304,6 +304,25 @@ func (w *BtcElectrumWallet) GetUnusedLegacyAddress() (btcutil.Address, error) {
 	return addrP2PKH, nil
 }
 
+func (w *BtcElectrumWallet) GetPrivKeyForAddress(pw string, address btcutil.Address) (string, error) {
+	if ok := w.storageManager.IsValidPw(pw); !ok {
+		return "", errors.New("invalid password")
+	}
+	hdKey, err := w.keyManager.GetKeyForScript(address.ScriptAddress())
+	if err != nil {
+		return "", err
+	}
+	privKey, err := hdKey.ECPrivKey()
+	if err != nil {
+		return "", err
+	}
+	wif, err := btcutil.NewWIF(privKey, w.params, true)
+	if err != nil {
+		return "", err
+	}
+	return wif.String(), nil
+}
+
 // Marks the address as used (involved in at least one transaction)
 func (w *BtcElectrumWallet) MarkAddressUsed(address btcutil.Address) error {
 	return w.txstore.Keys().MarkKeyAsUsed(address.ScriptAddress())

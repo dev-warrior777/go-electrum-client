@@ -119,6 +119,19 @@ func (ec *BtcElectrumClient) Spend(
 	return changeIndex, rawTxHex, txidHex, nil
 }
 
+// GetPrivKeyForAddress
+func (ec *BtcElectrumClient) GetPrivKeyForAddress(pw, addr string) (string, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		return "", ErrNoWallet
+	}
+	address, err := btcutil.DecodeAddress(addr, w.Params())
+	if err != nil {
+		return "", err
+	}
+	return w.GetPrivKeyForAddress(pw, address)
+}
+
 // RpcBroadcast sends a transaction to the server for broadcast on the bitcoin
 // network. It is a test rpc server endpoint and it is thus not part of the
 // ElectrumClient interface.

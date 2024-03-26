@@ -200,6 +200,7 @@ func (ec *BtcElectrumClient) CloseWallet() {
 // Interface methods in client_wallet.go
 //
 // Spend(amount int64, toAddress string, feeLevel wallet.FeeLevel, broadcast bool) (string, string, error)
+// GetPrivKeyForAddress(pw, addr string) (string, error)
 // Broadcast(*BroadcastParams) (string, error)
 // ListUnspent() ([]wallet.Utxo, error)
 // UnusedAddress() (string, error)

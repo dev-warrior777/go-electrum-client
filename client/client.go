@@ -41,7 +41,7 @@ const (
 type BroadcastParams struct {
 	Tx          *wire.MsgTx
 	ChangeIndex int
-	ownVouts    []int
+	OwnVouts    []int
 	//...
 }
 
@@ -71,6 +71,7 @@ type ElectrumClient interface {
 	GetBlockHeader(height int64) *wire.BlockHeader
 	GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error)
 	Spend(pw string, amount int64, toAddress string, feeLevel wallet.FeeLevel) (int, string, string, error)
+	GetPrivKeyForAddress(pw, addr string) (string, error)
 	Broadcast(*BroadcastParams) (string, error)
 	ListUnspent() ([]wallet.Utxo, error)
 	FreezeUTXO(txid string, out uint32) error
