@@ -41,7 +41,8 @@ var (
 	disabledPrinter = Printer(func(string, ...any) {})
 )
 
-const pingInterval = 10 * time.Second
+// from electrum code - about 50% default server timeout for ping which is ~10m
+const pingInterval = 300 * time.Second
 
 // ServerConn represents a connection to an Electrum server e.g. ElectrumX. It
 // is a single use type that must be replaced if the connection is lost. Use

@@ -30,7 +30,7 @@ func NewSingleNode(cfg *electrumx.NodeConfig) *SingleNode {
 func (s *SingleNode) Start(parent context.Context) error {
 	trustedServer := s.Config.TrustedPeer
 	if trustedServer == nil {
-		return errors.New("SingleNode requires a trusted ElectrumX server")
+		return errors.New("SingleNode requires a trusted ElectrumX server in the config")
 	}
 	netProto := trustedServer.Network()
 	addr := trustedServer.String()

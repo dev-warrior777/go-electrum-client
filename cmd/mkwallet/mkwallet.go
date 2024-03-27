@@ -99,32 +99,40 @@ func configure() (string, string, string, *client.ClientConfig, error) {
 	fmt.Println("action:", *action)
 	fmt.Println("pass:", *pass)
 	fmt.Println("seed:", *seed)
-	if !*test_wallet {
-		if *action == "create" && *pass == "" {
-			return "", "", "", nil, errors.New("wallet create needs a password")
-		} else if *action == "recreate" {
-			if *pass == "" {
-				return "", "", "", nil, errors.New("wallet recreate needs a new password - " +
-					"can be different to the previous password")
+	if *test_wallet {
+		switch *net {
+		case "regtest", "simnet":
+			*seed = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
+		case "testnet", "testnet3":
+			*seed = "canyon trip truly ritual lonely quiz romance rose alone journey like bronze"
+		default:
+			return "", "", "", nil, errors.New("no test_wallet for mainnet")
+		}
+	}
+	if *action == "create" && *pass == "" {
+		return "", "", "", nil, errors.New("wallet create needs a password")
+	} else if *action == "recreate" {
+		if *pass == "" {
+			return "", "", "", nil, errors.New("wallet recreate needs a new password - " +
+				"can be different to the previous password")
+		}
+		if *seed == "" {
+			return "", "", "", nil, errors.New("wallet recreate needs the old wallet seed")
+		}
+		words := strings.SplitN(*seed, " ", 12)
+		fmt.Printf("%q (len %d)\n", words, len(words))
+		if len(words) != 12 {
+			return "", "", "", nil, errors.New("a seed must have 12 words each separated by a space")
+		}
+		var bad bool
+		for _, word := range words {
+			if len(word) < 3 {
+				fmt.Printf("bad word: '%s'\n", word)
+				bad = true
 			}
-			if *seed == "" {
-				return "", "", "", nil, errors.New("wallet recreate needs the old wallet seed")
-			}
-			words := strings.SplitN(*seed, " ", 12)
-			fmt.Printf("%q (len %d)\n", words, len(words))
-			if len(words) != 12 {
-				return "", "", "", nil, errors.New("a seed must have 12 words each separated by a space")
-			}
-			var bad bool
-			for _, word := range words {
-				if len(word) < 3 {
-					fmt.Printf("bad word: '%s'\n", word)
-					bad = true
-				}
-			}
-			if bad {
-				return "", "", "", nil, errors.New("a seed must be at least 3 letters long -- did you put extra spaces?")
-			}
+		}
+		if bad {
+			return "", "", "", nil, errors.New("malformed seed -- did you put extra spaces?")
 		}
 	}
 	cfg, err := makeBasicConfig(*coin, *net)
@@ -184,9 +192,7 @@ func main() {
 		// err := ec.RecreateWallet(pass, mnemonic)
 		err := ec.RecreateWallet(pass, seed)
 		if err != nil {
-			ec.GetNode().Stop()
 			fmt.Println(err, " - exiting")
-			os.Exit(1)
 		}
 	} else if net == "testnet3" {
 		// for non-mainnet testing recreate a wallet with a known set of keys ..
@@ -198,7 +204,6 @@ func main() {
 	} else if net == "mainnet" {
 		err := ec.RecreateWallet(pass, seed)
 		if err != nil {
-			ec.GetNode().Stop()
 			fmt.Println(err)
 		}
 	}
