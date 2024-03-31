@@ -2,6 +2,7 @@ package btc
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -143,14 +144,14 @@ func (ec *BtcElectrumClient) removeSubscription(pkScript string) error {
 /////////////////////////////
 
 // addressStatusNotify listens for address status change notifications
-func (ec *BtcElectrumClient) addressStatusNotify() error {
+func (ec *BtcElectrumClient) addressStatusNotify(ctx context.Context) error {
 	node := ec.GetNode()
 
 	scripthashNotifyCh, err := node.GetScripthashNotify()
 	if err != nil {
 		return err
 	}
-	svrCtx := node.GetServerConn().SvrCtx
+	// svrCtx := node.GetServerConn().SvrCtx
 
 	go func() {
 
@@ -160,9 +161,8 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 		for {
 			select {
 
-			case <-svrCtx.Done():
-				fmt.Println("Server shutdown - in scripthash notify")
-				node.Stop()
+			case <-ctx.Done():
+				fmt.Println("shutdown - in scripthash notify")
 				return
 
 			case status, ok := <-scripthashNotifyCh:
@@ -189,14 +189,14 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 				}
 
 				// get scripthash history
-				history, err := ec.GetAddressHistoryFromNode(sub)
+				history, err := ec.GetAddressHistoryFromNode(ctx, sub)
 				if err != nil {
 					continue
 				}
 				ec.dumpHistory(sub, history)
 
 				// add/update wallet db tx store
-				ec.addTxHistoryToWallet(history)
+				ec.addTxHistoryToWallet(ctx, history)
 			}
 		}
 	}()
@@ -209,7 +209,7 @@ func (ec *BtcElectrumClient) addressStatusNotify() error {
 // It returns a subscribe status which is the hash of all address history known
 // to the electrumX server and can be a zero length string if the subscription
 // is new and has no history yet.
-func (ec *BtcElectrumClient) SubscribeAddressNotify(newSub *wallet.Subscription) (string, error) {
+func (ec *BtcElectrumClient) SubscribeAddressNotify(ctx context.Context, newSub *wallet.Subscription) (string, error) {
 	node := ec.GetNode()
 	if node == nil {
 		return "", ErrNoNode
@@ -220,7 +220,7 @@ func (ec *BtcElectrumClient) SubscribeAddressNotify(newSub *wallet.Subscription)
 	}
 
 	// subscribe to node and wallet database
-	res, err := node.SubscribeScripthashNotify(newSub.ElectrumScripthash)
+	res, err := node.SubscribeScripthashNotify(ctx, newSub.ElectrumScripthash)
 	if err != nil {
 		return "", err
 	}
@@ -239,7 +239,7 @@ func (ec *BtcElectrumClient) SubscribeAddressNotify(newSub *wallet.Subscription)
 
 // UnsubscribeAddressNotify both unsubscribes from notifications for an address
 // _and_ removes the subscription details from the wallet database.
-func (ec *BtcElectrumClient) UnsubscribeAddressNotify(pkScript string) {
+func (ec *BtcElectrumClient) UnsubscribeAddressNotify(ctx context.Context, pkScript string) {
 	node := ec.GetNode()
 	if node == nil {
 		return
@@ -251,7 +251,7 @@ func (ec *BtcElectrumClient) UnsubscribeAddressNotify(pkScript string) {
 	}
 
 	// unsubscribe from node and wallet db
-	node.UnsubscribeScripthashNotify(subscription.ElectrumScripthash)
+	node.UnsubscribeScripthashNotify(ctx, subscription.ElectrumScripthash)
 	err = ec.removeSubscription(pkScript)
 	if err != nil {
 		fmt.Println("removeSubscription", err)
@@ -262,12 +262,12 @@ func (ec *BtcElectrumClient) UnsubscribeAddressNotify(pkScript string) {
 
 // GetAddressHistoryFromNode requests address history from ElectrumX  for a
 // subscribed address.
-func (ec *BtcElectrumClient) GetAddressHistoryFromNode(subscription *wallet.Subscription) (electrumx.HistoryResult, error) {
+func (ec *BtcElectrumClient) GetAddressHistoryFromNode(ctx context.Context, subscription *wallet.Subscription) (electrumx.HistoryResult, error) {
 	node := ec.GetNode()
 	if node == nil {
 		return nil, ErrNoNode
 	}
-	res, err := ec.GetNode().GetHistory(subscription.ElectrumScripthash)
+	res, err := node.GetHistory(ctx, subscription.ElectrumScripthash)
 	if err != nil {
 		return nil, err
 	}
@@ -283,12 +283,12 @@ func (ec *BtcElectrumClient) GetAddressHistoryFromNode(subscription *wallet.Subs
 // GetRawTransactionFromNode requests a raw hex transaction for a subscribed address
 // from ElectrumX keyed on a txid. This txid is usually taken from an ElectrumX
 // history list.
-func (ec *BtcElectrumClient) GetRawTransactionFromNode(txid string) (*wire.MsgTx, time.Time, error) {
+func (ec *BtcElectrumClient) GetRawTransactionFromNode(ctx context.Context, txid string) (*wire.MsgTx, time.Time, error) {
 	node := ec.GetNode()
 	if node == nil {
 		return nil, time.Time{}, ErrNoNode
 	}
-	txres, err := node.GetRawTransaction(txid)
+	txres, err := node.GetRawTransaction(ctx, txid)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
@@ -307,7 +307,7 @@ func (ec *BtcElectrumClient) GetRawTransactionFromNode(txid string) (*wire.MsgTx
 }
 
 // addTxHistoryToWallet adds new transaction details for an ElectrumX history list
-func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResult) {
+func (ec *BtcElectrumClient) addTxHistoryToWallet(ctx context.Context, history electrumx.HistoryResult) {
 	for _, h := range history {
 		txid, err := hex.DecodeString(h.TxHash)
 		if err != nil {
@@ -328,7 +328,7 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(history electrumx.HistoryResul
 		}
 
 		// add or update the wallet transaction
-		msgTx, txtime, err := ec.GetRawTransactionFromNode(h.TxHash)
+		msgTx, txtime, err := ec.GetRawTransactionFromNode(ctx, h.TxHash)
 		if err != nil {
 			continue
 		}

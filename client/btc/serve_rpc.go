@@ -101,7 +101,7 @@ func (e *Ec) RPCListUnspent(request map[string]string, response *map[string]stri
 // Get a new unused wallet receive address
 func (e *Ec) RPCUnusedAddress(request map[string]string, response *map[string]string) error {
 	r := *response
-	address, err := e.EleClient.UnusedAddress()
+	address, err := e.EleClient.UnusedAddress(context.TODO())
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (e *Ec) RPCUnusedAddress(request map[string]string, response *map[string]st
 // Get a new unused wallet change address
 func (e *Ec) RPCChangeAddress(request map[string]string, response *map[string]string) error {
 	r := *response
-	address, err := e.EleClient.ChangeAddress()
+	address, err := e.EleClient.ChangeAddress(context.TODO())
 	if err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func (e *Ec) RPCBroadcast(request map[string]string, response *map[string]string
 	if len(rawTx) > 27 {
 		fmt.Println("rpc:", rawTx[:27], "...", " changeIndex", changeIndex)
 	}
-	txid, err := e.EleClient.RpcBroadcast(rawTx, changeIndex)
+	txid, err := e.EleClient.RpcBroadcast(context.TODO(), rawTx, changeIndex)
 	fmt.Println("rpc err:", err)
 	if err != nil {
 		return err

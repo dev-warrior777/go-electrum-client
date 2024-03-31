@@ -57,12 +57,12 @@ type ElectrumClient interface {
 	UnregisterTipChangeNotify()
 	//
 	CreateWallet(pw string) error
-	RecreateWallet(pw, mnenomic string) error
 	LoadWallet(pw string) error
+	RecreateWallet(ctx context.Context, pw, mnenomic string) error
 	//
-	SyncWallet() error
-	RescanWallet() error
-	ImportAndSweep(wifKeyPairs []string) error
+	SyncWallet(ctx context.Context) error
+	RescanWallet(ctx context.Context) error
+	ImportAndSweep(ctx context.Context, keyPairs []string) error
 	//
 	CloseWallet()
 	//
@@ -72,20 +72,22 @@ type ElectrumClient interface {
 	GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error)
 	Spend(pw string, amount int64, toAddress string, feeLevel wallet.FeeLevel) (int, string, string, error)
 	GetPrivKeyForAddress(pw, addr string) (string, error)
-	Broadcast(*BroadcastParams) (string, error)
 	ListUnspent() ([]wallet.Utxo, error)
 	FreezeUTXO(txid string, out uint32) error
 	UnfreezeUTXO(txid string, out uint32) error
-	UnusedAddress() (string, error)
-	ChangeAddress() (string, error)
+	UnusedAddress(ctx context.Context) (string, error)
+	ChangeAddress(ctx context.Context) (string, error)
 	Balance() (int64, int64, error)
-	FeeRate(confTarget int64) (int64, error)
+
+	// adapt and pass thru
+	Broadcast(context.Context, *BroadcastParams) (string, error)
+	FeeRate(ctx context.Context, confTarget int64) (int64, error)
 
 	//pass thru
-	GetTransaction(txid string) (*electrumx.GetTransactionResult, error)
-	GetRawTransaction(txid string) ([]byte, error)
-	GetAddressHistory(addr string) (electrumx.HistoryResult, error)
-	GetAddressUnspent(addr string) (electrumx.ListUnspentResult, error)
+	GetTransaction(ctx context.Context, txid string) (*electrumx.GetTransactionResult, error)
+	GetRawTransaction(ctx context.Context, txid string) ([]byte, error)
+	GetAddressHistory(ctx context.Context, addr string) (electrumx.HistoryResult, error)
+	GetAddressUnspent(ctx context.Context, addr string) (electrumx.ListUnspentResult, error)
 	//...
 
 }

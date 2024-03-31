@@ -2,6 +2,7 @@ package btc
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -24,7 +25,7 @@ var ErrNoNode error = errors.New("no node")
 // SyncWallet sets up address notifications for subscribed addresses in the
 // wallet db. This will update txns, utxos, stxos wallet db tables with any
 // new address status history since the wallet was last open.
-func (ec *BtcElectrumClient) SyncWallet() error {
+func (ec *BtcElectrumClient) SyncWallet(ctx context.Context) error {
 	w := ec.GetWallet()
 	if w == nil {
 		return ErrNoWallet
@@ -44,7 +45,7 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		//     i.e. the up to date history list of txid:height, if any
 		//   - for each tx insert or update the wallet db
 
-		status, err := ec.SubscribeAddressNotify(subscription)
+		status, err := ec.SubscribeAddressNotify(ctx, subscription)
 		if err != nil {
 			return err
 		}
@@ -54,18 +55,18 @@ func (ec *BtcElectrumClient) SyncWallet() error {
 		}
 
 		// get address history to date for this address from ElectrumX
-		history, err := ec.GetAddressHistoryFromNode(subscription)
+		history, err := ec.GetAddressHistoryFromNode(ctx, subscription)
 		if err != nil {
 			return err
 		}
 		ec.dumpHistory(subscription, history)
 
 		// update wallet txstore if needed
-		ec.addTxHistoryToWallet(history)
+		ec.addTxHistoryToWallet(ctx, history)
 	}
 
 	// start goroutine to listen for scripthash status change notifications arriving
-	err = ec.addressStatusNotify()
+	err = ec.addressStatusNotify(ctx)
 	if err != nil {
 		return err
 	}
@@ -135,7 +136,7 @@ func (ec *BtcElectrumClient) GetPrivKeyForAddress(pw, addr string) (string, erro
 // RpcBroadcast sends a transaction to the server for broadcast on the bitcoin
 // network. It is a test rpc server endpoint and it is thus not part of the
 // ElectrumClient interface.
-func (ec *BtcElectrumClient) RpcBroadcast(rawTx string, changeIndex int) (string, error) {
+func (ec *BtcElectrumClient) RpcBroadcast(ctx context.Context, rawTx string, changeIndex int) (string, error) {
 	txBytes, err := hex.DecodeString(rawTx)
 	if err != nil {
 		return "", err
@@ -147,13 +148,13 @@ func (ec *BtcElectrumClient) RpcBroadcast(rawTx string, changeIndex int) (string
 		Tx:          wireMsgTx,
 		ChangeIndex: changeIndex,
 	}
-	return ec.Broadcast(&bc)
+	return ec.Broadcast(ctx, &bc)
 }
 
 // Broadcast sends a transaction to the ElectrumX server for broadcast on the
 // bitcoin network. It may also set up address status change notifications with
 // ElectrumX and the wallet db for a change address belonging to the wallet.
-func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, error) {
+func (ec *BtcElectrumClient) Broadcast(ctx context.Context, bc *client.BroadcastParams) (string, error) {
 	w := ec.GetWallet()
 	if w == nil {
 		return "", ErrNoWallet
@@ -187,7 +188,7 @@ func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, erro
 
 	// Send tx to ElectrumX for broadcasting to the bitcoin network
 	rawTxStr := hex.EncodeToString(rawTx)
-	txid, err := node.Broadcast(rawTxStr)
+	txid, err := node.Broadcast(ctx, rawTxStr)
 	if err != nil {
 		return "", err
 	}
@@ -220,7 +221,7 @@ func (ec *BtcElectrumClient) Broadcast(bc *client.BroadcastParams) (string, erro
 		}
 
 		// request notifications from node
-		res, err := node.SubscribeScripthashNotify(scripthash)
+		res, err := node.SubscribeScripthashNotify(ctx, scripthash)
 		if err != nil {
 			w.RemoveSubscription(newSub.PkScript)
 			return "", err
@@ -245,7 +246,7 @@ func (ec *BtcElectrumClient) ListUnspent() ([]wallet.Utxo, error) {
 
 // UnusedAddress gets a new unused wallet receive address and subscribes for
 // ElectrumX address status notify events on the returned address.
-func (ec *BtcElectrumClient) UnusedAddress() (string, error) {
+func (ec *BtcElectrumClient) UnusedAddress(ctx context.Context) (string, error) {
 	w := ec.GetWallet()
 	if w == nil {
 		return "", ErrNoWallet
@@ -278,7 +279,7 @@ func (ec *BtcElectrumClient) UnusedAddress() (string, error) {
 	}
 
 	// request notifications from node
-	res, err := node.SubscribeScripthashNotify(newSub.ElectrumScripthash)
+	res, err := node.SubscribeScripthashNotify(ctx, newSub.ElectrumScripthash)
 	if err != nil {
 		w.RemoveSubscription(newSub.PkScript)
 		return "", err
@@ -293,7 +294,7 @@ func (ec *BtcElectrumClient) UnusedAddress() (string, error) {
 
 // ChangeAddress gets a new unused wallet change address and subscribes for
 // ElectrumX address status notify events on the returned address.
-func (ec *BtcElectrumClient) ChangeAddress() (string, error) {
+func (ec *BtcElectrumClient) ChangeAddress(ctx context.Context) (string, error) {
 	w := ec.GetWallet()
 	if w == nil {
 		return "", ErrNoWallet
@@ -326,7 +327,7 @@ func (ec *BtcElectrumClient) ChangeAddress() (string, error) {
 	}
 
 	// request notifications from node
-	res, err := node.SubscribeScripthashNotify(newSub.ElectrumScripthash)
+	res, err := node.SubscribeScripthashNotify(ctx, newSub.ElectrumScripthash)
 	if err != nil {
 		w.RemoveSubscription(newSub.PkScript)
 		return "", err
@@ -371,10 +372,10 @@ func (ec *BtcElectrumClient) UnfreezeUTXO(txid string, out uint32) error {
 	return w.UnFreezeUTXO(op)
 }
 
-func (ec *BtcElectrumClient) FeeRate(confTarget int64) (int64, error) {
+func (ec *BtcElectrumClient) FeeRate(ctx context.Context, confTarget int64) (int64, error) {
 	node := ec.GetNode()
 	if node != nil {
-		feeRate, _ := node.EstimateFeeRate(confTarget)
+		feeRate, _ := node.EstimateFeeRate(ctx, confTarget)
 		if feeRate != -1 {
 			return feeRate, nil
 		}

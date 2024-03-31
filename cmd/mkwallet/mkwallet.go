@@ -190,19 +190,19 @@ func main() {
 		// for non-mainnet testing recreate a wallet with a known set of keys ..
 		// var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
 		// err := ec.RecreateWallet(pass, mnemonic)
-		err := ec.RecreateWallet(pass, seed)
+		err := ec.RecreateWallet(context.TODO(), pass, seed)
 		if err != nil {
 			fmt.Println(err, " - exiting")
 		}
 	} else if net == "testnet3" {
 		// for non-mainnet testing recreate a wallet with a known set of keys ..
 		// err := ec.RecreateWallet("abc", "canyon trip truly ritual lonely quiz romance rose alone journey like bronze")
-		err := ec.RecreateWallet(pass, seed)
+		err := ec.RecreateWallet(context.TODO(), pass, seed)
 		if err != nil {
 			fmt.Println(err)
 		}
 	} else if net == "mainnet" {
-		err := ec.RecreateWallet(pass, seed)
+		err := ec.RecreateWallet(context.TODO(), pass, seed)
 		if err != nil {
 			fmt.Println(err)
 		}

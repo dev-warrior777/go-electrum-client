@@ -91,21 +91,61 @@ func (ec *BtcElectrumClient) getDatastore() error {
 }
 
 // createNode creates a single unconnected ElectrumX node
-func (ec *BtcElectrumClient) createNode(_ client.NodeType) {
+func (ec *BtcElectrumClient) createNode(_ client.NodeType) error {
 	nodeCfg := ec.GetConfig().MakeNodeConfig()
-	n := elxbtc.NewSingleNode(nodeCfg)
+	n, err := elxbtc.NewSingleNode(nodeCfg)
+	if err != nil {
+		return err
+	}
 	ec.Node = n
+	return nil
 }
 
 // client interface implementation
 
 func (ec *BtcElectrumClient) Start(ctx context.Context) error {
-	ec.createNode(client.SingleNode)
-	err := ec.Node.Start(ctx)
+	err := ec.createNode(client.SingleNode)
 	if err != nil {
 		return err
 	}
-	return ec.syncHeaders()
+	err = ec.Node.Start(ctx)
+	if err != nil {
+		return err
+	}
+	err = ec.syncHeaders(ctx)
+	if err != nil {
+		return err
+	}
+	err = ec.listenNetworkRestarted(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ec *BtcElectrumClient) listenNetworkRestarted(ctx context.Context) error {
+	node := ec.GetNode()
+	if node == nil {
+		return ErrNoNode
+	}
+	networkRestartCh := node.RegisterNetworkRestart()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case nr := <-networkRestartCh:
+				fmt.Printf("network restart at %v\n", nr.Time)
+				ec.syncHeaders(ctx)
+				w := ec.GetWallet()
+				if w != nil {
+					ec.SyncWallet(ctx)
+				}
+			}
+		}
+
+	}()
+	return nil
 }
 
 func (ec *BtcElectrumClient) Stop() {
@@ -141,7 +181,7 @@ func (ec *BtcElectrumClient) CreateWallet(pw string) error {
 // RecreateWallet recreates a wallet from an existing mnemonic seed.
 // The password is to encrypt the stored xpub, xprv and other sensitive data
 // and can be different from the original wallet's password.
-func (ec *BtcElectrumClient) RecreateWallet(pw, mnenomic string) error {
+func (ec *BtcElectrumClient) RecreateWallet(ctx context.Context, pw, mnenomic string) error {
 	if ec.walletExists() {
 		//TODO: should we backup any wallet file that exists
 		return errors.New("wallet already exists")
@@ -157,7 +197,7 @@ func (ec *BtcElectrumClient) RecreateWallet(pw, mnenomic string) error {
 	}
 	// Do a rescan as alhough we have a wallet structure with a keychain we
 	// do not have any transaction history
-	err = ec.RescanWallet()
+	err = ec.RescanWallet(ctx)
 	if err != nil {
 		return err
 	}

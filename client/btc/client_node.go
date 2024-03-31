@@ -1,6 +1,7 @@
 package btc
 
 import (
+	"context"
 	"encoding/hex"
 
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
@@ -9,12 +10,12 @@ import (
 // Note: The below are walletless server queries, results are not checked by SPV.
 
 // Return the raw transaction bytes for a txid.
-func (ec *BtcElectrumClient) GetRawTransaction(txid string) ([]byte, error) {
+func (ec *BtcElectrumClient) GetRawTransaction(ctx context.Context, txid string) ([]byte, error) {
 	node := ec.GetNode()
 	if node == nil {
 		return nil, ErrNoNode
 	}
-	txStr, err := node.GetRawTransaction(txid)
+	txStr, err := node.GetRawTransaction(ctx, txid)
 	if err != nil {
 		return nil, err
 	}
@@ -22,12 +23,12 @@ func (ec *BtcElectrumClient) GetRawTransaction(txid string) ([]byte, error) {
 }
 
 // Return the transaction info for a txid.
-func (ec *BtcElectrumClient) GetTransaction(txid string) (*electrumx.GetTransactionResult, error) {
+func (ec *BtcElectrumClient) GetTransaction(ctx context.Context, txid string) (*electrumx.GetTransactionResult, error) {
 	node := ec.GetNode()
 	if node == nil {
 		return nil, ErrNoNode
 	}
-	res, err := node.GetTransaction(txid)
+	res, err := node.GetTransaction(ctx, txid)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +36,7 @@ func (ec *BtcElectrumClient) GetTransaction(txid string) (*electrumx.GetTransact
 }
 
 // Return the transaction history of any address.
-func (ec *BtcElectrumClient) GetAddressHistory(addr string) (electrumx.HistoryResult, error) {
+func (ec *BtcElectrumClient) GetAddressHistory(ctx context.Context, addr string) (electrumx.HistoryResult, error) {
 	node := ec.GetNode()
 	if node == nil {
 		return nil, ErrNoNode
@@ -44,10 +45,10 @@ func (ec *BtcElectrumClient) GetAddressHistory(addr string) (electrumx.HistoryRe
 	if err != nil {
 		return nil, err
 	}
-	return node.GetHistory(scripthash)
+	return node.GetHistory(ctx, scripthash)
 }
 
-func (ec *BtcElectrumClient) GetAddressUnspent(addr string) (electrumx.ListUnspentResult, error) {
+func (ec *BtcElectrumClient) GetAddressUnspent(ctx context.Context, addr string) (electrumx.ListUnspentResult, error) {
 	node := ec.GetNode()
 	if node == nil {
 		return nil, ErrNoNode
@@ -56,5 +57,5 @@ func (ec *BtcElectrumClient) GetAddressUnspent(addr string) (electrumx.ListUnspe
 	if err != nil {
 		return nil, err
 	}
-	return node.GetListUnspent(scripthash)
+	return node.GetListUnspent(ctx, scripthash)
 }

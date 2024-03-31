@@ -1,6 +1,7 @@
 package btc
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -14,19 +15,19 @@ import (
 // syncHeaders uodates the client headers and then subscribes for new update
 // tip notifications and listens for them
 // syncHeaders is part of the ElectrumClient interface inmplementation
-func (ec *BtcElectrumClient) syncHeaders() error {
-	err := ec.syncClientHeaders()
+func (ec *BtcElectrumClient) syncHeaders(ctx context.Context) error {
+	err := ec.syncClientHeaders(ctx)
 	if err != nil {
 		return err
 	}
-	return ec.subscribeClientHeaders()
+	return ec.subscribeClientHeaders(ctx)
 }
 
 // syncClientHeaders reads blockchain_headers file, then gets any missing block
 // from end of file to current tip from server. The current set of headers is
 // also stored in headers map and the chain verified by checking previous block
 // hashes backwards from local Tip.
-func (ec *BtcElectrumClient) syncClientHeaders() error {
+func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 	h := ec.clientHeaders
 
 	// we start from a recent height for testnet/mainnet
@@ -59,7 +60,7 @@ func (ec *BtcElectrumClient) syncClientHeaders() error {
 
 	node := ec.GetNode()
 
-	hdrsRes, err := node.BlockHeaders(startHeight, blockCount)
+	hdrsRes, err := node.BlockHeaders(ctx, startHeight, blockCount)
 	if err != nil {
 		return err
 	}
@@ -86,21 +87,18 @@ func (ec *BtcElectrumClient) syncClientHeaders() error {
 		doneGathering = true
 	}
 
-	svrCtx := node.GetServerConn().SvrCtx
-
 	for !doneGathering {
 
 		startHeight += int64(blockCount)
 
 		select {
 
-		case <-svrCtx.Done():
-			fmt.Println("Server shutdown - gathering")
-			node.Stop()
+		case <-ctx.Done():
+			fmt.Println("shutdown - gathering")
 			return nil
 
 		case <-time.After(time.Millisecond * 1000):
-			hdrsRes, err := node.BlockHeaders(startHeight, blockCount)
+			hdrsRes, err := node.BlockHeaders(ctx, startHeight, blockCount)
 			if err != nil {
 				return err
 			}
@@ -168,7 +166,7 @@ func (ec *BtcElectrumClient) syncClientHeaders() error {
 // protocol does not guarantee notification of all intermediate block headers.
 //
 // subscribeClientHeaders is part of the ElectrumClient interface implementation
-func (ec *BtcElectrumClient) subscribeClientHeaders() error {
+func (ec *BtcElectrumClient) subscribeClientHeaders(ctx context.Context) error {
 	h := ec.clientHeaders
 
 	// local tip for calculation before storage
@@ -181,7 +179,7 @@ func (ec *BtcElectrumClient) subscribeClientHeaders() error {
 		return err
 	}
 
-	hdrRes, err := node.SubscribeHeaders()
+	hdrRes, err := node.SubscribeHeaders(ctx)
 	if err != nil {
 		return err
 	}
@@ -190,7 +188,7 @@ func (ec *BtcElectrumClient) subscribeClientHeaders() error {
 	fmt.Println("hdrRes.Height", hdrRes.Height, "maybeTip", maybeTip, "diff", hdrRes.Height-maybeTip)
 	fmt.Println("hdrRes.Hex", hdrRes.Hex)
 
-	svrCtx := node.GetServerConn().SvrCtx
+	// svrCtx := node.GetServerConn().SvrCtx
 
 	go func() {
 
@@ -200,9 +198,8 @@ func (ec *BtcElectrumClient) subscribeClientHeaders() error {
 		for {
 			select {
 
-			case <-svrCtx.Done():
-				fmt.Println("Server shutdown - in headers notify")
-				node.Stop()
+			case <-ctx.Done():
+				fmt.Println("Shutdown - in headers notify")
 				return
 
 			case _, ok := <-hdrResNotifyCh:
@@ -253,7 +250,7 @@ func (ec *BtcElectrumClient) subscribeClientHeaders() error {
 							numToGet := int(numMissing)
 							fmt.Printf("Filling from height %d to height %d inclusive\n", from, x.Height)
 							// go get them with 'block.headers'
-							hdrsRes, err := node.BlockHeaders(from, numToGet)
+							hdrsRes, err := node.BlockHeaders(ctx, from, numToGet)
 							if err != nil {
 								panic(err)
 							}

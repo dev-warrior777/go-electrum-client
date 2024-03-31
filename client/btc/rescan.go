@@ -1,6 +1,7 @@
 package btc
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 
@@ -11,7 +12,7 @@ import (
 // RescanWallet asks ElectrumX for info for our wallet keys back to latest
 // checkpoint height.
 // We need to do this for a recreated wallet.
-func (ec *BtcElectrumClient) RescanWallet() error {
+func (ec *BtcElectrumClient) RescanWallet(ctx context.Context) error {
 	w := ec.GetWallet()
 	if w == nil {
 		return ErrNoWallet
@@ -44,7 +45,7 @@ func (ec *BtcElectrumClient) RescanWallet() error {
 			}
 			fmt.Printf("%s %s  Index:purpose %d:%d\n", address.String(), scripthash, keyIndex, purpose)
 
-			history, err := node.GetHistory(scripthash)
+			history, err := node.GetHistory(ctx, scripthash)
 			if err != nil {
 				fmt.Printf("error: %v - for scripthash %s\n", scripthash, err)
 				continue

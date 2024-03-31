@@ -1,5 +1,5 @@
 ///////////////
-//go:build live
+/////////////////////////////////////////go:build live
 
 ///////////////
 
@@ -21,6 +21,10 @@ import (
 
 var (
 	// https://github.com/spesmilo/electrum/blob/cffbe44c07a59a7d6a3d5183181659a57de8d2c0/electrum/servers_testnet.json
+	regServerAddr = "localhost:53002"
+	regTx         = ""
+	regGenesis    = "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"
+	// https://github.com/spesmilo/electrum/blob/cffbe44c07a59a7d6a3d5183181659a57de8d2c0/electrum/servers_testnet.json
 	testServerAddr = "testnet.aranguren.org:51001"
 	// testServerAddr = "blockstream.info:993"
 	// testServerAddr = "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion:51001"
@@ -35,12 +39,16 @@ var (
 	mainGenesis = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
 )
 
-func TestRunMainnetNode(t *testing.T) {
-	RunNode(t, ex.Mainnet, mainServerAddr, mainTx, mainGenesis, true)
+func TestRunRegtestNode(t *testing.T) {
+	RunNode(t, ex.Regtest, regServerAddr, regTx, regGenesis, true)
 }
 
 func TestRunTestnetNode(t *testing.T) {
 	RunNode(t, ex.Testnet, testServerAddr, testTx, testGenesis, false)
+}
+
+func TestRunMainnetNode(t *testing.T) {
+	RunNode(t, ex.Mainnet, mainServerAddr, mainTx, mainGenesis, true)
 }
 
 func RunNode(t *testing.T, network ex.Network, addr, tx, genesis string, useTls bool) {
@@ -96,9 +104,11 @@ func RunNode(t *testing.T, network ex.Network, addr, tx, genesis string, useTls 
 	}
 	t.Log("Genesis correct")
 
-	_, err = sc.GetTransaction(ctx, tx)
-	if err != nil {
-		t.Fatal(err)
+	if tx != "" {
+		_, err = sc.GetTransaction(ctx, tx)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	const until = time.Second * 7

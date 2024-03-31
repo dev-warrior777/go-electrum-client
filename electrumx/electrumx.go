@@ -3,6 +3,7 @@ package electrumx
 import (
 	"context"
 	"net"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
@@ -54,27 +55,26 @@ var Mainnet Network = "mainnet"
 
 var DebugMode bool
 
-type ElectrumXNode interface {
-	Start(ctx context.Context) error
-	Stop()
-	GetServerConn() *ElectrumXSvrConn
-	GetHeadersNotify() (<-chan *HeadersNotifyResult, error)
-	SubscribeHeaders() (*HeadersNotifyResult, error)
-	BlockHeaders(startHeight int64, blockCount int) (*GetBlockHeadersResult, error)
-	GetScripthashNotify() (<-chan *ScripthashStatusResult, error)
-	SubscribeScripthashNotify(scripthash string) (*ScripthashStatusResult, error)
-	UnsubscribeScripthashNotify(scripthash string)
-	GetHistory(scripthash string) (HistoryResult, error)
-	GetListUnspent(scripthash string) (ListUnspentResult, error)
-	GetTransaction(txid string) (*GetTransactionResult, error)
-	GetRawTransaction(txid string) (string, error)
-	EstimateFeeRate(confTarget int64) (int64, error)
-	//
-	Broadcast(rawTx string) (string, error)
+type NetworkRestart struct {
+	Time time.Time
 }
 
-type ElectrumXSvrConn struct {
-	SvrCtx  context.Context
-	SvrConn *ServerConn
-	Running bool
+type ElectrumXNode interface {
+	Start(ctx context.Context) error
+	RegisterNetworkRestart() <-chan *NetworkRestart
+	Stop()
+	GetHeadersNotify() (<-chan *HeadersNotifyResult, error)
+	SubscribeHeaders(ctx context.Context) (*HeadersNotifyResult, error)
+	GetScripthashNotify() (<-chan *ScripthashStatusResult, error)
+	SubscribeScripthashNotify(ctx context.Context, scripthash string) (*ScripthashStatusResult, error)
+	UnsubscribeScripthashNotify(ctx context.Context, scripthash string)
+
+	BlockHeaders(ctx context.Context, startHeight int64, blockCount int) (*GetBlockHeadersResult, error)
+	GetHistory(ctx context.Context, scripthash string) (HistoryResult, error)
+	GetListUnspent(ctx context.Context, scripthash string) (ListUnspentResult, error)
+	GetTransaction(ctx context.Context, txid string) (*GetTransactionResult, error)
+	GetRawTransaction(ctx context.Context, txid string) (string, error)
+	//
+	EstimateFeeRate(ctx context.Context, confTarget int64) (int64, error)
+	Broadcast(ctx context.Context, rawTx string) (string, error)
 }

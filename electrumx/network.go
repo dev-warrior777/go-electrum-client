@@ -89,7 +89,7 @@ func (sc *ServerConn) listen(ctx context.Context) {
 	// make a reader with a buffer big enough to handle initial sync download
 	// of block headers from ElectrumX -> client in chunks of 2016 headers for
 	// each request. Chunks * Header size * safety margin.
-	reader := bufio.NewReaderSize((sc.conn), 2016*80*16)
+	reader := bufio.NewReaderSize(sc.conn, 2016*80*16)
 
 	for {
 		if ctx.Err() != nil {
@@ -265,8 +265,8 @@ func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*Server
 		done:             make(chan struct{}),
 		debug:            logger,
 		respHandlers:     make(map[uint64]chan *response),
-		scripthashNotify: make(chan *ScripthashStatusResult, 16), // 128 bytes/slot
-		headersNotify:    make(chan *HeadersNotifyResult, 16),    // 168 bytes/slot
+		scripthashNotify: make(chan *ScripthashStatusResult, 1), // 128 bytes/slot
+		headersNotify:    make(chan *HeadersNotifyResult, 1),    // 168 bytes/slot
 	}
 
 	// Wrap the context with a cancel function for internal shutdown, and so the
@@ -720,7 +720,7 @@ type HeadersNotifyResult struct {
 
 // GetHeadersNotify returns this connection owned recv channel for headers
 // tip change notifications. This connection will close the channel.
-func (sc *ServerConn) GetHeadersNotify(ctx context.Context) <-chan *HeadersNotifyResult {
+func (sc *ServerConn) GetHeadersNotify() <-chan *HeadersNotifyResult {
 	return sc.headersNotify
 }
 
@@ -752,7 +752,7 @@ type ScripthashStatusResult struct {
 
 // GetScripthashNotify returns this connection owned recv channel for scripthash
 // status change notifications. This connection will close the channel.
-func (sc *ServerConn) GetScripthashNotify(ctx context.Context) <-chan *ScripthashStatusResult {
+func (sc *ServerConn) GetScripthashNotify() <-chan *ScripthashStatusResult {
 	return sc.scripthashNotify
 }
 

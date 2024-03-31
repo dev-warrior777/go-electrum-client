@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -125,17 +126,18 @@ func main() {
 	ec := btc.NewBtcElectrumClient(cfg)
 
 	// start client, create node & sync headers
-	err = ec.Start(context.Background())
+	clientCtx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
+	err = ec.Start(clientCtx)
 	if err != nil {
 		ec.Stop()
 		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
 		os.Exit(1)
 	}
 
-	feeRate, _ := ec.FeeRate(6)
+	feeRate, _ := ec.FeeRate(clientCtx, 6)
 	fmt.Println(feeRate)
 
-	history, err := ec.GetAddressHistory("bcrt1qdql55es0t6afs9gy9th2magjncahp0fxhs4jkn20mqjt4hjyjesqvp5ls8")
+	history, err := ec.GetAddressHistory(clientCtx, "bcrt1qdql55es0t6afs9gy9th2magjncahp0fxhs4jkn20mqjt4hjyjesqvp5ls8")
 	if err != nil {
 		ec.Stop()
 		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
@@ -147,17 +149,22 @@ func main() {
 		fmt.Println(" Fee:    ", h.Fee)
 	}
 
-	addrUnspent, err := ec.GetAddressUnspent("bcrt1qy7agjj62epx0ydnqskgwlcfwu52xjtpj36hr0d")
+	addrUnspent, err := ec.GetAddressUnspent(clientCtx, "bcrt1qy7agjj62epx0ydnqskgwlcfwu52xjtpj36hr0d")
 	if err != nil {
 		ec.Stop()
 		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
 		os.Exit(1)
 	}
+	var i int = 0
 	for _, u := range addrUnspent {
 		fmt.Println(" Height: ", u.Height)
 		fmt.Println(" TxHash: ", u.TxHash)
 		fmt.Println(" TxPos:  ", u.TxPos)
 		fmt.Println(" Value:  ", u.Value)
+		i++
+		if i == 3 {
+			break
+		}
 	}
 
 	// make the client's wallet
@@ -203,14 +210,14 @@ func main() {
 	// set up Notify for all our already given out receive addresses (getunusedaddress)
 	// and broadcasted change addresses in order to receive any changes to the state of
 	// the address history from the node
-	err = ec.SyncWallet()
+	err = ec.SyncWallet(clientCtx)
 	if err != nil {
 		ec.Stop()
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
 
-	address, err := ec.UnusedAddress()
+	address, err := ec.UnusedAddress(clientCtx)
 	if err != nil {
 		ec.Stop()
 		fmt.Println(err, " - exiting")
