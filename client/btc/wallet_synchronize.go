@@ -151,24 +151,30 @@ func (ec *BtcElectrumClient) addressStatusNotify(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// svrCtx := node.GetServerConn().SvrCtx
+
+	// in case of network restart we will want to cancel this thread and restart
+	// a new one
+
+	// make new cancellable context for network restarts
+	notifyCtx, cancelAddressStatus := context.WithCancel(ctx)
+	// store in ec
+	ec.cancelAddressStatusNotify = cancelAddressStatus
 
 	go func() {
 
 		fmt.Println("=== Waiting for address change notifications ===")
 
-	loop:
 		for {
 			select {
 
-			case <-ctx.Done():
-				fmt.Println("shutdown - in scripthash notify")
+			case <-notifyCtx.Done():
+				fmt.Println("notifyCtx.Done - in scripthash notify - exiting thread")
 				return
 
 			case status, ok := <-scripthashNotifyCh:
 				if !ok {
-					fmt.Println("scripthash notify channel closed - exiting loop")
-					break loop
+					fmt.Println("scripthash notify channel closed - exiting thread")
+					return
 				}
 
 				fmt.Printf("\n%s\n", "----------------------------------------")

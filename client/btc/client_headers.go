@@ -20,7 +20,7 @@ func (ec *BtcElectrumClient) syncHeaders(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return ec.subscribeClientHeaders(ctx)
+	return ec.headersNotify(ctx)
 }
 
 // syncClientHeaders reads blockchain_headers file, then gets any missing block
@@ -66,7 +66,7 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 	}
 	count := hdrsRes.Count
 
-	fmt.Print("Count: ", count, " read from server at Height: ", startHeight, "max: ", hdrsRes.Max)
+	fmt.Print("Count: ", count, " read from server at Height: ", startHeight, ", max: ", hdrsRes.Max)
 
 	if count > 0 {
 		b, err := hex.DecodeString(hdrsRes.HexConcat)
@@ -104,7 +104,7 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 			}
 			count = hdrsRes.Count
 
-			fmt.Print("Count: ", count, " read from server at Height: ", startHeight, " max:", hdrsRes.Max)
+			fmt.Print("Count: ", count, " read from server at Height: ", startHeight, ", max:", hdrsRes.Max)
 
 			if count > 0 {
 				b, err := hex.DecodeString(hdrsRes.HexConcat)
@@ -156,7 +156,7 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 	return nil
 }
 
-// subscribeClientHeaders subscribes to new block tip notifications from the
+// headersNotify subscribes to new block tip notifications from the
 // electrumx server and handles them as they arrive. The client local 'blockhain
 // _headers' file is appended and the headers map updated and verified.
 //
@@ -165,8 +165,8 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 // prior blocks, the server may only notify of the most recent chain tip. The
 // protocol does not guarantee notification of all intermediate block headers.
 //
-// subscribeClientHeaders is part of the ElectrumClient interface implementation
-func (ec *BtcElectrumClient) subscribeClientHeaders(ctx context.Context) error {
+// headersNotify is part of the ElectrumClient interface implementation
+func (ec *BtcElectrumClient) headersNotify(ctx context.Context) error {
 	h := ec.clientHeaders
 
 	// local tip for calculation before storage
@@ -188,24 +188,28 @@ func (ec *BtcElectrumClient) subscribeClientHeaders(ctx context.Context) error {
 	fmt.Println("hdrRes.Height", hdrRes.Height, "maybeTip", maybeTip, "diff", hdrRes.Height-maybeTip)
 	fmt.Println("hdrRes.Hex", hdrRes.Hex)
 
-	// svrCtx := node.GetServerConn().SvrCtx
+	// in case of network restart we want to cancel this thread and restart a new one
+
+	// make new cancellable context for network restarts
+	notifyCtx, cancelHeaders := context.WithCancel(ctx)
+	// store in ec
+	ec.cancelHeadersNotify = cancelHeaders
 
 	go func() {
 
 		fmt.Println("=== Waiting for headers ===")
 
-	loop:
 		for {
 			select {
 
-			case <-ctx.Done():
-				fmt.Println("Shutdown - in headers notify")
+			case <-notifyCtx.Done():
+				fmt.Println("notifyCtx.Done - in headers notify - exiting thread")
 				return
 
 			case _, ok := <-hdrResNotifyCh:
 				if !ok {
-					fmt.Println("headers notify channel closed - exiting loop")
-					break loop
+					fmt.Println("headers notify channel closed - exiting thread")
+					return
 				}
 
 				// read whatever is in the queue, usually one header at tip

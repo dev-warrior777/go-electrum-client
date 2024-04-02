@@ -23,13 +23,19 @@ type BtcElectrumClient struct {
 	Node         electrumx.ElectrumXNode
 	// client copy of blockchain headers
 	clientHeaders *Headers
+	// cancel stale addressStatusNotify thread after network restart
+	cancelAddressStatusNotify context.CancelFunc
+	// cancel stale headersNotify thread after network restart
+	cancelHeadersNotify context.CancelFunc
 }
 
 func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 	ec := BtcElectrumClient{
-		ClientConfig: cfg,
-		Wallet:       nil,
-		Node:         nil,
+		ClientConfig:              cfg,
+		Wallet:                    nil,
+		Node:                      nil,
+		cancelAddressStatusNotify: nil,
+		cancelHeadersNotify:       nil,
 	}
 	ec.clientHeaders = NewHeaders(cfg)
 	return &ec
@@ -133,29 +139,45 @@ func (ec *BtcElectrumClient) listenNetworkRestarted(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
+				fmt.Println("listenNetworkRestarted thread exit")
 				return
 			case nr := <-networkRestartCh:
+				if nr == nil {
+					fmt.Printf("network restart nr == <nil>")
+					continue
+				}
 				fmt.Printf("network restart at %v\n", nr.Time)
+				if ec.cancelHeadersNotify != nil {
+					ec.cancelHeadersNotify()
+					ec.cancelHeadersNotify = nil
+				} else {
+					fmt.Println("network restart cancelHeadersNotify == <nil>")
+				}
 				ec.syncHeaders(ctx)
 				w := ec.GetWallet()
 				if w != nil {
+					if ec.cancelAddressStatusNotify != nil {
+						ec.cancelAddressStatusNotify()
+						ec.cancelAddressStatusNotify = nil
+					} else {
+						fmt.Println("network restart cancelAddressStatusNotify == <nil>")
+					}
 					ec.SyncWallet(ctx)
 				}
 			}
 		}
-
 	}()
 	return nil
 }
 
 func (ec *BtcElectrumClient) Stop() {
-	fmt.Printf("client.Stopping\n")
+	fmt.Printf("client stopping\n")
 	ec.CloseWallet()
 	node := ec.GetNode()
 	if node != nil {
 		node.Stop()
 	}
-	fmt.Printf("client.Stop\n")
+	fmt.Printf("client stopped\n")
 }
 
 // CreateWallet makes a new wallet with a new seed. The password is to encrypt

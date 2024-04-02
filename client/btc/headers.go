@@ -196,8 +196,8 @@ func (h *Headers) VerifyFromTip(depth int64, all bool) error {
 		thisHdr := h.hdrs[height]
 		prevHdr := h.hdrs[height-1]
 		prevHdrBlkHash := prevHdr.BlockHash()
-		if prevHdr.BlockHash() != thisHdr.PrevBlock {
-			return errors.New("verify failed")
+		if prevHdrBlkHash != thisHdr.PrevBlock {
+			return fmt.Errorf("verify failed: height %d", height)
 		}
 		fmt.Printf("verified header at height %d has blockhash %s\n",
 			height-1, prevHdrBlkHash.String())

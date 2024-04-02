@@ -87,6 +87,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 }
 
 func configure() (string, string, string, *client.ClientConfig, error) {
+	help := flag.Bool("help", false, "usage help")
 	coin := flag.String("coin", "btc", "coin name")
 	net := flag.String("net", "regtest", "network type; testnet, mainnet, regtest")
 	pass := flag.String("pass", "", "wallet password")
@@ -94,6 +95,10 @@ func configure() (string, string, string, *client.ClientConfig, error) {
 	seed := flag.String("seed", "", "'seed words for recreate' inside ''; example: 'word1 word2 ... word12'")
 	test_wallet := flag.Bool("tw", false, "known test wallets override for regtest/testnet")
 	flag.Parse()
+	if *help {
+		flag.Usage()
+		os.Exit(0)
+	}
 	fmt.Println("coin:", *coin)
 	fmt.Println("net:", *net)
 	fmt.Println("action:", *action)

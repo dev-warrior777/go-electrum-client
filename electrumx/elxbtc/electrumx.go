@@ -155,11 +155,11 @@ func (s *SingleNode) run(clientCtx context.Context) {
 				s.serverMtx.Unlock()
 				break newServer
 			case hdrs := <-s.server.headersNotifyChan:
-				if hdrs != nil {
+				if hdrs != nil && s.serverRunning() {
 					s.headersNotify <- hdrs
 				}
 			case status := <-s.server.scripthashNotifyChan:
-				if status != nil {
+				if status != nil && s.serverRunning() {
 					s.scripthashNotify <- status
 				}
 			}
@@ -174,6 +174,7 @@ func (s *SingleNode) run(clientCtx context.Context) {
 			// connect to electrumX
 			sc, err := electrumx.ConnectServer(clientCtx, s.serverAddr, s.connectOpts)
 			if err == nil {
+				s.serverMtx.Lock()
 				s.server.conn = sc
 				s.server.headersNotifyChan = sc.GetHeadersNotify()
 				s.server.scripthashNotifyChan = sc.GetScripthashNotify()
@@ -182,6 +183,7 @@ func (s *SingleNode) run(clientCtx context.Context) {
 				s.restarting <- &electrumx.NetworkRestart{
 					Time: time.Now(),
 				}
+				s.serverMtx.Unlock()
 				break
 			}
 		}
@@ -195,6 +197,8 @@ func (s *SingleNode) RegisterNetworkRestart() <-chan *electrumx.NetworkRestart {
 func (s *SingleNode) Stop() {
 	fmt.Println("stopping single node...")
 	close(s.restarting)
+	close(s.headersNotify)
+	close(s.scripthashNotify)
 	if !s.serverRunning() {
 		fmt.Println("..server not running")
 		return
