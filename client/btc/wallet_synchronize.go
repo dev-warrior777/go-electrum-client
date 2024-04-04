@@ -315,21 +315,12 @@ func (ec *BtcElectrumClient) GetRawTransactionFromNode(ctx context.Context, txid
 // addTxHistoryToWallet adds new transaction details for an ElectrumX history list
 func (ec *BtcElectrumClient) addTxHistoryToWallet(ctx context.Context, history electrumx.HistoryResult) {
 	for _, h := range history {
-		txid, err := hex.DecodeString(h.TxHash)
-		if err != nil {
-			continue
-		}
-		txhash, err := chainhash.NewHash(txid)
-		if err != nil {
-			continue
-		}
-		fmt.Println(txhash.String())
-
+		fmt.Println(h.TxHash)
 		// does wallet already has a confirmed transaction?
-		walletHasTx := ec.GetWallet().HasTransaction(*txhash)
+		walletHasTx := ec.GetWallet().HasTransaction(h.TxHash)
 		fmt.Println("walletHasTx", walletHasTx)
 		if walletHasTx && h.Height > 0 {
-			fmt.Println("** already got confirmed tx", txid)
+			fmt.Println("** already got confirmed tx", h.TxHash)
 			continue
 		}
 

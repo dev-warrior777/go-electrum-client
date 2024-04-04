@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	bolt "go.etcd.io/bbolt"
 )
@@ -31,14 +30,9 @@ func (t *TxnsDB) Put(txn []byte, txid string, value int64, height int64, timesta
 	return t.put(trec)
 }
 
-func (t *TxnsDB) Get(txid chainhash.Hash) (wallet.Txn, error) {
+func (t *TxnsDB) Get(txid string) (wallet.Txn, error) {
 	txn := wallet.Txn{}
-	txidStr := txid.String()
-	trec, err := t.get(txidStr)
-	if err != nil {
-		return txn, err
-	}
-	txidBytes, err := chainhash.NewHashFromStr(trec.Txid)
+	trec, err := t.get(txid)
 	if err != nil {
 		return txn, err
 	}
@@ -47,7 +41,7 @@ func (t *TxnsDB) Get(txid chainhash.Hash) (wallet.Txn, error) {
 	if err != nil {
 		return txn, err
 	}
-	txn.Txid = *txidBytes
+	txn.Txid = trec.Txid
 	txn.Value = trec.Value
 	txn.Height = trec.Height
 	txn.Timestamp = timestamp
@@ -67,17 +61,13 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 		if trec.WatchOnly && !includeWatchOnly {
 			continue
 		}
-		txid, err := chainhash.NewHashFromStr(trec.Txid)
-		if err != nil {
-			return nil, err
-		}
 		timestamp := time.Time{}
 		err = timestamp.GobDecode(trec.Timestamp)
 		if err != nil {
 			return nil, err
 		}
 		txn := wallet.Txn{
-			Txid:      *txid,
+			Txid:      trec.Txid,
 			Value:     trec.Value,
 			Height:    trec.Height,
 			Timestamp: timestamp,
@@ -89,12 +79,12 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 	return ret, nil
 }
 
-func (t *TxnsDB) Delete(txid chainhash.Hash) error {
-	return t.delete(txid.String())
+func (t *TxnsDB) Delete(txid string) error {
+	return t.delete(txid)
 }
 
-func (t *TxnsDB) UpdateHeight(txid chainhash.Hash, height int, timestamp time.Time) error {
-	trec, err := t.get(txid.String())
+func (t *TxnsDB) UpdateHeight(txid string, height int, timestamp time.Time) error {
+	trec, err := t.get(txid)
 	if err != nil {
 		return err
 	}

@@ -70,7 +70,7 @@ func (ts *TxStore) PopulateAdrs() {
 	txns, _ := ts.Txns().GetAll(true)
 	ts.txidsMutex.Lock()
 	for _, t := range txns {
-		ts.txids[t.Txid.String()] = t.Height
+		ts.txids[t.Txid] = t.Height
 	}
 	ts.txidsMutex.Unlock()
 }
@@ -204,7 +204,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 	if hits > 0 || matchesWatchOnly {
 		ts.cbMutex.Lock()
 		ts.txidsMutex.Lock()
-		txn, err := ts.Txns().Get(tx.TxHash())
+		txn, err := ts.Txns().Get(tx.TxHash().String())
 		if err != nil {
 			txn.Timestamp = timestamp
 			var buf bytes.Buffer
@@ -215,7 +215,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 		// Let's check the height before committing so we don't allow rogue electrumX servers to send us a lose
 		// tx that resets our height to zero.
 		if err == nil && txn.Height <= 0 {
-			ts.Txns().UpdateHeight(tx.TxHash(), int(height), txn.Timestamp)
+			ts.Txns().UpdateHeight(tx.TxHash().String(), int(height), txn.Timestamp)
 			ts.txids[tx.TxHash().String()] = height
 		}
 		ts.txidsMutex.Unlock()
@@ -236,7 +236,7 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 		if err != nil {
 			return err
 		}
-		err = ts.Txns().UpdateHeight(s.SpendTxid, -1, time.Now())
+		err = ts.Txns().UpdateHeight(s.SpendTxid.String(), -1, time.Now())
 		if err != nil {
 			return err
 		}
@@ -275,7 +275,7 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 			}
 		}
 	}
-	ts.Txns().UpdateHeight(txid, -1, time.Now())
+	ts.Txns().UpdateHeight(txid.String(), -1, time.Now())
 	return nil
 }
 

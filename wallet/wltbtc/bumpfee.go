@@ -1,7 +1,6 @@
 package wltbtc
 
 import (
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
@@ -10,7 +9,7 @@ import (
 // var BumpFeeTransactionDeadError = errors.New("cannot bump fee of dead transaction")
 // var BumpFeeNotFoundError = errors.New("transaction either doesn't exist or has already been spent")
 
-func (w *BtcElectrumWallet) BumpFee(txid chainhash.Hash) (*wire.MsgTx, error) {
+func (w *BtcElectrumWallet) BumpFee(txid string) (*wire.MsgTx, error) {
 
 	return nil, wallet.ErrWalletFnNotImplemented // FIXME: SweepAddress prevOutputFInder
 

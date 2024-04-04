@@ -129,7 +129,7 @@ func main() {
 	if err == nil {
 		fmt.Println("Txns:")
 		for _, txn := range txns {
-			fmt.Printf(" Txid:          %s\n", txn.Txid.String())
+			fmt.Printf(" Txid:          %s\n", txn.Txid)
 			fmt.Printf(" Value:         %d\n", txn.Value)
 			fmt.Printf(" Height:        %d\n", txn.Height)
 			fmt.Printf(" Timestamp:     %v\n", txn.Timestamp)

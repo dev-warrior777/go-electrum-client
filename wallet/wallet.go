@@ -132,14 +132,18 @@ type ElectrumWallet interface {
 	// address basis.
 	Balance() (int64, int64, error)
 
+	// Sign an unsigned transaction with the wallet and return singned tx and
+	// the change output index
+	SignTx(pw string, txBytes []byte) (int, []byte, error)
+
 	// Returns a list of transactions for this wallet - currently unused
 	Transactions() ([]Txn, error)
 
 	// Does the wallet have a specific transaction?
-	HasTransaction(txid chainhash.Hash) bool
+	HasTransaction(txid string) bool
 
 	// Get info on a specific transaction - currently unused
-	GetTransaction(txid chainhash.Hash) (Txn, error)
+	GetTransaction(txid string) (Txn, error)
 
 	// Return the confirmed txids and heights for an address
 	GetAddressHistory(address btcutil.Address) ([]AddressHistory, error)
@@ -166,7 +170,7 @@ type ElectrumWallet interface {
 	SweepCoins(coins []InputInfo, feeLevel FeeLevel, maxTxInputs int) ([]*wire.MsgTx, error)
 
 	// CPFP logic; rbf not supported
-	BumpFee(txid chainhash.Hash) (*wire.MsgTx, error)
+	BumpFee(txid string) (*wire.MsgTx, error)
 
 	// Update the height of the tip from the headers chain & the blockchain sync status.
 	UpdateTip(newTip int64, synced bool)

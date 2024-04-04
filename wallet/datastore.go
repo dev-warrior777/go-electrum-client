@@ -141,16 +141,16 @@ type Txns interface {
 	Put(raw []byte, txid string, value int64, height int64, timestamp time.Time, watchOnly bool) error
 
 	// Fetch a tx and it's metadata given a hash
-	Get(txid chainhash.Hash) (Txn, error)
+	Get(txid string) (Txn, error)
 
 	// Fetch all transactions from the db
 	GetAll(includeWatchOnly bool) ([]Txn, error)
 
 	// Update the height of a transaction
-	UpdateHeight(txid chainhash.Hash, height int, timestamp time.Time) error
+	UpdateHeight(txid string, height int, timestamp time.Time) error
 
 	// Delete a transaction from the db
-	Delete(txid chainhash.Hash) error
+	Delete(txid string) error
 }
 
 // Keys provides a database interface for the wallet to:
@@ -321,7 +321,7 @@ func (stxo *Stxo) IsEqual(alt *Stxo) bool {
 
 type Txn struct {
 	// Transaction ID
-	Txid chainhash.Hash
+	Txid string
 
 	// The value relevant to the wallet
 	Value int64

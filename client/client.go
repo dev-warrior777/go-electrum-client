@@ -78,6 +78,8 @@ type ElectrumClient interface {
 	UnusedAddress(ctx context.Context) (string, error)
 	ChangeAddress(ctx context.Context) (string, error)
 	Balance() (int64, int64, error)
+	SignTx(pw string, txBytes []byte) (int, []byte, error)
+	GetWalletTx(txid string) (int, []byte, error)
 
 	// adapt and pass thru
 	Broadcast(context.Context, *BroadcastParams) (string, error)

@@ -432,18 +432,18 @@ func (w *BtcElectrumWallet) Transactions() ([]wallet.Txn, error) {
 	return w.txstore.Txns().GetAll(false)
 }
 
-func (w *BtcElectrumWallet) HasTransaction(txid chainhash.Hash) bool {
+func (w *BtcElectrumWallet) HasTransaction(txid string) bool {
 	_, err := w.txstore.Txns().Get(txid)
 	// errors only for 'no rows in rowset'
 	return err == nil
 }
 
-func (w *BtcElectrumWallet) GetTransaction(txid chainhash.Hash) (wallet.Txn, error) {
+func (w *BtcElectrumWallet) GetTransaction(txid string) (wallet.Txn, error) {
 	txn, err := w.txstore.Txns().Get(txid)
 	if err != nil {
-		return txn, err
+		return txn, fmt.Errorf("no such transaction")
 	}
-	tx := wire.NewMsgTx(1)
+	tx := wire.NewMsgTx(wire.TxVersion)
 	rbuf := bytes.NewReader(txn.Bytes)
 	err = tx.BtcDecode(rbuf, wire.ProtocolVersion, wire.WitnessEncoding)
 	if err != nil {
@@ -555,7 +555,7 @@ func (w *BtcElectrumWallet) Close() {
 // implementations in bumpfee.go
 
 // CPFP logic - No rbf and never will be here!
-// func (w *BtcElectrumWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error)
+// func (w *BtcElectrumWallet) BumpFee(txid *chainhash.Hash) (*chainhash.Hash, error)
 
 // end interface impl
 /////////////////////

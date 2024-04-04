@@ -143,7 +143,7 @@ func (ec *BtcElectrumClient) listenNetworkRestarted(ctx context.Context) error {
 				return
 			case nr := <-networkRestartCh:
 				if nr == nil {
-					fmt.Printf("network restart nr == <nil>")
+					// fmt.Println("network restart nr == <nil>")
 					continue
 				}
 				fmt.Printf("network restart at %v\n", nr.Time)

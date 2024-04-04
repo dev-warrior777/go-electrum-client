@@ -133,6 +133,33 @@ func (ec *BtcElectrumClient) GetPrivKeyForAddress(pw, addr string) (string, erro
 	return w.GetPrivKeyForAddress(pw, address)
 }
 
+func (ec *BtcElectrumClient) SignTx(pw string, txBytes []byte) (int, []byte, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		return -1, nil, ErrNoWallet
+	}
+
+	//...
+
+	return -1, nil, errors.New("not implemented on goele side")
+}
+
+func (ec *BtcElectrumClient) GetWalletTx(txid string) (int, []byte, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		return -1, nil, ErrNoWallet
+	}
+	txn, err := w.GetTransaction(txid)
+	if err != nil {
+		return -1, nil, err
+	}
+
+	tip, _ := ec.Tip()
+	confirmations := tip - txn.Height
+
+	return int(confirmations), txn.Bytes, nil
+}
+
 // RpcBroadcast sends a transaction to the server for broadcast on the bitcoin
 // network. It is a test rpc server endpoint and it is thus not part of the
 // ElectrumClient interface.
