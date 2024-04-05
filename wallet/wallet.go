@@ -134,7 +134,7 @@ type ElectrumWallet interface {
 
 	// Sign an unsigned transaction with the wallet and return singned tx and
 	// the change output index
-	SignTx(pw string, tx *wire.MsgTx, info *SigningInfo) (int, []byte, error)
+	SignTx(pw string, info *SigningInfo) ([]byte, error)
 
 	// Returns a list of transactions for this wallet - currently unused
 	Transactions() ([]Txn, error)
@@ -231,6 +231,7 @@ type TransactionOutput struct {
 type SigningInfo struct {
 	UnsignedTx *wire.MsgTx
 	PrevOuts   []*InputInfo
+	VerifyTx   bool
 }
 
 type InputInfo struct {

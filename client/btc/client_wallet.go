@@ -133,10 +133,10 @@ func (ec *BtcElectrumClient) GetPrivKeyForAddress(pw, addr string) (string, erro
 	return w.GetPrivKeyForAddress(pw, address)
 }
 
-func (ec *BtcElectrumClient) SignTx(ctx context.Context, pw string, txBytes []byte) (int, []byte, error) {
+func (ec *BtcElectrumClient) SignTx(ctx context.Context, pw string, txBytes []byte) ([]byte, error) {
 	w := ec.GetWallet()
 	if w == nil {
-		return -1, nil, ErrNoWallet
+		return nil, ErrNoWallet
 	}
 	newWireTx := func(b []byte) (*wire.MsgTx, error) {
 		tx := wire.NewMsgTx(wire.TxVersion)
@@ -152,7 +152,7 @@ func (ec *BtcElectrumClient) SignTx(ctx context.Context, pw string, txBytes []by
 	}
 	unsignedTx, err := newWireTx(txBytes)
 	if err != nil {
-		return -1, nil, err
+		return nil, err
 	}
 	var signInfo = &wallet.SigningInfo{
 		UnsignedTx: unsignedTx,
@@ -166,43 +166,37 @@ func (ec *BtcElectrumClient) SignTx(ctx context.Context, pw string, txBytes []by
 			// wallet tx
 			wtx, err := newWireTx(txn.Bytes)
 			if err != nil {
-				return -1, nil, err
+				return nil, err
 			}
 			if uint32(len(wtx.TxOut)) < in.PreviousOutPoint.Index {
-				return -1, nil, fmt.Errorf("tx: no prev out found for input[%d] vout", i)
+				return nil, fmt.Errorf("tx: no prev out found for input[%d] vout", i)
 			}
+			prevOut.Height = txn.Height
 			prevOut.RedeemScript = wtx.TxOut[i].PkScript
 			prevOut.Value = wtx.TxOut[i].Value
 			signInfo.PrevOuts = append(signInfo.PrevOuts, prevOut)
 			continue
 		}
 		// global tx
-		grtBytes, err := ec.GetRawTransaction(ctx, txid)
+		grtBytes, err := ec.GetRawTransaction(ctx, txid) //for conf this has to be GetTransaction (verbose)
 		if err != nil {
-			return -1, nil, err
+			return nil, err
 		}
 		gtx, err := newWireTx(grtBytes)
 		if err != nil {
-			return -1, nil, err
+			return nil, err
 		}
 		if uint32(len(gtx.TxOut)) <= in.PreviousOutPoint.Index {
-			return -1, nil, fmt.Errorf("tx: no prev out found for input[%d] vout", i)
+			return nil, fmt.Errorf("tx: no prev out found for input[%d] vout", i)
 		}
 		prevOut.RedeemScript = gtx.TxOut[i].PkScript
 		prevOut.Value = gtx.TxOut[i].Value
 		signInfo.PrevOuts = append(signInfo.PrevOuts, prevOut)
 	}
 
-	changeIndex, signedTx, err := w.SignTx(pw, unsignedTx, signInfo)
+	signedTx, err := w.SignTx(pw, signInfo)
 
-	fmt.Printf("signed Tx:\n%s\nchange index: %d\nerr:%v\n",
-		hex.EncodeToString(signedTx),
-		changeIndex,
-		err,
-	)
-	//...
-
-	return -1, nil, errors.New("not implemented on goele side")
+	return signedTx, nil
 }
 
 func (ec *BtcElectrumClient) GetWalletTx(txid string) (int, []byte, error) {
