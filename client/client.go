@@ -77,9 +77,9 @@ type ElectrumClient interface {
 	UnfreezeUTXO(txid string, out uint32) error
 	UnusedAddress(ctx context.Context) (string, error)
 	ChangeAddress(ctx context.Context) (string, error)
-	Balance() (int64, int64, error)
-	SignTx(pw string, txBytes []byte) (int, []byte, error)
+	SignTx(ctx context.Context, pw string, txBytes []byte) (int, []byte, error)
 	GetWalletTx(txid string) (int, []byte, error)
+	Balance() (int64, int64, error)
 
 	// adapt and pass thru
 	Broadcast(context.Context, *BroadcastParams) (string, error)

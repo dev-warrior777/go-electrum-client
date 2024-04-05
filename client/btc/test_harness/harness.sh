@@ -140,6 +140,16 @@ chmod +x "${HARNESS_DIR}/quit"
   echo "Generating 200 blocks for alpha"
   tmux send-keys -t $SESSION:2 "./alpha generatetoaddress 200 ${ALPHA_MINING_ADDR} > /dev/null${DONE}" C-m\; ${WAIT}
 
+  #################################################################################
+  # make smaller utxos
+  ################################################################################
+
+  for i in 10 18 5 7 1 15 3 25
+  do
+    tmux send-keys -t $SESSION:2 "./alpha sendtoaddress ${ALPHA_MINING_ADDR} ${i}${DONE}" C-m\; ${WAIT}
+  done
+
+
 set +x
 
 # Reenable history
