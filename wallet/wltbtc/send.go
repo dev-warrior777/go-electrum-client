@@ -203,6 +203,8 @@ func (w *BtcElectrumWallet) buildTx(
 	// BIP 69 sorting
 	txsort.InPlaceSort(authoredTx.Tx)
 
+	fmt.Println(authoredTx.Tx.TxHash().String())
+
 	// Sign
 	var prevPkScripts [][]byte
 	var inputValues []btcutil.Amount

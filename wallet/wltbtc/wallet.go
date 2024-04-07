@@ -432,10 +432,13 @@ func (w *BtcElectrumWallet) Transactions() ([]wallet.Txn, error) {
 	return w.txstore.Txns().GetAll(false)
 }
 
-func (w *BtcElectrumWallet) HasTransaction(txid string) bool {
-	_, err := w.txstore.Txns().Get(txid)
-	// errors only for 'no rows in rowset'
-	return err == nil
+func (w *BtcElectrumWallet) HasTransaction(txid string) (bool, *wallet.Txn) {
+	txn, err := w.txstore.Txns().Get(txid)
+	// errors only for 'no rows in rowset' (sqlite)
+	if err != nil {
+		return false, nil
+	}
+	return true, &txn
 }
 
 func (w *BtcElectrumWallet) GetTransaction(txid string) (wallet.Txn, error) {

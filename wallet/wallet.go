@@ -140,7 +140,7 @@ type ElectrumWallet interface {
 	Transactions() ([]Txn, error)
 
 	// Does the wallet have a specific transaction?
-	HasTransaction(txid string) bool
+	HasTransaction(txid string) (bool, *Txn)
 
 	// Get info on a specific transaction - currently unused
 	GetTransaction(txid string) (Txn, error)
@@ -230,7 +230,6 @@ type TransactionOutput struct {
 
 type SigningInfo struct {
 	UnsignedTx *wire.MsgTx
-	PrevOuts   []*InputInfo
 	VerifyTx   bool
 }
 
@@ -240,7 +239,7 @@ type InputInfo struct {
 	Value         int64
 	KeyPair       *btcutil.WIF
 	LinkedAddress btcutil.Address
-	RedeemScript  []byte
+	PkScript      []byte
 }
 
 func (info *InputInfo) String() string {
@@ -259,8 +258,8 @@ func (info *InputInfo) String() string {
 		privkey = hex.EncodeToString(info.KeyPair.PrivKey.Serialize())
 		pubkey = hex.EncodeToString(info.KeyPair.SerializePubKey())
 	}
-	if len(info.RedeemScript) > 0 {
-		redeemscript = hex.EncodeToString(info.RedeemScript)
+	if len(info.PkScript) > 0 {
+		redeemscript = hex.EncodeToString(info.PkScript)
 	}
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Outpoint:      %s\n", outPoint))

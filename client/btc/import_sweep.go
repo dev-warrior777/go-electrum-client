@@ -67,7 +67,7 @@ func (ec *BtcElectrumClient) getPubKeyHashUtxos(ctx context.Context, keyPair *bt
 			Height:        unspent.Height,
 			Value:         unspent.Value,
 			LinkedAddress: addressPubKeyHash,
-			RedeemScript:  []byte{},
+			PkScript:      []byte{},
 			KeyPair:       keyPair,
 		}
 		inputList = append(inputList, input)
@@ -110,7 +110,7 @@ func (ec *BtcElectrumClient) getWitnessPubKeyHashUtxos(ctx context.Context, keyP
 			Height:        unspent.Height,
 			Value:         unspent.Value,
 			LinkedAddress: addressWitnessPubKeyHash,
-			RedeemScript:  []byte{},
+			PkScript:      []byte{},
 			KeyPair:       keyPair,
 		}
 		inputList = append(inputList, input)

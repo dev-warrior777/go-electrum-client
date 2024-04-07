@@ -156,48 +156,59 @@ func (ec *BtcElectrumClient) SignTx(ctx context.Context, pw string, txBytes []by
 	}
 	var signInfo = &wallet.SigningInfo{
 		UnsignedTx: unsignedTx,
-		PrevOuts:   make([]*wallet.InputInfo, 0),
+		VerifyTx:   true,
 	}
-	for i, in := range unsignedTx.TxIn {
-		prevOut := &wallet.InputInfo{}
-		txid := in.PreviousOutPoint.Hash.String()
-		txn, err := w.GetTransaction(txid)
-		if err == nil {
-			// wallet tx
-			wtx, err := newWireTx(txn.Bytes)
-			if err != nil {
-				return nil, err
-			}
-			if uint32(len(wtx.TxOut)) < in.PreviousOutPoint.Index {
-				return nil, fmt.Errorf("tx: no prev out found for input[%d] vout", i)
-			}
-			prevOut.Height = txn.Height
-			prevOut.RedeemScript = wtx.TxOut[i].PkScript
-			prevOut.Value = wtx.TxOut[i].Value
-			signInfo.PrevOuts = append(signInfo.PrevOuts, prevOut)
-			continue
-		}
-		// global tx
-		grtBytes, err := ec.GetRawTransaction(ctx, txid) //for conf this has to be GetTransaction (verbose)
-		if err != nil {
-			return nil, err
-		}
-		gtx, err := newWireTx(grtBytes)
-		if err != nil {
-			return nil, err
-		}
-		if uint32(len(gtx.TxOut)) <= in.PreviousOutPoint.Index {
-			return nil, fmt.Errorf("tx: no prev out found for input[%d] vout", i)
-		}
-		prevOut.RedeemScript = gtx.TxOut[i].PkScript
-		prevOut.Value = gtx.TxOut[i].Value
-		signInfo.PrevOuts = append(signInfo.PrevOuts, prevOut)
-	}
-
-	signedTx, err := w.SignTx(pw, signInfo)
-
-	return signedTx, nil
+	return w.SignTx(pw, signInfo)
 }
+
+// func (ec *BtcElectrumClient) SignTx(ctx context.Context, pw string, txBytes []byte) ([]byte, error) {
+// 	w := ec.GetWallet()
+// 	if w == nil {
+// 		return nil, ErrNoWallet
+// 	}
+// 	newWireTx := func(b []byte) (*wire.MsgTx, error) {
+// 		tx := wire.NewMsgTx(wire.TxVersion)
+// 		r := bytes.NewBuffer(b)
+// 		err := tx.Deserialize(r)
+// 		if len(tx.TxIn) == 0 {
+// 			return nil, errors.New("tx: no inputs")
+// 		}
+// 		if len(tx.TxOut) == 0 {
+// 			return nil, errors.New("tx: no outputs")
+// 		}
+// 		return tx, err
+// 	}
+// 	unsignedTx, err := newWireTx(txBytes)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	var signInfo = &wallet.SigningInfo{
+// 		UnsignedTx: unsignedTx,
+// 		PrevOuts:   make([]*wallet.InputInfo, 0),
+// 	}
+// 	for i, in := range unsignedTx.TxIn {
+// 		prevOut := &wallet.InputInfo{}
+// 		txid := in.PreviousOutPoint.Hash.String()
+// 		txn, err := w.GetTransaction(txid)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("prevout hash %s is not in wallet", txid)
+// 		}
+// 		// wallet tx
+// 		wtx, err := newWireTx(txn.Bytes)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		if uint32(len(wtx.TxOut)) < in.PreviousOutPoint.Index {
+// 			return nil, fmt.Errorf("tx: no prev out found for input[%d] vout", i)
+// 		}
+// 		prevOut.Height = txn.Height
+// 		prevOut.PkScript = wtx.TxOut[i].PkScript
+// 		prevOut.Value = wtx.TxOut[i].Value
+// 		signInfo.PrevOuts = append(signInfo.PrevOuts, prevOut)
+// 	}
+// 	signInfo.VerifyTx = true
+// 	return w.SignTx(pw, signInfo)
+// }
 
 func (ec *BtcElectrumClient) GetWalletTx(txid string) (int, []byte, error) {
 	w := ec.GetWallet()
