@@ -3,6 +3,8 @@
 package wltbtc
 
 import (
+	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -203,7 +205,10 @@ func (w *BtcElectrumWallet) buildTx(
 	// BIP 69 sorting
 	txsort.InPlaceSort(authoredTx.Tx)
 
-	fmt.Println(authoredTx.Tx.TxHash().String())
+	b := make([]byte, 0, 300)
+	br := bytes.NewBuffer(b)
+	authoredTx.Tx.Serialize(br)
+	fmt.Println("unsigned tx:", hex.EncodeToString(br.Bytes()))
 
 	// Sign
 	var prevPkScripts [][]byte

@@ -42,6 +42,7 @@ func createTxStore() (*TxStore, *StorageManager) {
 	return txStore, sm
 }
 
+// A sample regtest wallet
 func MockWallet() *BtcElectrumWallet {
 	txstore, storageMgr := createTxStore()
 

@@ -497,6 +497,34 @@ func (w *BtcElectrumWallet) ListUnspent() ([]wallet.Utxo, error) {
 	return w.txstore.Utxos().GetAll()
 }
 
+func (w *BtcElectrumWallet) ListConfirmedUnspent() ([]wallet.Utxo, error) {
+	utxos, err := w.txstore.Utxos().GetAll()
+	if err != nil {
+		return nil, err
+	}
+	var confirmed = make([]wallet.Utxo, 0)
+	for _, utxo := range utxos {
+		if utxo.AtHeight > 0 {
+			confirmed = append(confirmed, utxo)
+		}
+	}
+	return confirmed, nil
+}
+
+func (w *BtcElectrumWallet) ListFrozenUnspent() ([]wallet.Utxo, error) {
+	utxos, err := w.txstore.Utxos().GetAll()
+	if err != nil {
+		return nil, err
+	}
+	var frozen = make([]wallet.Utxo, 0)
+	for _, utxo := range utxos {
+		if utxo.Frozen {
+			frozen = append(frozen, utxo)
+		}
+	}
+	return frozen, nil
+}
+
 func (w *BtcElectrumWallet) FreezeUTXO(op *wire.OutPoint) error {
 	utxos, err := w.txstore.Utxos().GetAll()
 	if err != nil {

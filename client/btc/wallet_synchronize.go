@@ -340,8 +340,8 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(ctx context.Context, history e
 }
 
 // updateWalletTip updates wallet's notion of the blockchain tip based on the
-// latest client headers' 'maybe' tip. This would be used for calculating tx
-// confirmations for example.
+// latest client headers' "maybe" tip. This would be used for example in
+// calculating tx confirmations .
 func (ec *BtcElectrumClient) updateWalletTip() {
 	w := ec.GetWallet()
 	if w != nil {

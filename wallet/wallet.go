@@ -151,8 +151,15 @@ type ElectrumWallet interface {
 	// Add a transaction to the database
 	AddTransaction(tx *wire.MsgTx, height int64, timestamp time.Time) error
 
-	// List all unspent outputs in the wallet
+	// List all unspent outputs in the wallet irrespective of status
 	ListUnspent() ([]Utxo, error)
+
+	// List all unspent outputs in the wallet that have been mined once or more
+	// times
+	ListConfirmedUnspent() ([]Utxo, error)
+
+	// List all unspent outputs that are frozen (temporarily) in the wallet
+	ListFrozenUnspent() ([]Utxo, error)
 
 	// Set the utxo as temporarily unspendable
 	FreezeUTXO(op *wire.OutPoint) error

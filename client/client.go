@@ -73,10 +73,13 @@ type ElectrumClient interface {
 	Spend(pw string, amount int64, toAddress string, feeLevel wallet.FeeLevel) (int, string, string, error)
 	GetPrivKeyForAddress(pw, addr string) (string, error)
 	ListUnspent() ([]wallet.Utxo, error)
+	ListConfirmedUnspent() ([]wallet.Utxo, error)
+	ListFrozenUnspent() ([]wallet.Utxo, error)
 	FreezeUTXO(txid string, out uint32) error
 	UnfreezeUTXO(txid string, out uint32) error
 	UnusedAddress(ctx context.Context) (string, error)
 	ChangeAddress(ctx context.Context) (string, error)
+	ValidateAddress(ctx context.Context, addr string) (bool, bool, error)
 	SignTx(ctx context.Context, pw string, txBytes []byte) ([]byte, error)
 	GetWalletTx(txid string) (int, []byte, error)
 	Balance() (int64, int64, error)
