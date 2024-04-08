@@ -12,6 +12,8 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
+const scriptDebug = false
+
 // Sign an unsigned transaction with the wallet
 func (w *BtcElectrumWallet) SignTx(pw string, info *wallet.SigningInfo) ([]byte, error) {
 	if ok := w.storageManager.IsValidPw(pw); !ok {
@@ -100,11 +102,14 @@ func (w *BtcElectrumWallet) SignTx(pw string, info *wallet.SigningInfo) ([]byte,
 			if err != nil {
 				panic(err)
 			}
-			// err = e.Execute()
-			// if err != nil {
-			// 	panic(err)
-			// }
-			stepDebugScript(e)
+			if !scriptDebug {
+				err = e.Execute()
+				if err != nil {
+					panic(err)
+				}
+			} else {
+				stepDebugScript(e)
+			}
 		}
 	}
 

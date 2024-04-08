@@ -10,7 +10,6 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -133,7 +132,7 @@ func (ec *BtcElectrumClient) GetPrivKeyForAddress(pw, addr string) (string, erro
 	return w.GetPrivKeyForAddress(pw, address)
 }
 
-func (ec *BtcElectrumClient) SignTx(ctx context.Context, pw string, txBytes []byte) ([]byte, error) {
+func (ec *BtcElectrumClient) SignTx(pw string, txBytes []byte) ([]byte, error) {
 	w := ec.GetWallet()
 	if w == nil {
 		return nil, ErrNoWallet
@@ -158,35 +157,28 @@ func (ec *BtcElectrumClient) GetWalletTx(txid string) (int, []byte, error) {
 	if err != nil {
 		return -1, nil, err
 	}
-
 	tip, _ := ec.Tip()
 	confirmations := tip - txn.Height
-
 	return int(confirmations), txn.Bytes, nil
 }
 
 // RpcBroadcast sends a transaction to the server for broadcast on the bitcoin
 // network. It is a test rpc server endpoint and it is thus not part of the
 // ElectrumClient interface.
-func (ec *BtcElectrumClient) RpcBroadcast(ctx context.Context, rawTx string, changeIndex int) (string, error) {
-	txBytes, err := hex.DecodeString(rawTx)
+func (ec *BtcElectrumClient) RpcBroadcast(ctx context.Context, tx string, changeIndex int) (string, error) {
+	rawTx, err := hex.DecodeString(tx)
 	if err != nil {
 		return "", err
 	}
-	r := bytes.NewBuffer(txBytes)
-	wireMsgTx := wire.NewMsgTx(wire.TxVersion)
-	wireMsgTx.BtcDecode(r, wire.ProtocolVersion, wire.WitnessEncoding)
-	bc := client.BroadcastParams{
-		Tx:          wireMsgTx,
-		ChangeIndex: changeIndex,
-	}
-	return ec.Broadcast(ctx, &bc)
+	return ec.Broadcast(ctx, rawTx)
 }
 
 // Broadcast sends a transaction to the ElectrumX server for broadcast on the
 // bitcoin network. It may also set up address status change notifications with
-// ElectrumX and the wallet db for a change address belonging to the wallet.
-func (ec *BtcElectrumClient) Broadcast(ctx context.Context, bc *client.BroadcastParams) (string, error) {
+// ElectrumX and the wallet db for addresses such as change address belonging to
+// the wallet.
+func (ec *BtcElectrumClient) Broadcast(ctx context.Context, rawTx []byte) (string, error) {
+	params := ec.ClientConfig.Params
 	w := ec.GetWallet()
 	if w == nil {
 		return "", ErrNoWallet
@@ -195,28 +187,37 @@ func (ec *BtcElectrumClient) Broadcast(ctx context.Context, bc *client.Broadcast
 	if node == nil {
 		return "", ErrNoNode
 	}
-	if bc.Tx == nil {
+	if rawTx == nil {
 		return "", errors.New("nil Tx")
 	}
-
-	// serialize msg tx
-	wb := bytes.NewBuffer(make([]byte, 0))
-	err := bc.Tx.BtcEncode(wb, 1, wire.WitnessEncoding)
+	tx, err := newWireTx(rawTx, true)
 	if err != nil {
 		return "", err
 	}
-	rawTx := wb.Bytes()
-
-	// check change index is valid
-	hasChange := false
-	fmt.Println("*** change output index", bc.ChangeIndex, "***")
-	if bc.ChangeIndex >= 0 {
-		txOuts := bc.Tx.TxOut
-		if len(txOuts) < bc.ChangeIndex+1 {
-			return "", errors.New("invalid change index")
+	ourAddresses := w.ListAddresses()
+	isOurs := func(address btcutil.Address) bool {
+		for _, ourAddress := range ourAddresses {
+			if bytes.Equal(address.ScriptAddress(), ourAddress.ScriptAddress()) {
+				return true
+			}
 		}
-		hasChange = true
+		return false
 	}
+	var backToWallet = make(map[int][]byte)
+	for idx, txOut := range tx.TxOut {
+		pkScript := txOut.PkScript
+		_, addresses, _, err := txscript.ExtractPkScriptAddrs(pkScript, params)
+		if err != nil {
+			return "", err
+		}
+		if len(addresses) != 1 {
+			return "", err
+		}
+		if isOurs(addresses[0]) {
+			backToWallet[idx] = pkScript
+		}
+	}
+	fmt.Printf("%d address(es) back to our wallet\n", len(backToWallet))
 
 	// Send tx to ElectrumX for broadcasting to the bitcoin network
 	rawTxStr := hex.EncodeToString(rawTx)
@@ -230,16 +231,18 @@ func (ec *BtcElectrumClient) Broadcast(ctx context.Context, bc *client.Broadcast
 	// wallet txns db in response to the first status change notification of the
 	// subscribed address. In particular we almost always have a change script
 	// address to watch paying back to our wallet after it's containing tx is
-	// broadcasted to the network by ElectrumX.
+	// broadcasted to the network by ElectrumX and mined.
 
-	if hasChange {
-		change := bc.Tx.TxOut[bc.ChangeIndex]
-
-		scripthash := pkScriptToElectrumScripthash(change.PkScript)
-
+	for idx := range tx.TxOut {
+		pkScript, ok := backToWallet[idx]
+		if !ok {
+			continue
+		}
+		// make subscription for this output pkScript
+		scripthash := pkScriptToElectrumScripthash(pkScript)
 		// wallet db
-		pkScriptStr := hex.EncodeToString(change.PkScript)
-		_, addr := ec.pkScriptToAddressPubkeyHash(change.PkScript)
+		pkScriptStr := hex.EncodeToString(pkScript)
+		_, addr := ec.pkScriptToAddressPubkeyHash(pkScript)
 		newSub := wallet.Subscription{
 			PkScript:           pkScriptStr,
 			ElectrumScripthash: scripthash,
@@ -390,11 +393,30 @@ func (ec *BtcElectrumClient) ChangeAddress(ctx context.Context) (string, error) 
 	return address.String(), nil
 }
 
-func (ec *BtcElectrumClient) ValidateAddress(ctx context.Context, addr string) (bool, bool, error) {
-
-	return false, false, nil
+// ValidateAddress returns if the address is valid and if it does or does not
+// belong to this wallet
+func (ec *BtcElectrumClient) ValidateAddress(addr string) (bool, bool, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		return false, false, ErrNoWallet
+	}
+	queryAddress, err := btcutil.DecodeAddress(addr, ec.ClientConfig.Params)
+	if err != nil {
+		return false, false, err
+	}
+	// so it is a valid address according to btcutil
+	ourAddresses := w.ListAddresses()
+	for _, address := range ourAddresses {
+		if bytes.Equal(address.ScriptAddress(), queryAddress.ScriptAddress()) {
+			return true, true, nil
+		}
+	}
+	return true, false, nil
 }
 
+// Balance returns the confirmed and unconfirmed balances of this wallet.
+// This is a simple wallet and once a transaction has been mined it is
+// considered confirmed.
 func (ec *BtcElectrumClient) Balance() (int64, int64, error) {
 	w := ec.GetWallet()
 	if w == nil {

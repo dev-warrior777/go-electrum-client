@@ -318,7 +318,7 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(ctx context.Context, history e
 		fmt.Println(h.TxHash)
 		// does wallet already has a confirmed transaction?
 		walletHasTx, txn := ec.GetWallet().HasTransaction(h.TxHash)
-		fmt.Printf("walletHasTx %v at height %d\n", walletHasTx, txn.Height)
+		fmt.Printf("walletHasTx %v\n", walletHasTx)
 		if walletHasTx && txn.Height > 0 {
 			fmt.Println("** already got confirmed tx", h.TxHash)
 			continue

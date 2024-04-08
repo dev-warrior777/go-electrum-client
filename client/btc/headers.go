@@ -1,6 +1,6 @@
 package btc
 
-// This is the Client's copy of the blockchain headers for a blockchain
+// This is the Client's copy of the blockchain headers for a blockchain.
 // Backed by a file in the datadir of the chain (main, test, reg nets)
 // We store here as a map and not a tree so we must trust the server if
 // SingleNode. When grabbing new blocks some attempt is made to understand

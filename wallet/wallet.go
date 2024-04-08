@@ -66,9 +66,9 @@ type ElectrumWallet interface {
 	// GetUnusedAddress returns an address suitable for receiving payments.
 	// `purpose` specifies whether the address should be internal or external.
 	// This function will return the same address so long as that address is
-	// not invloved in a transaction. Whenever the returned address has it's
-	// first payment tx this function should start returning a new, unused
-	// address.
+	// not invloved in a transaction. Whenever the returned address has been
+	// used in a broadcasted tx this function should start returning a new,
+	// unused address.
 	GetUnusedAddress(purpose KeyPurpose) (btcutil.Address, error)
 
 	// GetUnusedLegacyAddress returns an address suitable for receiving payments
@@ -164,7 +164,7 @@ type ElectrumWallet interface {
 	// Set the utxo as temporarily unspendable
 	FreezeUTXO(op *wire.OutPoint) error
 
-	// Set the utxo as spendable againrce chd
+	// Set the utxo as spendable again
 	UnFreezeUTXO(op *wire.OutPoint) error
 
 	// Make a new spending transaction
@@ -188,6 +188,7 @@ type ElectrumWallet interface {
 
 // Errors
 var (
+	// ErrDustAmount is returned if an output amount is below the dust threshold
 	ErrDustAmount error = errors.New("amount is below network dust threshold")
 
 	// ErrInsufficientFunds is returned when the wallet is unable to send the
@@ -195,7 +196,7 @@ var (
 	ErrInsufficientFunds = errors.New("ERROR_INSUFFICIENT_FUNDS")
 
 	// ErrWalletFnNotImplemented is returned from some unimplemented functions.
-	// This is due to a concrete wallet not implementing the finctionality or
+	// This is due to a concrete wallet not implementing the functionality or
 	// temporarily during development.
 	ErrWalletFnNotImplemented = errors.New("wallet function is not implemented")
 )
