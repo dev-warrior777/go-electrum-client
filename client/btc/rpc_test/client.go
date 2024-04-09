@@ -174,7 +174,6 @@ func (c *cmd) spend(client *rpc.Client) {
 func (c *cmd) broadcast(client *rpc.Client) {
 	var request = make(map[string]string)
 	request["rawTx"] = c.args[0]
-	request["changeIndex"] = c.args[1]
 	var response = make(map[string]string)
 	err := client.Call("Ec.RPCBroadcast", &request, &response)
 	if err != nil {
@@ -247,10 +246,10 @@ func main() {
 			log.Fatal(c.String(), "feeType should be NORMAL, PRIORITY or ECONOMIC")
 		}
 	case "broadcast":
-		// 2 param, others ignored
-		if len(c.args) < 2 {
+		// 1 param, others ignored
+		if len(c.args) < 1 {
 			usage()
-			log.Fatal(c.String(), "needs 2 argument: the raw tx and change index")
+			log.Fatal(c.String(), "needs 1 argument: the raw tx")
 		}
 	default:
 		usage()

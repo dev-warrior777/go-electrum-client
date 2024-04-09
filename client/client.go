@@ -59,7 +59,7 @@ type ElectrumClient interface {
 	//
 	CloseWallet()
 	//
-	// Small subset of electrum methods
+	// Small subset of electrum-like methods
 	Tip() (int64, bool)
 	GetBlockHeader(height int64) *wire.BlockHeader
 	GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error)

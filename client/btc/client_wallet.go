@@ -9,7 +9,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
@@ -79,10 +78,7 @@ func (ec *BtcElectrumClient) SyncWallet(ctx context.Context) error {
 
 // Spend tries to create a new transaction to pay an amount from the wallet to
 // toAddress. It returns Tx & Txid as hex strings and the index of any change
-// output or -1 if none. The client needs to know the change address so it can
-// set up notification of change address status after ElectrumX later broadcasts
-// the resultant spend tx to the bitcoin network. This function does not broadcast
-// the transaction.
+// output or -1 if none.
 // The wallet password is required in order to sign the tx.
 func (ec *BtcElectrumClient) Spend(
 	pw string,
@@ -108,13 +104,11 @@ func (ec *BtcElectrumClient) Spend(
 
 	txidHex := wireTx.TxHash().String()
 
-	b := make([]byte, 0, wireTx.SerializeSize())
-	buf := bytes.NewBuffer(b)
-	err = wireTx.BtcEncode(buf, 0, wire.WitnessEncoding)
+	b, err := serializeWireTx(wireTx)
 	if err != nil {
 		return -1, "", "", err
 	}
-	rawTxHex := hex.EncodeToString(buf.Bytes())
+	rawTxHex := hex.EncodeToString(b)
 
 	return changeIndex, rawTxHex, txidHex, nil
 }
@@ -137,6 +131,7 @@ func (ec *BtcElectrumClient) SignTx(pw string, txBytes []byte) ([]byte, error) {
 	if w == nil {
 		return nil, ErrNoWallet
 	}
+	w.UpdateTip(ec.Tip())
 	// Note: this errors if no inputs or no outputs or both
 	unsignedTx, err := newWireTx(txBytes, true /*checkIo*/)
 	if err != nil {
@@ -148,6 +143,7 @@ func (ec *BtcElectrumClient) SignTx(pw string, txBytes []byte) ([]byte, error) {
 	}
 	return w.SignTx(pw, signInfo)
 }
+
 func (ec *BtcElectrumClient) GetWalletTx(txid string) (int, []byte, error) {
 	w := ec.GetWallet()
 	if w == nil {
@@ -165,7 +161,7 @@ func (ec *BtcElectrumClient) GetWalletTx(txid string) (int, []byte, error) {
 // RpcBroadcast sends a transaction to the server for broadcast on the bitcoin
 // network. It is a test rpc server endpoint and it is thus not part of the
 // ElectrumClient interface.
-func (ec *BtcElectrumClient) RpcBroadcast(ctx context.Context, tx string, changeIndex int) (string, error) {
+func (ec *BtcElectrumClient) RpcBroadcast(ctx context.Context, tx string) (string, error) {
 	rawTx, err := hex.DecodeString(tx)
 	if err != nil {
 		return "", err
@@ -194,6 +190,9 @@ func (ec *BtcElectrumClient) Broadcast(ctx context.Context, rawTx []byte) (strin
 	if err != nil {
 		return "", err
 	}
+	// Find any outputs that pay back to this wallet. In particular we almost
+	// always have a change scriptaddress to watch paying back to our wallet
+	// after it's containing tx is broadcasted to the network by ElectrumX
 	ourAddresses := w.ListAddresses()
 	isOurs := func(address btcutil.Address) bool {
 		for _, ourAddress := range ourAddresses {
@@ -217,7 +216,7 @@ func (ec *BtcElectrumClient) Broadcast(ctx context.Context, rawTx []byte) (strin
 			backToWallet[idx] = pkScript
 		}
 	}
-	fmt.Printf("%d address(es) back to our wallet\n", len(backToWallet))
+	fmt.Printf("found %d address(es) back to our wallet\n", len(backToWallet))
 
 	// Send tx to ElectrumX for broadcasting to the bitcoin network
 	rawTxStr := hex.EncodeToString(rawTx)
@@ -227,31 +226,26 @@ func (ec *BtcElectrumClient) Broadcast(ctx context.Context, rawTx []byte) (strin
 	}
 
 	// Subscribe for address status notification from ElectrumX for addresses
-	// we might be interested in. This should also add the containing tx to the
+	// paying back to our wallet. This will also add the containing tx to the
 	// wallet txns db in response to the first status change notification of the
-	// subscribed address. In particular we almost always have a change script
-	// address to watch paying back to our wallet after it's containing tx is
-	// broadcasted to the network by ElectrumX and mined.
-
+	// subscribed address.
 	for idx := range tx.TxOut {
 		pkScript, ok := backToWallet[idx]
 		if !ok {
 			continue
 		}
-		// make subscription for this output pkScript
+		// make wallet subscription for this output pkScript
 		scripthash := pkScriptToElectrumScripthash(pkScript)
-		// wallet db
-		pkScriptStr := hex.EncodeToString(pkScript)
 		_, addr := ec.pkScriptToAddressPubkeyHash(pkScript)
 		newSub := wallet.Subscription{
-			PkScript:           pkScriptStr,
+			PkScript:           hex.EncodeToString(pkScript),
 			ElectrumScripthash: scripthash,
 			Address:            addr,
 		}
-		ec.dumpSubscription("adding change subscription", &newSub)
+		// add to db
 		err = w.AddSubscription(&newSub)
 		if err != nil {
-			// assert db store
+			// assert db store .. stop here before things get more messed up
 			panic(err)
 		}
 
@@ -276,6 +270,7 @@ func (ec *BtcElectrumClient) ListUnspent() ([]wallet.Utxo, error) {
 	if w == nil {
 		return nil, ErrNoWallet
 	}
+	w.UpdateTip(ec.Tip())
 	return w.ListUnspent()
 }
 
@@ -285,6 +280,7 @@ func (ec *BtcElectrumClient) ListConfirmedUnspent() ([]wallet.Utxo, error) {
 	if w == nil {
 		return nil, ErrNoWallet
 	}
+	w.UpdateTip(ec.Tip())
 	return w.ListConfirmedUnspent()
 }
 
@@ -294,6 +290,7 @@ func (ec *BtcElectrumClient) ListFrozenUnspent() ([]wallet.Utxo, error) {
 	if w == nil {
 		return nil, ErrNoWallet
 	}
+	w.UpdateTip(ec.Tip())
 	return w.ListFrozenUnspent()
 }
 
@@ -405,13 +402,8 @@ func (ec *BtcElectrumClient) ValidateAddress(addr string) (bool, bool, error) {
 		return false, false, err
 	}
 	// so it is a valid address according to btcutil
-	ourAddresses := w.ListAddresses()
-	for _, address := range ourAddresses {
-		if bytes.Equal(address.ScriptAddress(), queryAddress.ScriptAddress()) {
-			return true, true, nil
-		}
-	}
-	return true, false, nil
+	mine := w.IsMine(queryAddress)
+	return true, mine, nil
 }
 
 // Balance returns the confirmed and unconfirmed balances of this wallet.

@@ -27,16 +27,11 @@ func newWireTx(b []byte, checkIo bool) (*wire.MsgTx, error) {
 }
 
 func serializeWireTx(tx *wire.MsgTx) ([]byte, error) {
-	b := make([]byte, 0, 300)
+	b := make([]byte, 0, tx.SerializeSize())
 	w := bytes.NewBuffer(b)
 	err := tx.Serialize(w)
 	if err != nil {
 		return nil, err
 	}
 	return w.Bytes(), nil
-}
-
-func serializeWireTxUnsafe(tx *wire.MsgTx) []byte {
-	s, _ := serializeWireTx(tx)
-	return s
 }

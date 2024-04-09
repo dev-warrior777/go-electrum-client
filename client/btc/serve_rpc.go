@@ -151,17 +151,15 @@ func (e *Ec) RPCSpend(request map[string]string, response *map[string]string) er
 func (e *Ec) RPCBroadcast(request map[string]string, response *map[string]string) error {
 	r := *response
 	rawTx := cast.ToString(request["rawTx"])
-	changeIndex := cast.ToInt(request["changeIndex"])
 	if len(rawTx) > 27 {
-		fmt.Println("rpc:", rawTx[:27], "...", " changeIndex", changeIndex)
+		fmt.Println("rpc:", rawTx[:27])
 	}
-	txid, err := e.EleClient.RpcBroadcast(context.TODO(), rawTx, changeIndex)
+	txid, err := e.EleClient.RpcBroadcast(context.TODO(), rawTx)
 	fmt.Println("rpc err:", err)
 	if err != nil {
 		return err
 	}
 	r["txid"] = txid
-	r["changeIndex"] = txid
 	return nil
 }
 

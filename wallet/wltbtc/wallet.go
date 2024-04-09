@@ -385,6 +385,16 @@ func (w *BtcElectrumWallet) ListAddresses() []btcutil.Address {
 	return addresses
 }
 
+func (w *BtcElectrumWallet) IsMine(queryAddress btcutil.Address) bool {
+	ourAddresses := w.ListAddresses()
+	for _, address := range ourAddresses {
+		if bytes.Equal(address.ScriptAddress(), queryAddress.ScriptAddress()) {
+			return true
+		}
+	}
+	return false
+}
+
 func (w *BtcElectrumWallet) Balance() (int64, int64, error) {
 
 	checkIfStxoIsConfirmed := func(utxo wallet.Utxo, stxos []wallet.Stxo) bool {
@@ -428,7 +438,7 @@ func (w *BtcElectrumWallet) Balance() (int64, int64, error) {
 	return confirmed, unconfirmed, nil
 }
 
-func (w *BtcElectrumWallet) Transactions() ([]wallet.Txn, error) {
+func (w *BtcElectrumWallet) ListTransactions() ([]wallet.Txn, error) {
 	return w.txstore.Txns().GetAll(false)
 }
 
@@ -476,13 +486,11 @@ func (w *BtcElectrumWallet) GetTransaction(txid string) (wallet.Txn, error) {
 	return txn, err
 }
 
-// Return the confirmed txids and heights for an address in client wallet. We
-// can also get this info from the Node.
-func (w *BtcElectrumWallet) GetAddressHistory(address btcutil.Address) ([]wallet.AddressHistory, error) {
+// Return the calculated confirmed txids and heights for an address in this
+// wallet. Currently we get this info from the Node.
+func (w *BtcElectrumWallet) GetWalletAddressHistory(address btcutil.Address) ([]wallet.AddressHistory, error) {
 	var history []wallet.AddressHistory
-
-	//TODO:
-
+	//TODO: if need a seperate and fast source of wallet only history.
 	return history, nil
 }
 

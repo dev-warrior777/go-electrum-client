@@ -122,6 +122,9 @@ type ElectrumWallet interface {
 	// Returns a list of addresses for this wallet
 	ListAddresses() []btcutil.Address
 
+	//Returns true if the address is a wallet address
+	IsMine(address btcutil.Address) bool
+
 	// Balance returns the confirmed & unconfirmed aggregate balance for the wallet.
 	// For utxo based wallets if a spend of confirmed coins is made, the resulting
 	// "change" should be also counted as confirmed even if the spending transaction
@@ -137,7 +140,7 @@ type ElectrumWallet interface {
 	SignTx(pw string, info *SigningInfo) ([]byte, error)
 
 	// Returns a list of transactions for this wallet - currently unused
-	Transactions() ([]Txn, error)
+	ListTransactions() ([]Txn, error)
 
 	// Does the wallet have a specific transaction?
 	HasTransaction(txid string) (bool, *Txn)
@@ -145,8 +148,8 @@ type ElectrumWallet interface {
 	// Get info on a specific transaction - currently unused
 	GetTransaction(txid string) (Txn, error)
 
-	// Return the confirmed txids and heights for an address
-	GetAddressHistory(address btcutil.Address) ([]AddressHistory, error)
+	// Return the calculated confirmed txids and heights for an address - unused
+	GetWalletAddressHistory(address btcutil.Address) ([]AddressHistory, error)
 
 	// Add a transaction to the database
 	AddTransaction(tx *wire.MsgTx, height int64, timestamp time.Time) error

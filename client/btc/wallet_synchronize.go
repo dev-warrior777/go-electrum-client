@@ -1,7 +1,6 @@
 package btc
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -302,14 +301,12 @@ func (ec *BtcElectrumClient) GetRawTransactionFromNode(ctx context.Context, txid
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	hexBuf := bytes.NewBuffer(b)
-	var msgTx wire.MsgTx = wire.MsgTx{Version: 1}
-	err = msgTx.BtcDecode(hexBuf, 1, wire.WitnessEncoding) // careful here witness!
+	msgTx, err := newWireTx(b, true)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
 	txTime := time.Now()
-	return &msgTx, txTime, nil
+	return msgTx, txTime, nil
 }
 
 // addTxHistoryToWallet adds new transaction details for an ElectrumX history list
@@ -323,10 +320,10 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(ctx context.Context, history e
 			fmt.Println("** already got confirmed tx", h.TxHash)
 			continue
 		}
-
 		// add or update the wallet transaction
 		msgTx, txtime, err := ec.GetRawTransactionFromNode(ctx, h.TxHash)
 		if err != nil {
+			fmt.Println(err)
 			continue
 		}
 		fmt.Println(msgTx.TxHash().String(), txtime)
@@ -337,6 +334,18 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(ctx context.Context, history e
 			continue
 		}
 	}
+}
+
+func (ec *BtcElectrumClient) pkScriptToAddressPubkeyHash(pkScript []byte) (btcutil.Address, string) {
+	pks, err := txscript.ParsePkScript(pkScript)
+	if err != nil {
+		return nil, ""
+	}
+	apkh, err := pks.Address(ec.GetConfig().Params)
+	if err != nil {
+		return nil, ""
+	}
+	return apkh, apkh.String()
 }
 
 // updateWalletTip updates wallet's notion of the blockchain tip based on the
@@ -352,18 +361,6 @@ func (ec *BtcElectrumClient) updateWalletTip() {
 // //////////////////////////
 // dbg dump
 // /////////
-func (ec *BtcElectrumClient) pkScriptToAddressPubkeyHash(pkScript []byte) (btcutil.Address, string) {
-	pks, err := txscript.ParsePkScript(pkScript)
-	if err != nil {
-		return nil, ""
-	}
-	apkh, err := pks.Address(ec.GetConfig().Params)
-	if err != nil {
-		return nil, ""
-	}
-	return apkh, apkh.String()
-}
-
 func (ec *BtcElectrumClient) dumpSubscription(title string, sub *wallet.Subscription) {
 	fmt.Printf("%s\n PkScript: %s\n ElectrumScriptHash: %s\n Address: %s\n\n",
 		title,

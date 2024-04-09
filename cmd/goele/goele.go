@@ -137,46 +137,15 @@ func main() {
 	feeRate, _ := ec.FeeRate(clientCtx, 6)
 	fmt.Println(feeRate)
 
-	history, err := ec.GetAddressHistory(clientCtx, "bcrt1qdql55es0t6afs9gy9th2magjncahp0fxhs4jkn20mqjt4hjyjesqvp5ls8")
-	if err != nil {
-		ec.Stop()
-		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
-		os.Exit(1)
-	}
-	for _, h := range history {
-		fmt.Println(" Height: ", h.Height)
-		fmt.Println(" TxHash: ", h.TxHash)
-		fmt.Println(" Fee:    ", h.Fee)
-	}
-
-	addrUnspent, err := ec.GetAddressUnspent(clientCtx, "bcrt1qy7agjj62epx0ydnqskgwlcfwu52xjtpj36hr0d")
-	if err != nil {
-		ec.Stop()
-		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
-		os.Exit(1)
-	}
-	var i int = 0
-	for _, u := range addrUnspent {
-		fmt.Println(" Height: ", u.Height)
-		fmt.Println(" TxHash: ", u.TxHash)
-		fmt.Println(" TxPos:  ", u.TxPos)
-		fmt.Println(" Value:  ", u.Value)
-		i++
-		if i == 3 {
-			break
-		}
-	}
-
 	// make the client's wallet
-	//
 	// - for regtest/testnet testing recreate a wallet with a known set of keys.
 	// - use the mkwallet and  tools to create, recreate a wallet at the
 	//   configured location
 	// - use the rmwallet tool to remove a wallet from the configured location.
 	//   regtest & testnet only
 
-	if net == "regtest" {
-
+	switch net {
+	case "regtest":
 		// mnemonic := "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
 		// err := ec.RecreateWallet("abc", mnemonic)
 		err := ec.LoadWallet("abc")
@@ -185,9 +154,7 @@ func main() {
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}
-
-	} else if net == "testnet3" {
-
+	case "testnet3":
 		// mnemonic := "canyon trip truly ritual lonely quiz romance rose alone journey like bronze"
 		// err := ec.RecreateWallet("abc", mnemonic)
 		ec.LoadWallet("abc")
@@ -196,8 +163,7 @@ func main() {
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}
-
-	} else if net == "mainnet" {
+	case "mainnet":
 		// production usage: load the client's wallet
 		err := ec.LoadWallet(pass)
 		if err != nil {
@@ -205,31 +171,21 @@ func main() {
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}
+	default:
+		ec.Stop()
+		fmt.Printf("unknown net %s - exiting\n", net)
+		os.Exit(1)
 	}
 
-	// set up Notify for all our already given out receive addresses (getunusedaddress)
+	// Set up Notify for all our already given out receive addresses (getunusedaddress)
 	// and broadcasted change addresses in order to receive any changes to the state of
-	// the address history from the node
+	// the address history back from the node
 	err = ec.SyncWallet(clientCtx)
 	if err != nil {
 		ec.Stop()
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
-
-	address, err := ec.UnusedAddress(clientCtx)
-	if err != nil {
-		ec.Stop()
-		fmt.Println(err, " - exiting")
-		os.Exit(1)
-	}
-	wif, err := ec.GetPrivKeyForAddress("abc", address)
-	if err != nil {
-		ec.Stop()
-		fmt.Println(err, " - exiting")
-		os.Exit(1)
-	}
-	fmt.Println(wif)
 
 	// for testing only
 	err = btc.RPCServe(ec)
