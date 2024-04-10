@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
@@ -442,13 +443,24 @@ func (ec *BtcElectrumClient) UnfreezeUTXO(txid string, out uint32) error {
 }
 
 func (ec *BtcElectrumClient) FeeRate(ctx context.Context, confTarget int64) (int64, error) {
-	node := ec.GetNode()
-	if node != nil {
-		feeRate, _ := node.EstimateFeeRate(ctx, confTarget)
-		if feeRate != -1 {
-			return feeRate, nil
-		}
+	// Maye we can use oracle like https://blockexplorer.one/bitcoin/mainnet (/testnet)
+	// https://rest.cryptoapis.io/v2/blockchain-data/bitcoin/testnet/mempool/fees
+	// I do not like this!
+	// node := ec.GetNode()
+	// if node != nil {
+	// 	feeRate, _ := node.EstimateFeeRate(ctx, confTarget)
+	// 	if feeRate != -1 {
+	// 		return feeRate, nil
+	// 	}
+	// }
+	switch ec.ClientConfig.Params {
+	case &chaincfg.MainNetParams:
+		return 30000, nil
+	case &chaincfg.TestNet3Params:
+		return 1500, nil
+	case &chaincfg.RegressionNetParams:
+		return 1500, nil
+	default:
+		return 1000, nil
 	}
-	// for now just return default fee rate of 1000
-	return 1000, nil
 }
