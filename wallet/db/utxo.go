@@ -21,7 +21,7 @@ func (u *UtxoDB) Put(utxo wallet.Utxo) error {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 	tx, _ := u.db.Begin()
-	stmt, err := tx.Prepare("insert or replace into utxos(outpoint, value, height, scriptPubKey, watchOnly) values(?,?,?,?,?)")
+	stmt, err := tx.Prepare("insert or replace into utxos(outpoint, value, height, scriptPubKey, watchOnly, frozen) values(?,?,?,?,?,?)")
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -32,7 +32,11 @@ func (u *UtxoDB) Put(utxo wallet.Utxo) error {
 	if utxo.WatchOnly {
 		watchOnly = 1
 	}
-	_, err = stmt.Exec(outpoint, int(utxo.Value), int(utxo.AtHeight), hex.EncodeToString(utxo.ScriptPubkey), watchOnly)
+	frozen := 0
+	if utxo.Frozen {
+		frozen = 1
+	}
+	_, err = stmt.Exec(outpoint, int(utxo.Value), int(utxo.AtHeight), hex.EncodeToString(utxo.ScriptPubkey), watchOnly, frozen)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -45,7 +49,7 @@ func (u *UtxoDB) GetAll() ([]wallet.Utxo, error) {
 	u.lock.RLock()
 	defer u.lock.RUnlock()
 	var ret []wallet.Utxo
-	stm := "select outpoint, value, height, scriptPubKey, watchOnly from utxos"
+	stm := "select outpoint, value, height, scriptPubKey, watchOnly, frozen from utxos"
 	rows, err := u.db.Query(stm)
 	if err != nil {
 		return ret, err
@@ -57,11 +61,12 @@ func (u *UtxoDB) GetAll() ([]wallet.Utxo, error) {
 		var height int
 		var scriptPubKey string
 		var watchOnlyInt int
-		if err := rows.Scan(&outpoint, &value, &height, &scriptPubKey, &watchOnlyInt); err != nil {
+		var frozenInt int
+		if err := rows.Scan(&outpoint, &value, &height, &scriptPubKey, &watchOnlyInt, &frozenInt); err != nil {
 			continue
 		}
 		s := strings.Split(outpoint, ":")
-		if err != nil {
+		if len(s) < 2 {
 			continue
 		}
 		shaHash, err := chainhash.NewHashFromStr(s[0])
@@ -80,6 +85,10 @@ func (u *UtxoDB) GetAll() ([]wallet.Utxo, error) {
 		if watchOnlyInt == 1 {
 			watchOnly = true
 		}
+		frozen := false
+		if frozenInt == 1 {
+			frozen = true
+		}
 		ret = append(ret, wallet.Utxo{
 			Op: *wire.NewOutPoint(
 				shaHash,
@@ -89,6 +98,7 @@ func (u *UtxoDB) GetAll() ([]wallet.Utxo, error) {
 			Value:        int64(value),
 			ScriptPubkey: scriptBytes,
 			WatchOnly:    watchOnly,
+			Frozen:       frozen,
 		})
 	}
 	return ret, nil

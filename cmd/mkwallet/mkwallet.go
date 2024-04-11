@@ -94,6 +94,8 @@ func configure() (string, string, string, *client.ClientConfig, error) {
 	action := flag.String("action", "create", "action: 'create'a new wallet or 'recreate' from seed")
 	seed := flag.String("seed", "", "'seed words for recreate' inside ''; example: 'word1 word2 ... word12'")
 	test_wallet := flag.Bool("tw", false, "known test wallets override for regtest/testnet")
+	dbType := flag.String("dbtype", "bbolt", "set database type: 'bbolt' default, 'sqlite'")
+
 	flag.Parse()
 	if *help {
 		flag.Usage()
@@ -104,6 +106,8 @@ func configure() (string, string, string, *client.ClientConfig, error) {
 	fmt.Println("action:", *action)
 	fmt.Println("pass:", *pass)
 	fmt.Println("seed:", *seed)
+	fmt.Println("test_wallet:", *test_wallet)
+	fmt.Println("dbtype:", *dbType)
 	if *test_wallet {
 		switch *net {
 		case "regtest", "simnet":
@@ -141,6 +145,9 @@ func configure() (string, string, string, *client.ClientConfig, error) {
 		}
 	}
 	cfg, err := makeBasicConfig(*coin, *net)
+	if *dbType == "sqlite" {
+		cfg.DbType = "sqlite"
+	}
 	return *action, *pass, *seed, cfg, err
 }
 

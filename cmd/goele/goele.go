@@ -122,6 +122,9 @@ func main() {
 	net := cfg.Params.Name
 	fmt.Println(net)
 
+	cfg.DbType = "sqlite"
+	fmt.Println(cfg.DbType)
+
 	// make basic client
 	ec := btc.NewBtcElectrumClient(cfg)
 

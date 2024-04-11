@@ -31,7 +31,7 @@ func init() {
 		Value:        100000000,
 		ScriptPubkey: []byte("scriptpubkey"),
 		WatchOnly:    false,
-		Frozen:       false,
+		Frozen:       true,
 	}
 }
 
@@ -40,18 +40,20 @@ func TestUtxoPut(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	stmt, _ := uxdb.db.Prepare("select outpoint, value, height, scriptPubKey from utxos where outpoint=?")
+	stmt, _ := uxdb.db.Prepare("select outpoint, value, height, scriptPubKey, frozen from utxos where outpoint=?")
 	defer stmt.Close()
 
 	var outpoint string
 	var value int
 	var height int
 	var scriptPubkey string
+	var frozenInt int
 	o := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
-	err = stmt.QueryRow(o).Scan(&outpoint, &value, &height, &scriptPubkey)
+	err = stmt.QueryRow(o).Scan(&outpoint, &value, &height, &scriptPubkey, &frozenInt)
 	if err != nil {
 		t.Error(err)
 	}
+	bFrozen := frozenInt == 1
 	if outpoint != o {
 		t.Error("Utxo db returned wrong outpoint")
 	}
@@ -63,6 +65,10 @@ func TestUtxoPut(t *testing.T) {
 	}
 	if scriptPubkey != hex.EncodeToString(utxo.ScriptPubkey) {
 		t.Error("Utxo db returned wrong scriptPubKey")
+	}
+	if bFrozen != utxo.Frozen {
+		t.Error("Utxo db returned wrong scriptPubKey")
+
 	}
 }
 
@@ -89,6 +95,12 @@ func TestUtxoGetAll(t *testing.T) {
 	}
 	if !bytes.Equal(utxos[0].ScriptPubkey, utxo.ScriptPubkey) {
 		t.Error("Utxo db returned wrong scriptPubKey")
+	}
+	if utxos[0].WatchOnly != utxo.WatchOnly {
+		t.Error("Utxo db returned wrong watchOnly value")
+	}
+	if utxos[0].Frozen != utxo.Frozen {
+		t.Error("Utxo db returned wrong frozen value")
 	}
 }
 
