@@ -188,7 +188,10 @@ func main() {
 	}
 
 	feeRateSatsPerKB, _ := ec.FeeRate(clientCtx, 1)
-	fmt.Println(feeRateSatsPerKB)
+	fmt.Println("Sats/KB:", feeRateSatsPerKB)
+
+	// addr, _ := ec.UnusedAddress(clientCtx)
+	// fmt.Println("new address:", addr)
 
 	// for testing only
 	err = btc.RPCServe(ec)
