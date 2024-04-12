@@ -151,13 +151,13 @@ chmod +x "${HARNESS_DIR}/quit"
   done
 
   #################################################################################
-  # fund goele regtest wallet made from well known test_wallet seed
+  # fund goele regtest wallet made from well known test_wallet seed - tricky!
   ################################################################################
 
-  for i in 1 1 1 2 2 2 3 3 3
-  do
-    tmux send-keys -t $SESSION:2 "./alpha sendtoaddress ${GOELE_WALLET_ADDR} ${i}${DONE}" C-m\; ${WAIT}
-  done
+  # for i in 1 1 1 2 2 2 3 3 3
+  # do
+  #   tmux send-keys -t $SESSION:2 "./alpha sendtoaddress ${GOELE_WALLET_ADDR} ${i}${DONE}" C-m\; ${WAIT}
+  # done
 
 
 set +x

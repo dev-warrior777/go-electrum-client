@@ -157,7 +157,6 @@ func main() {
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}
-		ec.GetNode().SubscribeScripthashNotify(clientCtx, "c960d908145178d6ff9eccfbb6de66ce0ebc7a0c4f0252280632e85cb6e97bde")
 	case "testnet3":
 		// mnemonic := "canyon trip truly ritual lonely quiz romance rose alone journey like bronze"
 		// err := ec.RecreateWallet("abc", mnemonic)
