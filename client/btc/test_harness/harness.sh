@@ -14,6 +14,7 @@ ALPHA_WALLET_SEED="cMndqchcXSCUQDDZQSKU2cUHbPb5UfFL9afspxsBELeE6qx6ac9n"
 ALPHA_MINING_ADDR="bcrt1qy7agjj62epx0ydnqskgwlcfwu52xjtpj36hr0d"
 EXTRA_ARGS="--blockfilterindex --peerblockfilters --rpcbind=0.0.0.0 --rpcallowip=0.0.0.0/0"
 CREATE_DEFAULT_WALLET="1"
+GOELE_WALLET_ADDR="bcrt1q5v9qeuw63sxrdt5dvdakw3nrenetx8j9c68hk5"
 
 # Run the harness
 HARNESS_VER="1" # for outdated chain archive detection
@@ -147,6 +148,15 @@ chmod +x "${HARNESS_DIR}/quit"
   for i in 10 18 5 7 1 15 3 25
   do
     tmux send-keys -t $SESSION:2 "./alpha sendtoaddress ${ALPHA_MINING_ADDR} ${i}${DONE}" C-m\; ${WAIT}
+  done
+
+  #################################################################################
+  # fund goele regtest wallet made from well known test_wallet seed
+  ################################################################################
+
+  for i in 1 1 1 2 2 2 3 3 3
+  do
+    tmux send-keys -t $SESSION:2 "./alpha sendtoaddress ${GOELE_WALLET_ADDR} ${i}${DONE}" C-m\; ${WAIT}
   done
 
 
