@@ -87,7 +87,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 		return hits, err
 	}
 
-	// Check to see if we've already processed this tx. If so, return.
+	// Check to see if we've already processed this tx upto confirmed state.
 	ts.txidsMutex.RLock()
 	sh, ok := ts.txids[tx.TxHash().String()]
 	ts.txidsMutex.RUnlock()
@@ -293,9 +293,10 @@ func (ts *TxStore) CheckDoubleSpends(argTx *wire.MsgTx) ([]*chainhash.Hash, erro
 		if compTx.Height < 0 {
 			continue
 		}
-		r := bytes.NewReader(compTx.Bytes)
-		msgTx := wire.NewMsgTx(1)
-		msgTx.BtcDecode(r, 1, wire.WitnessEncoding)
+		msgTx, err := newWireTx(compTx.Bytes, true)
+		if err != nil {
+			return dubs, err
+		}
 		compTxid := msgTx.TxHash()
 		for _, argIn := range argTx.TxIn {
 			// iterate through inputs of compTx
@@ -320,11 +321,4 @@ func (ts *TxStore) extractScriptAddress(script []byte) ([]byte, error) {
 		return nil, errors.New("unknown script")
 	}
 	return addrs[0].ScriptAddress(), nil
-}
-
-func outPointsEqual(a, b wire.OutPoint) bool {
-	if !a.Hash.IsEqual(&b.Hash) {
-		return false
-	}
-	return a.Index == b.Index
 }

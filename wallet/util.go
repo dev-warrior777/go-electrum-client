@@ -40,3 +40,10 @@ func NewOutPoint(txid string, out uint32) (*wire.OutPoint, error) {
 	}
 	return wire.NewOutPoint(hash, out), nil
 }
+
+func outPointsEqual(a, b wire.OutPoint) bool {
+	if !a.Hash.IsEqual(&b.Hash) {
+		return false
+	}
+	return a.Index == b.Index
+}
