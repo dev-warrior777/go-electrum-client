@@ -4,65 +4,62 @@ import (
 	"encoding/hex"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
-	"github.com/tyler-smith/go-bip39"
 )
 
-var test_mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
+// var test_mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
 
-func makeRegtestSeed() []byte {
-	return bip39.NewSeed(test_mnemonic, "")
-}
+// func makeRegtestSeed() []byte {
+// 	return bip39.NewSeed(test_mnemonic, "")
+// }
 
-func createTxStore() (*TxStore, *StorageManager) {
-	mockDb := MockDatastore{
-		&mockConfig{creationDate: time.Now()},
-		&mockStorage{blob: make([]byte, 10)},
-		&mockKeyStore{make(map[string]*keyStoreEntry)},
-		&mockUtxoStore{make(map[string]*wallet.Utxo)},
-		&mockStxoStore{make(map[string]*wallet.Stxo)},
-		&mockTxnStore{make(map[string]*wallet.Txn)},
-		&mockSubscriptionsStore{make(map[string]*wallet.Subscription)},
-	}
+// func createTxStore() (*TxStore, *StorageManager) {
+// 	mockDb := MockDatastore{
+// 		&mockConfig{creationDate: time.Now()},
+// 		&mockStorage{blob: make([]byte, 10)},
+// 		&mockKeyStore{make(map[string]*keyStoreEntry)},
+// 		&mockUtxoStore{make(map[string]*wallet.Utxo)},
+// 		&mockStxoStore{make(map[string]*wallet.Stxo)},
+// 		&mockTxnStore{make(map[string]*wallet.Txn)},
+// 		&mockSubscriptionsStore{make(map[string]*wallet.Subscription)},
+// 	}
 
-	seed = makeRegtestSeed()
-	// fmt.Println("Made test seed")
-	key, _ := hdkeychain.NewMaster(seed, &chaincfg.RegressionNetParams)
-	km, _ := NewKeyManager(mockDb.Keys(), &chaincfg.RegressionNetParams, key)
-	sm := NewStorageManager(mockDb.Enc(), &chaincfg.RegressionNetParams)
-	txStore, _ := NewTxStore(&chaincfg.RegressionNetParams, &mockDb, km)
-	return txStore, sm
-}
+// 	seed = makeRegtestSeed()
+// 	// fmt.Println("Made test seed")
+// 	key, _ := hdkeychain.NewMaster(seed, &chaincfg.RegressionNetParams)
+// 	km, _ := NewKeyManager(mockDb.Keys(), &chaincfg.RegressionNetParams, key)
+// 	sm := NewStorageManager(mockDb.Enc(), &chaincfg.RegressionNetParams)
+// 	txStore, _ := NewTxStore(&chaincfg.RegressionNetParams, &mockDb, km)
+// 	return txStore, sm
+// }
 
-// A sample regtest wallet
-func MockWallet() *BtcElectrumWallet {
-	txstore, storageMgr := createTxStore()
+// // A sample regtest wallet
+// func MockWallet() *BtcElectrumWallet {
+// 	txstore, storageMgr := createTxStore()
 
-	storageMgr.store.Xprv = "tprv8ZgxMBicQKsPfJU6JyiVdmFAtAzmWmTeEv85nTAHjLQyL35tdP2fAPWDSBBnFqGhhfTHVQMcnZhZDFkzFmCjm1bgf5UDwMAeFUWhJ9Dr8c4"
-	storageMgr.store.Xpub = "tpubD6NzVbkrYhZ4YmVtCdP63AuHTCWhg6eYpDis4yCb9cDNAXLfFmrFLt85cLFTwHiDJ9855NiE7cgQdiTGt5mb2RS9RfaxgVDkwBybJWm54Gh"
-	storageMgr.store.ShaPw = chainhash.HashB([]byte(pw))
-	storageMgr.store.Seed = []byte{0x01, 0x02, 0x03}
+// 	storageMgr.store.Xprv = "tprv8ZgxMBicQKsPfJU6JyiVdmFAtAzmWmTeEv85nTAHjLQyL35tdP2fAPWDSBBnFqGhhfTHVQMcnZhZDFkzFmCjm1bgf5UDwMAeFUWhJ9Dr8c4"
+// 	storageMgr.store.Xpub = "tpubD6NzVbkrYhZ4YmVtCdP63AuHTCWhg6eYpDis4yCb9cDNAXLfFmrFLt85cLFTwHiDJ9855NiE7cgQdiTGt5mb2RS9RfaxgVDkwBybJWm54Gh"
+// 	storageMgr.store.ShaPw = chainhash.HashB([]byte(pw))
+// 	storageMgr.store.Seed = []byte{0x01, 0x02, 0x03}
 
-	return &BtcElectrumWallet{
-		txstore:        txstore,
-		keyManager:     txstore.keyManager,
-		storageManager: storageMgr,
-		params:         &chaincfg.RegressionNetParams,
-		feeProvider:    wallet.DefaultFeeProvider(),
-	}
-}
+// 	return &BtcElectrumWallet{
+// 		txstore:        txstore,
+// 		keyManager:     txstore.keyManager,
+// 		storageManager: storageMgr,
+// 		params:         &chaincfg.RegressionNetParams,
+// 		feeProvider:    wallet.DefaultFeeProvider(),
+// 	}
+// }
 
 // test gather coins
 func Test_gatherCoins(t *testing.T) {
-	w := MockWallet()
+	w := MockWallet("abc")
 	w.blockchainTip = 500
 	// utxo 1
 	txid1 := "edfab2f9b2a013a36c524bf63e9778a5d13ca8bf1fce279647fbcee30bf7dd62"
@@ -124,7 +121,7 @@ func Test_gatherCoins(t *testing.T) {
 
 // The wallet is segwit by default. Here we test making a transaction from 2 inputs
 func Test_newSegwitMultiInputTransaction(t *testing.T) {
-	w := MockWallet()
+	w := MockWallet(pw)
 	w.blockchainTip = 500
 	// utxo 1
 	txid1 := "edfab2f9b2a013a36c524bf63e9778a5d13ca8bf1fce279647fbcee30bf7dd62"
@@ -184,7 +181,7 @@ func Test_newSegwitMultiInputTransaction(t *testing.T) {
 
 // default segwit transaction - 1 utxo consumed
 func Test_newSegwitTransaction(t *testing.T) {
-	w := MockWallet()
+	w := MockWallet("abc")
 	w.blockchainTip = 500
 
 	// A real Tx from harness->goele
@@ -248,7 +245,7 @@ func Test_newSegwitTransaction(t *testing.T) {
 // we previously passed to an entity (CEX?) that does not yet send to segwit bech32
 // addresses. Hopefully never though!
 func Test_newLegacyTransaction(t *testing.T) {
-	w := MockWallet()
+	w := MockWallet("abc")
 	w.blockchainTip = 500
 
 	// make one utxo

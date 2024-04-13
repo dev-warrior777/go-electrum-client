@@ -133,7 +133,7 @@ type ElectrumWallet interface {
 	//
 	// This command uses the local wallet. We can also get from ElectrumX but on a per
 	// address basis.
-	Balance() (int64, int64, error)
+	Balance() (int64, int64, int64, error)
 
 	// Sign an unsigned transaction with the wallet and return singned tx and
 	// the change output index

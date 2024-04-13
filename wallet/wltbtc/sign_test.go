@@ -110,7 +110,7 @@ func TestSignTx(t *testing.T) {
 		UnsignedTx: tx,
 		VerifyTx:   true,
 	}
-	w := MockWallet()
+	w := MockWallet("abc")
 	w.blockchainTip = 500
 	utxos := getUtxos()
 	for _, utxo := range utxos {

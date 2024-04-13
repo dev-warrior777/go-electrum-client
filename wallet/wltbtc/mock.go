@@ -9,10 +9,61 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil/hdkeychain"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
+	"github.com/tyler-smith/go-bip39"
 )
+
+var test_mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
+
+func makeRegtestSeed() []byte {
+	return bip39.NewSeed(test_mnemonic, "")
+}
+
+func createTxStore() (*TxStore, *StorageManager) {
+	mockDb := MockDatastore{
+		&mockConfig{creationDate: time.Now()},
+		&mockStorage{blob: make([]byte, 10)},
+		&mockKeyStore{make(map[string]*keyStoreEntry)},
+		&mockUtxoStore{make(map[string]*wallet.Utxo)},
+		&mockStxoStore{make(map[string]*wallet.Stxo)},
+		&mockTxnStore{make(map[string]*wallet.Txn)},
+		&mockSubscriptionsStore{make(map[string]*wallet.Subscription)},
+	}
+
+	seed := makeRegtestSeed()
+	// fmt.Println("Made test seed")
+	key, _ := hdkeychain.NewMaster(seed, &chaincfg.RegressionNetParams)
+	km, _ := NewKeyManager(mockDb.Keys(), &chaincfg.RegressionNetParams, key)
+	sm := NewStorageManager(mockDb.Enc(), &chaincfg.RegressionNetParams)
+	txStore, _ := NewTxStore(&chaincfg.RegressionNetParams, &mockDb, km)
+	return txStore, sm
+}
+
+// A 'regtest' wallet
+func MockWallet(pw string) *BtcElectrumWallet {
+	txstore, storageMgr := createTxStore()
+
+	storageMgr.store.Xprv = "tprv8ZgxMBicQKsPfJU6JyiVdmFAtAzmWmTeEv85nTAHjLQyL35tdP2fAPWDSBBnFqGhhfTHVQMcnZhZDFkzFmCjm1bgf5UDwMAeFUWhJ9Dr8c4"
+	storageMgr.store.Xpub = "tpubD6NzVbkrYhZ4YmVtCdP63AuHTCWhg6eYpDis4yCb9cDNAXLfFmrFLt85cLFTwHiDJ9855NiE7cgQdiTGt5mb2RS9RfaxgVDkwBybJWm54Gh"
+	storageMgr.store.ShaPw = chainhash.HashB([]byte(pw))
+	storageMgr.store.Seed = []byte{0x01, 0x02, 0x03}
+
+	wallet := &BtcElectrumWallet{
+		txstore:        txstore,
+		keyManager:     txstore.keyManager,
+		storageManager: storageMgr,
+		params:         &chaincfg.RegressionNetParams,
+		feeProvider:    wallet.DefaultFeeProvider(),
+	}
+
+	// fundWallet(wallet)
+
+	return wallet
+}
 
 type MockDatastore struct {
 	cfg              wallet.Cfg

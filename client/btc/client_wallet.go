@@ -410,10 +410,10 @@ func (ec *BtcElectrumClient) ValidateAddress(addr string) (bool, bool, error) {
 // Balance returns the confirmed and unconfirmed balances of this wallet.
 // This is a simple wallet and once a transaction has been mined it is
 // considered confirmed.
-func (ec *BtcElectrumClient) Balance() (int64, int64, error) {
+func (ec *BtcElectrumClient) Balance() (int64, int64, int64, error) {
 	w := ec.GetWallet()
 	if w == nil {
-		return 0, 0, ErrNoWallet
+		return 0, 0, 0, ErrNoWallet
 	}
 	return w.Balance()
 }

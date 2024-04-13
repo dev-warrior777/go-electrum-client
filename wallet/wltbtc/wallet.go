@@ -395,47 +395,56 @@ func (w *BtcElectrumWallet) IsMine(queryAddress btcutil.Address) bool {
 	return false
 }
 
-func (w *BtcElectrumWallet) Balance() (int64, int64, error) {
+func (w *BtcElectrumWallet) Balance() (int64, int64, int64, error) {
 
-	checkIfStxoIsConfirmed := func(utxo wallet.Utxo, stxos []wallet.Stxo) bool {
+	isStxoConfirmed := func(utxo wallet.Utxo, stxos []wallet.Stxo) bool {
 		for _, stxo := range stxos {
 			if stxo.Utxo.WatchOnly {
 				continue
 			}
+			// utxo is prevout of stxo SpendTxid
 			if stxo.SpendTxid.IsEqual(&utxo.Op.Hash) {
 				return stxo.SpendHeight > 0
-			} else if stxo.Utxo.IsEqual(&utxo) {
+			}
+			if stxo.Utxo.IsEqual(&utxo) {
 				return stxo.Utxo.AtHeight > 0
 			}
 		}
+		// no stxo so no spend
 		return false
 	}
 
 	confirmed := int64(0)
 	unconfirmed := int64(0)
+	locked := int64(0)
 	utxos, err := w.txstore.Utxos().GetAll()
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	stxos, err := w.txstore.Stxos().GetAll()
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	for _, utxo := range utxos {
 		if utxo.WatchOnly {
 			continue
 		}
+		if utxo.Frozen {
+			locked += utxo.Value
+			continue
+		}
 		if utxo.AtHeight > 0 {
 			confirmed += utxo.Value
-		} else {
-			if checkIfStxoIsConfirmed(utxo, stxos) {
-				confirmed += utxo.Value
-			} else {
-				unconfirmed += utxo.Value
-			}
+			continue
 		}
+		// height 0 so possibly spent in the mempool .. not implemented yet
+		if isStxoConfirmed(utxo, stxos) {
+			confirmed += utxo.Value
+			continue
+		}
+		unconfirmed += utxo.Value
 	}
-	return confirmed, unconfirmed, nil
+	return confirmed, unconfirmed, locked, nil
 }
 
 func (w *BtcElectrumWallet) ListTransactions() ([]wallet.Txn, error) {

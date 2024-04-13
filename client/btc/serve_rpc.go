@@ -51,14 +51,16 @@ func (e *Ec) RPCTip(request map[string]string, response *map[string]string) erro
 
 func (e *Ec) RPCBalance(request map[string]string, response *map[string]string) error {
 	r := *response
-	c, u, err := e.EleClient.Balance()
+	c, u, l, err := e.EleClient.Balance()
 	if err != nil {
 		return err
 	}
 	confirmed := cast.ToString(c)
 	unconfirmed := cast.ToString(u)
+	locked := cast.ToString(l)
 	r["confirmed"] = confirmed
 	r["unconfirmed"] = unconfirmed
+	r["locked"] = locked
 	return nil
 }
 
