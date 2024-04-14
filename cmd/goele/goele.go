@@ -140,11 +140,11 @@ func main() {
 	feeRate, _ := ec.FeeRate(clientCtx, 6)
 	fmt.Println(feeRate)
 
-	// make the client's wallet
+	// to make the client's wallet:
 	// - for regtest/testnet testing recreate a wallet with a known set of keys.
-	// - use the mkwallet and  tools to create, recreate a wallet at the
+	// - use the mkwallet and rmwallet tools to create, recreate a wallet at the
 	//   configured location
-	// - use the rmwallet tool to remove a wallet from the configured location.
+	// - the rmwallet tool removes a wallet from the configured location.
 	//   regtest & testnet only
 
 	switch net {

@@ -28,7 +28,7 @@ func usage() {
 	fmt.Println("  getunusedaddress", "\t\t\t Get a new unused wallet receive address")
 	fmt.Println("  getchangeaddress", "\t\t\t Get a new unused wallet change address")
 	fmt.Println("  spend pw amount address feeType", "\t Make signed transaction from wallet utxos")
-	fmt.Println("  broadcast rawTx changeIndex", "\t\t Broadcast rawTx to ElectrumX")
+	fmt.Println("  broadcast rawTx", "\t\t\t Broadcast rawTx to ElectrumX")
 	fmt.Println("-------------------------------------------------------------")
 	fmt.Println()
 }
@@ -87,8 +87,10 @@ func (c *cmd) getbalance(client *rpc.Client) {
 	// fmt.Printf("client response %v\n", response)
 	confirmed := cast.ToString(response["confirmed"])
 	unconfirmed := cast.ToString(response["unconfirmed"])
+	locked := cast.ToString(response["locked"])
 	fmt.Println("confirmed", confirmed)
 	fmt.Println("unconfirmed", unconfirmed)
+	fmt.Println("locked", locked)
 }
 
 // listunspent

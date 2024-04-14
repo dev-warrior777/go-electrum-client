@@ -23,8 +23,6 @@ import (
 //	ElectrumWallet
 
 // BtcElectrumWallet implements ElectrumWallet
-
-// TODO: adjust interface while developing because .. simpler
 var _ = wallet.ElectrumWallet(&BtcElectrumWallet{})
 
 const WalletVersion = "0.1.0"
@@ -431,13 +429,12 @@ func (w *BtcElectrumWallet) Balance() (int64, int64, int64, error) {
 		}
 		if utxo.Frozen {
 			locked += utxo.Value
-			continue
 		}
 		if utxo.AtHeight > 0 {
 			confirmed += utxo.Value
 			continue
 		}
-		// height 0 so possibly spent in the mempool .. not implemented yet
+		// height 0 so possibly spent in the mempool?
 		if isStxoConfirmed(utxo, stxos) {
 			confirmed += utxo.Value
 			continue

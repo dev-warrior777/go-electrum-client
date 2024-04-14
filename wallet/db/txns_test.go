@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/hex"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -20,6 +21,32 @@ func init() {
 		db:   conn,
 		lock: new(sync.RWMutex),
 	}
+}
+
+func TestTxnsPutGetBlob(t *testing.T) {
+	// sqlite3 cli tool does not show blob data by default. So this test specifically
+	// checks the 'tx (blob) field'
+	// info: 'select hex(tx) from txns;' works to show the blob data.
+	txid := "e3957892c2b446fa104cca45f45b86a3d67701d9f856b02791921f557944379b"
+	txHex := "01000000018b5d47ec7ae47ae2e158345069fd38a1460f436c486fd3376de24b5df8da62a201000000da00483045022100d9dfd2bd3762fbb06d4b7d37ba3544aefd2ea9913a728b90b446abf530eed03d0220066f3fe0e7a652d2383cfa3b06188301e7ff02320d3a9b32675d1b0d62e9de740147304402206271eb865f0a5f92fdb4306711c17f53c959a09d401cd375bf60904191f70e080220231368d0bacde1775505f6978486b2732179f3d3f971aa67690475763c3d96de01475221024760c9ba5fa6241da6ee8601f0266f0e0592f53735703f0feaae23eda6673ae821038cfa8e97caaafbe21455803043618440c28c501ec32d6ece6865003165a0d4d152aeffffffff0224eb1400000000001976a91411a23852c4554182abb97f811509d60015071a5188acc4c59d260000000017a9140be09225644b4cfdbb472028d8ccaf6df736025c8700000000"
+	TxBytes, _ := hex.DecodeString(txHex)
+	now := time.Now()
+	err := txdb.Put(TxBytes, txid, 0, 1, now, false)
+	if err != nil {
+		t.Error(err)
+	}
+	txn, err := txdb.Get(txid)
+	if err != nil {
+		t.Error(err)
+	}
+	if !bytes.Equal(TxBytes, txn.Bytes) {
+		t.Error("Txn db get failed")
+	}
+	retTxHex := hex.EncodeToString(txn.Bytes)
+	if retTxHex != txHex {
+		t.Error("Txn db get failed")
+	}
+	fmt.Println(retTxHex, txHex)
 }
 
 func TestTxnsPut(t *testing.T) {
@@ -76,6 +103,9 @@ func TestTxnsGet(t *testing.T) {
 	txn, err := txdb.Get(tx.TxHash().String())
 	if err != nil {
 		t.Error(err)
+	}
+	if !bytes.Equal(raw, txn.Bytes) {
+		t.Error("Txn db get failed")
 	}
 	if tx.TxHash().String() != txn.Txid {
 		t.Error("Txn db get failed")

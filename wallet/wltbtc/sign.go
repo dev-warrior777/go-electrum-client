@@ -113,13 +113,11 @@ func (w *BtcElectrumWallet) SignTx(pw string, info *wallet.SigningInfo) ([]byte,
 		}
 	}
 
-	b := make([]byte, 0)
-	txOut := bytes.NewBuffer(b)
-	err = tx.Serialize(txOut)
+	txBytes, err := serializeWireTx(tx)
 	if err != nil {
 		return nil, err
 	}
-	return txOut.Bytes(), nil
+	return txBytes, nil
 }
 
 func stepDebugScript(e *txscript.Engine) {
