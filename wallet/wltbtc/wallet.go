@@ -462,9 +462,7 @@ func (w *BtcElectrumWallet) GetTransaction(txid string) (wallet.Txn, error) {
 	if err != nil {
 		return txn, fmt.Errorf("no such transaction")
 	}
-	tx := wire.NewMsgTx(wire.TxVersion)
-	rbuf := bytes.NewReader(txn.Bytes)
-	err = tx.BtcDecode(rbuf, wire.ProtocolVersion, wire.WitnessEncoding)
+	tx, err := newWireTx(txn.Bytes, true)
 	if err != nil {
 		return txn, err
 	}

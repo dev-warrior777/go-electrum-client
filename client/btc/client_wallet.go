@@ -154,8 +154,11 @@ func (ec *BtcElectrumClient) GetWalletTx(txid string) (int, []byte, error) {
 	if err != nil {
 		return -1, nil, err
 	}
-	tip, _ := ec.Tip()
-	confirmations := tip - txn.Height
+	var confirmations = int64(0)
+	if txn.Height > 0 {
+		tip, _ := ec.Tip()
+		confirmations = tip - txn.Height
+	}
 	return int(confirmations), txn.Bytes, nil
 }
 
