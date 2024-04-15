@@ -457,14 +457,14 @@ func (w *BtcElectrumWallet) HasTransaction(txid string) (bool, *wallet.Txn) {
 	return true, &txn
 }
 
-func (w *BtcElectrumWallet) GetTransaction(txid string) (wallet.Txn, error) {
+func (w *BtcElectrumWallet) GetTransaction(txid string) (*wallet.Txn, error) {
 	txn, err := w.txstore.Txns().Get(txid)
 	if err != nil {
-		return txn, fmt.Errorf("no such transaction")
+		return nil, fmt.Errorf("no such transaction")
 	}
 	tx, err := newWireTx(txn.Bytes, true)
 	if err != nil {
-		return txn, err
+		return nil, err
 	}
 	outs := []wallet.TransactionOutput{}
 	for i, out := range tx.TxOut {
@@ -472,7 +472,7 @@ func (w *BtcElectrumWallet) GetTransaction(txid string) (wallet.Txn, error) {
 		_, addrs, _, err := txscript.ExtractPkScriptAddrs(out.PkScript, w.params)
 		if err != nil {
 			fmt.Printf("error extracting address from txn pkscript: %v\n", err)
-			return txn, err
+			return nil, err
 		}
 		if len(addrs) == 0 {
 			address = nil
@@ -487,7 +487,7 @@ func (w *BtcElectrumWallet) GetTransaction(txid string) (wallet.Txn, error) {
 		outs = append(outs, tout)
 	}
 	txn.Outputs = outs
-	return txn, err
+	return &txn, err
 }
 
 // Return the calculated confirmed txids and heights for an address in this

@@ -146,7 +146,7 @@ type ElectrumWallet interface {
 	HasTransaction(txid string) (bool, *Txn)
 
 	// Get info on a specific transaction - currently unused
-	GetTransaction(txid string) (Txn, error)
+	GetTransaction(txid string) (*Txn, error)
 
 	// Return the calculated confirmed txids and heights for an address - unused
 	GetWalletAddressHistory(address btcutil.Address) ([]AddressHistory, error)
