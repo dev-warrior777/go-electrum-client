@@ -462,31 +462,6 @@ func (w *BtcElectrumWallet) GetTransaction(txid string) (*wallet.Txn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("no such transaction")
 	}
-	tx, err := newWireTx(txn.Bytes, true)
-	if err != nil {
-		return nil, err
-	}
-	outs := []wallet.TransactionOutput{}
-	for i, out := range tx.TxOut {
-		var address btcutil.Address
-		_, addrs, _, err := txscript.ExtractPkScriptAddrs(out.PkScript, w.params)
-		if err != nil {
-			fmt.Printf("error extracting address from txn pkscript: %v\n", err)
-			return nil, err
-		}
-		if len(addrs) == 0 {
-			address = nil
-		} else {
-			address = addrs[0]
-		}
-		tout := wallet.TransactionOutput{
-			Address: address,
-			Value:   out.Value,
-			Index:   uint32(i),
-		}
-		outs = append(outs, tout)
-	}
-	txn.Outputs = outs
 	return &txn, err
 }
 

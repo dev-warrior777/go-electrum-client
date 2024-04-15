@@ -29,12 +29,10 @@ func (ec *BtcElectrumClient) SyncWallet(ctx context.Context) error {
 	if w == nil {
 		return ErrNoWallet
 	}
-
 	subscriptions, err := w.ListSubscriptions()
 	if err != nil {
 		return err
 	}
-
 	// - get all subscribed receive/change/watched addresses in wallet db
 	for _, subscription := range subscriptions {
 
@@ -52,7 +50,6 @@ func (ec *BtcElectrumClient) SyncWallet(ctx context.Context) error {
 			fmt.Println("no history for this script address .. yet")
 			continue
 		}
-
 		// get address history to date for this address from ElectrumX
 		history, err := ec.GetAddressHistoryFromNode(ctx, subscription)
 		if err != nil {
@@ -63,13 +60,11 @@ func (ec *BtcElectrumClient) SyncWallet(ctx context.Context) error {
 		// update wallet txstore if needed
 		ec.addTxHistoryToWallet(ctx, history)
 	}
-
 	// start goroutine to listen for scripthash status change notifications arriving
 	err = ec.addressStatusNotify(ctx)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -92,25 +87,20 @@ func (ec *BtcElectrumClient) Spend(
 		return -1, "", "", ErrNoWallet
 	}
 	w.UpdateTip(ec.Tip())
-
 	address, err := btcutil.DecodeAddress(toAddress, ec.ClientConfig.Params)
 	if err != nil {
 		return -1, "", "", err
 	}
-
 	changeIndex, wireTx, err := w.Spend(pw, amount, address, feeLevel)
 	if err != nil {
 		return -1, "", "", err
 	}
-
 	txidHex := wireTx.TxHash().String()
-
 	b, err := serializeWireTx(wireTx)
 	if err != nil {
 		return -1, "", "", err
 	}
 	rawTxHex := hex.EncodeToString(b)
-
 	return changeIndex, rawTxHex, txidHex, nil
 }
 
@@ -145,21 +135,44 @@ func (ec *BtcElectrumClient) SignTx(pw string, txBytes []byte) ([]byte, error) {
 	return w.SignTx(pw, signInfo)
 }
 
-func (ec *BtcElectrumClient) GetWalletTx(txid string) (int, []byte, error) {
+// GetWalletTx gets a tx from this wallet if it exists. If it does not esist then
+// we return error.
+// Edge cases:
+//
+//   - If the tx in the db is unmined we return it with no error. But if it has been
+//     mined then we compare the height it was mined with 'maybeTip' and return an
+//     error if the wallet tip is obviously behind electrumx; and we also return a
+//     flag indicating that.
+//     Software calling this API can then choose to directly ask electrumx for tx
+//     information using the GetTransaction API.
+//
+//   - if wallet tx height is less than or equal to 'maybeTip' we return the tx with
+//     no error even though we may be behind electrumx.
+func (ec *BtcElectrumClient) GetWalletTx(txid string) (int, bool, []byte, error) {
 	w := ec.GetWallet()
 	if w == nil {
-		return -1, nil, ErrNoWallet
+		return -1, false, nil, ErrNoWallet
 	}
 	txn, err := w.GetTransaction(txid)
 	if err != nil {
-		return -1, nil, err
+		// 'no such transaction'
+		return -1, false, nil, err
 	}
-	var confirmations = int64(0)
-	if txn.Height > 0 {
-		tip, _ := ec.Tip()
-		confirmations = tip - txn.Height
+	if txn.Height < 0 {
+		return -1, false, nil, errors.New("txns db error")
 	}
-	return int(confirmations), txn.Bytes, nil
+	// not mined yet? return valid tx with no confs
+	if txn.Height == 0 {
+		return 0, false, txn.Bytes, nil
+	}
+	// mined
+	maybeTip, _ := ec.Tip()
+	conf := maybeTip - txn.Height
+	// definitely client tip is behind electrumx
+	if conf < 0 {
+		return int(conf), true, txn.Bytes, errors.New("tip behind electrumx")
+	}
+	return int(conf), false, txn.Bytes, nil
 }
 
 // RpcBroadcast sends a transaction to the server for broadcast on the bitcoin
@@ -231,8 +244,8 @@ func (ec *BtcElectrumClient) Broadcast(ctx context.Context, rawTx []byte) (strin
 
 	// Subscribe for address status notification from ElectrumX for addresses
 	// paying back to our wallet. This will also add the containing tx to the
-	// wallet txns db in response to the first status change notification of the
-	// subscribed address.
+	// wallet txns db in response to the first status change notification of
+	// the subscribed address.
 	for idx := range tx.TxOut {
 		pkScript, ok := backToWallet[idx]
 		if !ok {
@@ -264,7 +277,6 @@ func (ec *BtcElectrumClient) Broadcast(ctx context.Context, rawTx []byte) (strin
 			return "", errors.New("network: empty result")
 		}
 	}
-
 	return txid, nil
 }
 
@@ -288,7 +300,7 @@ func (ec *BtcElectrumClient) ListConfirmedUnspent() ([]wallet.Utxo, error) {
 	return w.ListConfirmedUnspent()
 }
 
-// ListUnspent returns a list of all utxos in the wallet db that are temporarily frozen.
+// ListFrozenUnspent returns a list of all utxos in the wallet db that are temporarily frozen.
 func (ec *BtcElectrumClient) ListFrozenUnspent() ([]wallet.Utxo, error) {
 	w := ec.GetWallet()
 	if w == nil {
@@ -309,7 +321,6 @@ func (ec *BtcElectrumClient) UnusedAddress(ctx context.Context) (string, error) 
 	if node == nil {
 		return "", ErrNoNode
 	}
-
 	address, err := w.GetUnusedAddress(wallet.RECEIVING)
 	if err != nil {
 		return "", err
@@ -318,7 +329,6 @@ func (ec *BtcElectrumClient) UnusedAddress(ctx context.Context) (string, error) 
 	if err != nil {
 		return "", err
 	}
-
 	// wallet db
 	newSub := &wallet.Subscription{
 		PkScript:           hex.EncodeToString(payToAddrScript),
@@ -331,7 +341,6 @@ func (ec *BtcElectrumClient) UnusedAddress(ctx context.Context) (string, error) 
 	if err != nil {
 		return "", err
 	}
-
 	// request notifications from node
 	res, err := node.SubscribeScripthashNotify(ctx, newSub.ElectrumScripthash)
 	if err != nil {
@@ -342,7 +351,6 @@ func (ec *BtcElectrumClient) UnusedAddress(ctx context.Context) (string, error) 
 		w.RemoveSubscription(newSub.PkScript)
 		return "", errors.New("network: empty result")
 	}
-
 	return address.String(), nil
 }
 
@@ -357,7 +365,6 @@ func (ec *BtcElectrumClient) ChangeAddress(ctx context.Context) (string, error) 
 	if node == nil {
 		return "", ErrNoNode
 	}
-
 	address, err := w.GetUnusedAddress(wallet.CHANGE)
 	if err != nil {
 		return "", err
@@ -366,7 +373,6 @@ func (ec *BtcElectrumClient) ChangeAddress(ctx context.Context) (string, error) 
 	if err != nil {
 		return "", err
 	}
-
 	// wallet db
 	newSub := &wallet.Subscription{
 		PkScript:           hex.EncodeToString(payToAddrScript),
@@ -379,7 +385,6 @@ func (ec *BtcElectrumClient) ChangeAddress(ctx context.Context) (string, error) 
 	if err != nil {
 		return "", err
 	}
-
 	// request notifications from node
 	res, err := node.SubscribeScripthashNotify(ctx, newSub.ElectrumScripthash)
 	if err != nil {
@@ -390,7 +395,6 @@ func (ec *BtcElectrumClient) ChangeAddress(ctx context.Context) (string, error) 
 		w.RemoveSubscription(newSub.PkScript)
 		return "", errors.New("network: empty result")
 	}
-
 	return address.String(), nil
 }
 
@@ -456,6 +460,8 @@ func (ec *BtcElectrumClient) FeeRate(ctx context.Context, confTarget int64) (int
 	// 		return feeRate, nil
 	// 	}
 	// }
+
+	// static
 	switch ec.ClientConfig.Params {
 	case &chaincfg.MainNetParams:
 		return 30000, nil
