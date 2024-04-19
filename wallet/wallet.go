@@ -164,6 +164,9 @@ type ElectrumWallet interface {
 	// List all unspent outputs that are frozen (temporarily) in the wallet
 	ListFrozenUnspent() ([]Utxo, error)
 
+	// List all spent
+	ListSpent() ([]Stxo, error)
+
 	// Set the utxo as temporarily unspendable
 	FreezeUTXO(op *wire.OutPoint) error
 

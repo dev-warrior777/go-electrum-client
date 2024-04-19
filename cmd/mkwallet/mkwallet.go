@@ -70,8 +70,10 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		cfg.TrustedPeer = electrumx.ServerAddr{
 			// Net: "ssl", Addr: "testnet.aranguren.org:51002",
 			// Net: "tcp", Addr: "testnet.aranguren.org:51001",
-			Net: "ssl", Addr: "blockstream.info:993",
-			// Net: "tcp", Addr: "blockstream.info:143",
+			// Net: "ssl", Addr: "testnet.hsmiths.com:53012",
+			Net: "ssl", Addr: "testnet.qtornado.com:51002",
+			// Net: "ssl", Addr: "tn.not.fyi:55002",
+
 		}
 		cfg.StoreEncSeed = true
 		cfg.Testing = true

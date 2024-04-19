@@ -176,11 +176,8 @@ func (ec *BtcElectrumClient) addressStatusNotify(ctx context.Context) error {
 					return
 				}
 
-				fmt.Printf("\n%s\n", "----------------------------------------")
-				fmt.Println("Scripthash:", status.Scripthash)
-				fmt.Println("Status:", status.Status)
 				if status.Status == "" {
-					fmt.Println("status.Status is null no history yet; ignoring...")
+					// fmt.Println("status.Status is null no history yet; ignoring...")
 					continue
 				}
 

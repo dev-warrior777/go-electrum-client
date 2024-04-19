@@ -175,6 +175,14 @@ func (ec *BtcElectrumClient) GetWalletTx(txid string) (int, bool, []byte, error)
 	return int(conf), false, txn.Bytes, nil
 }
 
+func (ec *BtcElectrumClient) GetWalletSpents() ([]wallet.Stxo, error) {
+	w := ec.GetWallet()
+	if w == nil {
+		return nil, ErrNoWallet
+	}
+	return w.ListSpent()
+}
+
 // RpcBroadcast sends a transaction to the server for broadcast on the bitcoin
 // network. It is a test rpc server endpoint and it is thus not part of the
 // ElectrumClient interface.
@@ -188,7 +196,7 @@ func (ec *BtcElectrumClient) RpcBroadcast(ctx context.Context, tx string) (strin
 
 // Broadcast sends a transaction to the ElectrumX server for broadcast on the
 // bitcoin network. It may also set up address status change notifications with
-// ElectrumX and the wallet db for addresses such as change address belonging to
+// ElectrumX in the wallet db for addresses such as change address belonging to
 // the wallet.
 func (ec *BtcElectrumClient) Broadcast(ctx context.Context, rawTx []byte) (string, error) {
 	params := ec.ClientConfig.Params
@@ -208,7 +216,7 @@ func (ec *BtcElectrumClient) Broadcast(ctx context.Context, rawTx []byte) (strin
 		return "", err
 	}
 	// Find any outputs that pay back to this wallet. In particular we almost
-	// always have a change scriptaddress to watch paying back to our wallet
+	// always have a change scriptaddress to watch paying back to this	 wallet
 	// after it's containing tx is broadcasted to the network by ElectrumX
 	ourAddresses := w.ListAddresses()
 	isOurs := func(address btcutil.Address) bool {
@@ -379,7 +387,7 @@ func (ec *BtcElectrumClient) ChangeAddress(ctx context.Context) (string, error) 
 		ElectrumScripthash: pkScriptToElectrumScripthash(payToAddrScript),
 		Address:            address.String(),
 	}
-	// ecdumpSubscription.("adding/updating get change address subscription", newSub)
+	// ec.dumpSubscription.("adding/updating get change address subscription", newSub)
 	// insert or update
 	err = w.AddSubscription(newSub)
 	if err != nil {

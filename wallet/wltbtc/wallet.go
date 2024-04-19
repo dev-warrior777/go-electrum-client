@@ -512,6 +512,11 @@ func (w *BtcElectrumWallet) ListFrozenUnspent() ([]wallet.Utxo, error) {
 	return frozen, nil
 }
 
+// List all spent
+func (w *BtcElectrumWallet) ListSpent() ([]wallet.Stxo, error) {
+	return w.txstore.Stxos().GetAll()
+}
+
 func (w *BtcElectrumWallet) FreezeUTXO(op *wire.OutPoint) error {
 	utxos, err := w.txstore.Utxos().GetAll()
 	if err != nil {

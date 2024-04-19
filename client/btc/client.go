@@ -263,19 +263,22 @@ func (ec *BtcElectrumClient) CloseWallet() {
 //
 // Spend(amount int64, toAddress string, feeLevel wallet.FeeLevel, broadcast bool) (string, string, error)
 // GetPrivKeyForAddress(pw, addr string) (string, error)
-// Broadcast(*BroadcastParams) (string, error)
+// Broadcast(ctx context.Context, rawTx []byte) (string, error)
+// FeeRate(ctx context.Context, confTarget int64) (int64, error)
 // ListUnspent() ([]wallet.Utxo, error)
-// UnusedAddress() (string, error)
-// ChangeAddress() (string, error)
+// UnusedAddress(ctx context.Context) (string, error)
+// ChangeAddress(ctx context.Context) (string, error)
 // Balance() (int64, int64, error)
 // FreezeUTXO((txid string, out uint32) error
 // UnFreezeUTXO((txid string, out uint32) error
+// GetWalletTx(txid string) (int, bool, []byte, error)
+// GetWalletSpents() ([]wallet.Stxo, error)
 
 // Interface methods in client_node.go
 //
-// GetTransaction(txid string) (*electrumx.GetTransactionResult, error)
-// GetRawTransaction(txid string) ([]byte, error)
-// GetAddressHistory(addr string) (electrumx.HistoryResult, error)
-// GetAddressUnspent(addr string) (electrumx.ListUnspentResult, error)
+// GetTransaction(ctx context.Context, txid string) (*electrumx.GetTransactionResult, error)
+// GetRawTransaction(ctx context.Context,txid string) ([]byte, error)
+// GetAddressHistory(ctx context.Context, addr string) (electrumx.HistoryResult, error)
+// GetAddressUnspent(ctx context.Context, addr string) (electrumx.ListUnspentResult, error)
 //
 //////////////////////////////////////////////////////////////////////////////

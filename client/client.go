@@ -75,6 +75,7 @@ type ElectrumClient interface {
 	ValidateAddress(addr string) (bool, bool, error)
 	SignTx(pw string, txBytes []byte) ([]byte, error)
 	GetWalletTx(txid string) (int, bool, []byte, error)
+	GetWalletSpents() ([]wallet.Stxo, error)
 	Balance() (int64, int64, int64, error)
 
 	// adapt and pass thru
