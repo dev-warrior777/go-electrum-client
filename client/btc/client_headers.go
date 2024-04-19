@@ -121,7 +121,7 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 			}
 
 			if count < blockCount {
-				fmt.Println("\nDone gathering")
+				// fmt.Println("\nDone gathering")
 				doneGathering = true
 			}
 		}

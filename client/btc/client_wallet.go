@@ -47,7 +47,7 @@ func (ec *BtcElectrumClient) SyncWallet(ctx context.Context) error {
 			return err
 		}
 		if status == "" {
-			fmt.Println("no history for this script address .. yet")
+			// fmt.Println("no history for this script address .. yet")
 			continue
 		}
 		// get address history to date for this address from ElectrumX
@@ -55,7 +55,7 @@ func (ec *BtcElectrumClient) SyncWallet(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		ec.dumpHistory(subscription, history)
+		// ec.dumpHistory(subscription, history)
 
 		// update wallet txstore if needed
 		ec.addTxHistoryToWallet(ctx, history)
@@ -335,7 +335,7 @@ func (ec *BtcElectrumClient) UnusedAddress(ctx context.Context) (string, error) 
 		ElectrumScripthash: pkScriptToElectrumScripthash(payToAddrScript),
 		Address:            address.String(),
 	}
-	ec.dumpSubscription("adding/updating get unused address subscription", newSub)
+	// ec.dumpSubscription("adding/updating get unused address subscription", newSub)
 	// insert or update
 	err = w.AddSubscription(newSub)
 	if err != nil {
@@ -379,7 +379,7 @@ func (ec *BtcElectrumClient) ChangeAddress(ctx context.Context) (string, error) 
 		ElectrumScripthash: pkScriptToElectrumScripthash(payToAddrScript),
 		Address:            address.String(),
 	}
-	ec.dumpSubscription("adding/updating get change address subscription", newSub)
+	// ecdumpSubscription.("adding/updating get change address subscription", newSub)
 	// insert or update
 	err = w.AddSubscription(newSub)
 	if err != nil {

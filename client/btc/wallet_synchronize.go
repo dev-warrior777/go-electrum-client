@@ -198,7 +198,7 @@ func (ec *BtcElectrumClient) addressStatusNotify(ctx context.Context) error {
 				if err != nil {
 					continue
 				}
-				ec.dumpHistory(sub, history)
+				// ec.dumpHistory(sub, history)
 
 				// add/update wallet db tx store
 				ec.addTxHistoryToWallet(ctx, history)
@@ -237,7 +237,7 @@ func (ec *BtcElectrumClient) SubscribeAddressNotify(ctx context.Context, newSub 
 		ec.addSubscription(newSub)
 	}
 
-	fmt.Println("Subscribed scripthash", res.Scripthash, " status:", res.Status)
+	// fmt.Println("Subscribed scripthash", res.Scripthash, " status:", res.Status)
 
 	return res.Status, nil
 }
@@ -312,10 +312,8 @@ func (ec *BtcElectrumClient) GetRawTransactionFromNode(ctx context.Context, txid
 // addTxHistoryToWallet adds new transaction details for an ElectrumX history list
 func (ec *BtcElectrumClient) addTxHistoryToWallet(ctx context.Context, history electrumx.HistoryResult) {
 	for _, h := range history {
-		fmt.Println(h.TxHash)
 		// does wallet already has a confirmed transaction?
 		walletHasTx, txn := ec.GetWallet().HasTransaction(h.TxHash)
-		// fmt.Printf("walletHasTx %v\n", walletHasTx)
 		if walletHasTx && txn.Height > 0 {
 			// fmt.Println("** already got confirmed tx", h.TxHash)
 			continue
@@ -361,19 +359,19 @@ func (ec *BtcElectrumClient) updateWalletTip() {
 // //////////////////////////
 // dbg dump
 // /////////
-func (ec *BtcElectrumClient) dumpSubscription(title string, sub *wallet.Subscription) {
-	fmt.Printf("%s\n PkScript: %s\n ElectrumScriptHash: %s\n Address: %s\n\n",
-		title,
-		sub.PkScript,
-		sub.ElectrumScripthash,
-		sub.Address)
-}
+// func (ec *BtcElectrumClient) dumpSubscription(title string, sub *wallet.Subscription) {
+// 	fmt.Printf("%s\n PkScript: %s\n ElectrumScriptHash: %s\n Address: %s\n\n",
+// 		title,
+// 		sub.PkScript,
+// 		sub.ElectrumScripthash,
+// 		sub.Address)
+// }
 
-func (ec *BtcElectrumClient) dumpHistory(sub *wallet.Subscription, history electrumx.HistoryResult) {
-	ec.dumpSubscription("Address History for subscription:", sub)
-	for _, h := range history {
-		fmt.Println(" Height:", h.Height)
-		fmt.Println(" TxHash: ", h.TxHash)
-		fmt.Println(" Fee: ", h.Fee)
-	}
-}
+// func (ec *BtcElectrumClient) dumpHistory(sub *wallet.Subscription, history electrumx.HistoryResult) {
+// 	ec.dumpSubscription("Address History for subscription:", sub)
+// 	for _, h := range history {
+// 		fmt.Println(" Height:", h.Height)
+// 		fmt.Println(" TxHash: ", h.TxHash)
+// 		fmt.Println(" Fee: ", h.Fee)
+// 	}
+// }

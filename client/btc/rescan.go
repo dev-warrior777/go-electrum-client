@@ -75,7 +75,7 @@ func (ec *BtcElectrumClient) RescanWallet(ctx context.Context) error {
 			err = w.AddSubscription(subscription)
 			if err != nil {
 				fmt.Printf("cannot add subscritpion for address: %s\n", address.String())
-				ec.dumpSubscription("failed to add", subscription)
+				// ec.dumpSubscription("failed to add", subscription)
 				continue
 			}
 			fmt.Printf("Added subscritpion for address: %s to wallet subscriptions\n", address.String())
