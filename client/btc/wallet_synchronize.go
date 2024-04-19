@@ -315,9 +315,9 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(ctx context.Context, history e
 		fmt.Println(h.TxHash)
 		// does wallet already has a confirmed transaction?
 		walletHasTx, txn := ec.GetWallet().HasTransaction(h.TxHash)
-		fmt.Printf("walletHasTx %v\n", walletHasTx)
+		// fmt.Printf("walletHasTx %v\n", walletHasTx)
 		if walletHasTx && txn.Height > 0 {
-			fmt.Println("** already got confirmed tx", h.TxHash)
+			// fmt.Println("** already got confirmed tx", h.TxHash)
 			continue
 		}
 		// add or update the wallet transaction
@@ -326,8 +326,8 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(ctx context.Context, history e
 			fmt.Println(err)
 			continue
 		}
-		fmt.Println(msgTx.TxHash().String(), txtime)
-		fmt.Println("adding transaction", h.TxHash, h.Height, h.Fee)
+		// fmt.Println(msgTx.TxHash().String(), txtime)
+		fmt.Println("adding/updating transaction", h.TxHash, h.Height, h.Fee)
 		err = ec.GetWallet().AddTransaction(msgTx, h.Height, txtime)
 		if err != nil {
 			fmt.Println(err)

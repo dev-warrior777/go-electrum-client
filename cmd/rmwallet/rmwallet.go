@@ -86,21 +86,32 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	var walletFile string
-	if cfg.DbType == "bbolt" {
-		walletFile = "wallet.bdb"
-	} else {
-		walletFile = "wallet.db"
+	type walletDb struct {
+		db   string
+		name string
 	}
-	wallet := path.Join(cfg.DataDir, walletFile)
-	fmt.Println(wallet)
-	if _, err := os.Stat(wallet); errors.Is(err, os.ErrNotExist) {
-		fmt.Println(err)
-		os.Exit(1)
+	walletFiles := []walletDb{
+		{
+			db:   "bbolt",
+			name: "wallet.bdb",
+		},
+		{
+			db:   "sqlite",
+			name: "wallet.db",
+		},
 	}
-	if askForConfirmation("remove?") {
-		os.Remove(wallet)
+	for _, w := range walletFiles {
+		wallet := path.Join(cfg.DataDir, w.name)
+		fmt.Println(wallet)
+		if _, err := os.Stat(wallet); errors.Is(err, os.ErrNotExist) {
+			fmt.Println(err)
+			continue
+		}
+		if askForConfirmation("remove?") {
+			os.Remove(wallet)
+		}
 	}
+
 	if cfg.Params == &chaincfg.RegressionNetParams {
 		headers := path.Join(cfg.DataDir, blockchain_headers)
 		fmt.Println(headers)

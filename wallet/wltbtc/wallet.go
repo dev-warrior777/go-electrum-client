@@ -202,15 +202,15 @@ func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrum
 		return nil, err
 	}
 
-	// TODO: Debug: remove
-	if config.Params != &chaincfg.MainNetParams {
-		fmt.Println("Stored Creation Date: ", w.creationDate)
-		fmt.Println(hex.EncodeToString(sm.store.Seed))
-		fmt.Println("Loaded Addresses:")
-		for _, adr := range w.txstore.adrs {
-			fmt.Printf("%v  %s\n", adr, hex.EncodeToString(adr.ScriptAddress()))
-		}
-	}
+	// // TODO: Debug: remove
+	// if config.Params != &chaincfg.MainNetParams {
+	// fmt.Println("Stored Creation Date: ", w.creationDate)
+	// fmt.Println(hex.EncodeToString(sm.store.Seed))
+	// fmt.Println("Loaded Addresses:")
+	// for _, adr := range w.txstore.adrs {
+	// 	fmt.Printf("%v  %s\n", adr, hex.EncodeToString(adr.ScriptAddress()))
+	// }
+	// }
 
 	return w, nil
 }
