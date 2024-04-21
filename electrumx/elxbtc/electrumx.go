@@ -105,7 +105,7 @@ func (s *SingleNode) start(clientCtx context.Context) error {
 	s.server.scripthashNotifyChan = sc.GetScripthashNotify()
 	s.server.connected = true
 
-	fmt.Printf("\n ** Connected to %s using %s **\n", network, sc.Proto())
+	fmt.Printf("** Connected to %s using %s **\n", network, sc.Proto())
 
 	feats, err := sc.Features(clientCtx)
 	if err != nil {

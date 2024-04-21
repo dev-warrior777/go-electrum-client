@@ -318,11 +318,9 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(ctx context.Context, history e
 		// add or update the wallet transaction
 		msgTx, txtime, err := ec.GetRawTransactionFromNode(ctx, h.TxHash)
 		if err != nil {
-			fmt.Println(err)
 			continue
 		}
-		// fmt.Println(msgTx.TxHash().String(), txtime)
-		fmt.Println("adding/updating transaction", h.TxHash, h.Height, h.Fee)
+		fmt.Printf("adding/updating transaction txid: %s, height: %d, fee %d\n", h.TxHash, h.Height, h.Fee)
 		err = ec.GetWallet().AddTransaction(msgTx, h.Height, txtime)
 		if err != nil {
 			fmt.Println(err)

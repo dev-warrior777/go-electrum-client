@@ -192,9 +192,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	feeRateSatsPerKB, _ := ec.FeeRate(clientCtx, 1)
-	fmt.Println("Sats/KB:", feeRateSatsPerKB)
-
 	// for testing only
 	err = btc.RPCServe(ec)
 	if err != nil {

@@ -18,7 +18,7 @@ import (
 
 type TxStore struct {
 	adrs       []btcutil.Address
-	txids      map[string]int64
+	txids      map[string]int64 // txid => height
 	txidsMutex *sync.RWMutex
 	addrMutex  *sync.Mutex
 	cbMutex    *sync.Mutex
@@ -46,7 +46,7 @@ func NewTxStore(params *chaincfg.Params, db wallet.Datastore, keyManager *KeyMan
 
 // PopulateAdrs makes a list of addresses from the key-index pairs we have in the
 // database. The key-pairs we have stored are returned in index order. PopulateAdrs
-// also makes a current list of transactions in the database. It never mutates the DB
+// also makes an up to date list of txs in the database. It never mutates the db.
 func (ts *TxStore) PopulateAdrs() {
 	keys := ts.keyManager.GetKeys()
 	ts.addrMutex.Lock()
@@ -75,19 +75,18 @@ func (ts *TxStore) PopulateAdrs() {
 	ts.txidsMutex.Unlock()
 }
 
-// AddTransaction puts a tx into the database atomically.
+// AddTransaction puts a tx into the database.
 func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.Time) (uint32, error) {
 	var hits uint32
 	var err error
-	// Tx has been OK'd by ElectrumX; check tx sanity
-	utilTx := btcutil.NewTx(tx) // convert for validation
-	// Checks basic stuff like there are inputs and ouputs
+	// transaction has been Okay'd by ElectrumX; check tx sanity.
+	utilTx := btcutil.NewTx(tx)
 	err = blockchain.CheckTransactionSanity(utilTx)
 	if err != nil {
 		return hits, err
 	}
 
-	// Check to see if we've already processed this tx upto confirmed state.
+	// check if we've already processed this tx up to confirmed state.
 	ts.txidsMutex.RLock()
 	sh, ok := ts.txids[tx.TxHash().String()]
 	ts.txidsMutex.RUnlock()
@@ -95,7 +94,7 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 		return 1, nil
 	}
 
-	// Check to see if this is a double spend
+	// check to see if this is a double spend
 	doubleSpends, err := ts.CheckDoubleSpends(tx)
 	if err != nil {
 		return hits, err
@@ -105,14 +104,14 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 		if height == 0 {
 			return 0, nil
 		} else {
-			// Mark any unconfirmed doubles as dead
+			// mark any unconfirmed doubles as dead
 			for _, double := range doubleSpends {
 				ts.markAsDead(*double)
 			}
 		}
 	}
 
-	// Generate PKH scripts for all addresses in our list
+	// generate pubkey hash scripts for all addresses in our list
 	ts.addrMutex.Lock()
 	pkScripts := make([][]byte, len(ts.adrs))
 	for i := range ts.adrs {
@@ -124,19 +123,18 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 	}
 	ts.addrMutex.Unlock()
 
-	// Iterate through all outputs of this tx, see if we gain
-	cachedSha := tx.TxHash()
+	// look through all outputs of this tx to see if we increase balance
+	thisTxHash := tx.TxHash()
 	value := int64(0)
 	matchesWatchOnly := false
 	for i, txout := range tx.TxOut {
-		// Ignore the error here because the sender could have used an exotic script
-		// for his change and we don't want to fail in that case.
 		for _, script := range pkScripts {
-			if bytes.Equal(txout.PkScript, script) { // new utxo found
+			if bytes.Equal(txout.PkScript, script) {
+				// new tx output paying to us
 				scriptAddress, _ := ts.extractScriptAddress(txout.PkScript)
 				ts.keyManager.MarkKeyAsUsed(scriptAddress)
 				newop := wire.OutPoint{
-					Hash:  cachedSha,
+					Hash:  thisTxHash,
 					Index: uint32(i),
 				}
 				newu := wallet.Utxo{
@@ -153,18 +151,22 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 			}
 		}
 	}
+
+	// get updated list with any new utxos added
 	utxos, err := ts.Utxos().GetAll()
 	if err != nil {
 		return 0, err
 	}
 
+	// look through all inputs of this tx to see if we decrease balance
 	for _, txin := range tx.TxIn {
 		for i, u := range utxos {
 			if outPointsEqual(txin.PreviousOutPoint, u.Op) {
+				// tx input spends our utxo
 				st := wallet.Stxo{
 					Utxo:        u,
 					SpendHeight: height,
-					SpendTxid:   cachedSha,
+					SpendTxid:   thisTxHash,
 				}
 				ts.Stxos().Put(st)
 				ts.Utxos().Delete(u)
@@ -180,14 +182,14 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 		}
 	}
 
-	// Update height of any stxos
+	// update height of any stxos
 	if height > 0 {
 		stxos, err := ts.Stxos().GetAll()
 		if err != nil {
 			return 0, err
 		}
 		for _, stxo := range stxos {
-			if stxo.SpendTxid == cachedSha {
+			if stxo.SpendTxid == thisTxHash {
 				stxo.SpendHeight = height
 				ts.Stxos().Put(stxo)
 				if !stxo.Utxo.WatchOnly {
@@ -200,20 +202,21 @@ func (ts *TxStore) AddTransaction(tx *wire.MsgTx, height int64, timestamp time.T
 		}
 	}
 
-	// If hits is nonzero it's a relevant tx and we should store it
+	// if hits is nonzero it's a relevant tx and we should store it
 	if hits > 0 || matchesWatchOnly {
 		ts.cbMutex.Lock()
 		ts.txidsMutex.Lock()
 		txn, err := ts.Txns().Get(tx.TxHash().String())
 		if err != nil {
+			// new txn{}
 			txn.Timestamp = timestamp
 			var buf bytes.Buffer
 			tx.BtcEncode(&buf, wire.ProtocolVersion, wire.WitnessEncoding)
 			ts.Txns().Put(buf.Bytes(), tx.TxHash().String(), value, height, txn.Timestamp, hits == 0)
 			ts.txids[tx.TxHash().String()] = height
 		}
-		// Let's check the height before committing so we don't allow rogue electrumX servers to send us a lose
-		// tx that resets our height to zero.
+		// check the height before committing so we don't allow rogue electrumX servers
+		// to send us a loose tx that resets our height to zero.
 		if err == nil && txn.Height <= 0 {
 			ts.Txns().UpdateHeight(tx.TxHash().String(), int(height), txn.Timestamp)
 			ts.txids[tx.TxHash().String()] = height
@@ -243,7 +246,7 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 		return nil
 	}
 	for _, s := range stxos {
-		// If an stxo is marked dead, move it back into the utxo table
+		// if an stxo is marked dead, move it back into the utxo table/bucket
 		if txid == s.SpendTxid {
 			if err := markStxoAsDead(s); err != nil {
 				return err
@@ -252,7 +255,7 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 				return err
 			}
 		}
-		// If a dependency of the spend is dead then mark the spend as dead
+		// if a dependency of the spend is dead then mark the spend as dead
 		if txid.IsEqual(&s.Utxo.Op.Hash) {
 			if err := markStxoAsDead(s); err != nil {
 				return err
@@ -266,7 +269,7 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 	if err != nil {
 		return err
 	}
-	// Dead utxos should just be deleted
+	// dead utxos should just be deleted
 	for _, u := range utxos {
 		if txid.IsEqual(&u.Op.Hash) {
 			err := ts.Utxos().Delete(u)
@@ -279,9 +282,9 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 	return nil
 }
 
-// CheckDoubleSpends takes a transaction and compares it with
-// all transactions in the db.  It returns a slice of all txids in the db
-// which are double spent by the received tx.
+// CheckDoubleSpends takes a transaction and compares it with all transactions
+// in the db. It returns a slice of all txids in the db which are double spent
+// by the received tx.
 func (ts *TxStore) CheckDoubleSpends(argTx *wire.MsgTx) ([]*chainhash.Hash, error) {
 	var dubs []*chainhash.Hash // slice of all double-spent txids
 	argTxid := argTx.TxHash()

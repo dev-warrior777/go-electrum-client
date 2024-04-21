@@ -40,7 +40,7 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 		return err
 	}
 	lb := int64(len(b))
-	fmt.Println("read header bytes", lb)
+	fmt.Println("read:", lb, " bytes from header file")
 	numHeaders, err := h.BytesToNumHdrs(lb)
 	if err != nil {
 		return err
@@ -66,7 +66,7 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 	}
 	count := hdrsRes.Count
 
-	fmt.Print("Count: ", count, " read from server at Height: ", startHeight, ", max: ", hdrsRes.Max)
+	fmt.Printf("read: %d from server at height %d max chunk size %d\n", count, startHeight, hdrsRes.Max)
 
 	if count > 0 {
 		b, err := hex.DecodeString(hdrsRes.HexConcat)
@@ -83,7 +83,6 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 	}
 
 	if count < blockCount {
-		fmt.Println("\nDone gathering")
 		doneGathering = true
 	}
 
@@ -103,8 +102,6 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 				return err
 			}
 			count = hdrsRes.Count
-
-			fmt.Print("Count: ", count, " read from server at Height: ", startHeight, ", max:", hdrsRes.Max)
 
 			if count > 0 {
 				b, err := hex.DecodeString(hdrsRes.HexConcat)
@@ -185,8 +182,7 @@ func (ec *BtcElectrumClient) headersNotify(ctx context.Context) error {
 	}
 
 	fmt.Println("Subscribe Headers")
-	fmt.Println("hdrRes.Height", hdrRes.Height, "maybeTip", maybeTip, "diff", hdrRes.Height-maybeTip)
-	fmt.Println("hdrRes.Hex", hdrRes.Hex)
+	fmt.Println(" - height", hdrRes.Height, "maybeTip", maybeTip, "diff", hdrRes.Height-maybeTip)
 
 	// in case of network restart we want to cancel this thread and restart a new one
 
@@ -214,7 +210,7 @@ func (ec *BtcElectrumClient) headersNotify(ctx context.Context) error {
 
 				// read whatever is in the queue, usually one header at tip
 				for x := range hdrResNotifyCh {
-					fmt.Println("\nNew Block: ", x.Height, x.Hex)
+					fmt.Printf("new block: height %d %s\n", x.Height, x.Hex)
 					if x.Height > maybeTip {
 						n := x.Height - maybeTip
 						if n == 1 {

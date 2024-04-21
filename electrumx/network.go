@@ -280,7 +280,7 @@ func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*Server
 		return nil, err // e.g. code 1: "unsupported protocol version: 1.4"
 	}
 
-	sc.debug("Connected to server %s using negotiated protocol version %s",
+	sc.debug("network: connected to server %s using negotiated protocol version %s",
 		addr, sc.proto)
 
 	go sc.listen(ctx) // must be running to receive response & notifications
