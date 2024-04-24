@@ -34,15 +34,6 @@ func (w *BtcElectrumWallet) SweepCoins(
 	var prevOutScripts map[int][]byte
 	var prevOutValues map[int]int64
 
-	scriptForInput := func(address btcutil.Address) []byte {
-		script, err := txscript.PayToAddrScript(address)
-		if err != nil {
-			fmt.Printf("cannot generate a payment script for %s\n",
-				address.String())
-		}
-		return script
-	}
-
 	// segwit output which makes this always a segwit transaction
 	walletAddressSegwit, err := w.GetUnusedAddress(wallet.RECEIVING)
 	if err != nil {
@@ -64,9 +55,14 @@ func (w *BtcElectrumWallet) SweepCoins(
 
 	for i, coin := range coins {
 		fmt.Println(coin.String())
+		scriptForInput, err := txscript.PayToAddrScript(coin.LinkedAddress)
+		if err != nil {
+			// we could change policy to just ignore .. see how
+			return nil, err
+		}
 		totalValue += coin.Value
 		prevOutValues[i] = coin.Value
-		prevOutScripts[i] = scriptForInput(coin.LinkedAddress)
+		prevOutScripts[i] = scriptForInput
 		privKeyToSignOutputs[i] = coin.KeyPair.PrivKey
 		// make a basic input from coin
 		input := wire.NewTxIn(coin.Outpoint, []byte{}, [][]byte{})
