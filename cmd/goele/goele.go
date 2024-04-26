@@ -68,13 +68,13 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 	case "testnet":
 		cfg.Params = &chaincfg.TestNet3Params
 		cfg.TrustedPeer = electrumx.ServerAddr{
-			// Net: "ssl", Addr: "testnet.aranguren.org:51002", // down?
+			Net: "ssl", Addr: "testnet.aranguren.org:51002", // down?
 			// Net: "ssl", Addr: "testnet.hsmiths.com:53012", // down?
 			// Net: "ssl", Addr: "electrum.blockstream.info:60002", // no verbose gtx
 			// Net: "ssl", Addr: "blackie.c3-soft.com:57006", // down?
 			// Net: "tcp", Addr: "blackie.c3-soft.com:57005", // down
 			// Net: "ssl", Addr: "testnet.qtornado.com:51002",
-			Net: "tcp", Addr: "testnet.qtornado.com:51001",
+			// Net: "tcp", Addr: "testnet.qtornado.com:51001",
 		}
 		cfg.StoreEncSeed = true
 		cfg.Testing = true

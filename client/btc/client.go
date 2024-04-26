@@ -25,8 +25,6 @@ type BtcElectrumClient struct {
 	clientHeaders *Headers
 	// cancel stale addressStatusNotify thread after network restart
 	cancelAddressStatusNotify context.CancelFunc
-	// cancel stale headersNotify thread after network restart
-	cancelHeadersNotify context.CancelFunc
 }
 
 func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
@@ -35,7 +33,6 @@ func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 		Wallet:                    nil,
 		Node:                      nil,
 		cancelAddressStatusNotify: nil,
-		cancelHeadersNotify:       nil,
 	}
 	ec.clientHeaders = NewHeaders(cfg)
 	return &ec
@@ -147,13 +144,6 @@ func (ec *BtcElectrumClient) listenNetworkRestarted(ctx context.Context) error {
 					continue
 				}
 				fmt.Printf("network restart at %v\n", nr.Time)
-				if ec.cancelHeadersNotify != nil {
-					ec.cancelHeadersNotify()
-					ec.cancelHeadersNotify = nil
-				} else {
-					fmt.Println("network restart cancelHeadersNotify == <nil>")
-				}
-				ec.syncHeaders(ctx)
 				w := ec.GetWallet()
 				if w != nil {
 					if ec.cancelAddressStatusNotify != nil {

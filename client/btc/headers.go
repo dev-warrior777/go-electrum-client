@@ -159,6 +159,18 @@ func (h *Headers) ReadAllBytesFromFile() ([]byte, error) {
 	return b, nil
 }
 
+// store some headers on top of current h.tip. Updates h.tip
+func (h *Headers) storeHeadersInMap(incoming []*wire.BlockHeader) {
+	h.hdrsMtx.Lock()
+	defer h.hdrsMtx.Unlock()
+	for _, blkHdr := range incoming {
+		h.tip++
+		h.hdrs[h.tip] = blkHdr
+		blkHash := blkHdr.BlockHash()
+		h.blkHdrs[blkHash] = h.tip
+	}
+}
+
 // store 'numHdrs' headers starting at height 'height' in 'hdrs' map
 // 'b' should have exactly 'numHdrs' x 'HEADER_SIZE' bytes.
 func (h *Headers) Store(b []byte, startHeight int64) error {

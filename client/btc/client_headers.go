@@ -1,6 +1,7 @@
 package btc
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
 // syncHeaders uodates the client headers and then subscribes for new update
@@ -153,16 +155,9 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 	return nil
 }
 
-// headersNotify subscribes to new block tip notifications from the
-// electrumx server and handles them as they arrive. The client local 'blockhain
-// _headers' file is appended and the headers map updated and verified.
-//
-// Note:
-// should a new block arrive quickly, perhaps while the server is still processing
-// prior blocks, the server may only notify of the most recent chain tip. The
-// protocol does not guarantee notification of all intermediate block headers.
-//
-// headersNotify is part of the ElectrumClient interface implementation
+// headersNotify polls for new blocks from the electrumx server and handles
+// them when they arrive. The client local 'blockhain_headers' file is appended
+// and the headers map updated and verified.
 func (ec *BtcElectrumClient) headersNotify(ctx context.Context) error {
 	h := ec.clientHeaders
 
@@ -170,26 +165,71 @@ func (ec *BtcElectrumClient) headersNotify(ctx context.Context) error {
 	maybeTip := h.tip
 
 	node := ec.GetNode()
-
-	hdrResNotifyCh, err := node.GetHeadersNotify()
-	if err != nil {
-		return err
+	if node == nil {
+		return ErrNoNode
 	}
 
-	hdrRes, err := node.SubscribeHeaders(ctx)
-	if err != nil {
-		return err
+	node.SubscribeHeaders(ctx)
+
+	fmt.Println("Poll Headers")
+
+	updateHeaders := func(gbr *electrumx.GetBlockHeadersResult) error {
+		rawBytes, err := hex.DecodeString(gbr.HexConcat)
+		if err != nil {
+			return err
+		}
+		// validate incoming bytes
+		rawBytesLen := int64(len(rawBytes))
+		n, err := h.BytesToNumHdrs(rawBytesLen)
+		if err != nil {
+			return err
+		}
+		count := int64(gbr.Count)
+		if n != count {
+			return fmt.Errorf("bad GetBlockHeadersResult")
+		}
+		// convert to BlockHeader
+		incoming := make([]*wire.BlockHeader, 0)
+		var i int64
+		for i = 0; i < count; i++ {
+			b := rawBytes[i*HEADER_SIZE : (i+1)*HEADER_SIZE]
+			r := bytes.NewBuffer(b)
+			blkHdr := &wire.BlockHeader{}
+			err = blkHdr.Deserialize(r)
+			if err != nil {
+				return err
+			}
+			incoming = append(incoming, blkHdr)
+		}
+		// verify backwards except the first incoming header
+		for i := count - 1; i > 0; i-- {
+			prev := incoming[i].PrevBlock
+			hash := incoming[i-1].BlockHash()
+			if prev != hash {
+				return err
+			}
+		}
+		// check no missing by verifying first incoming prev against last stored
+		// block hash.
+		lastHdr := h.hdrs[h.tip]
+		lastHdrHash := lastHdr.BlockHash()
+		if incoming[0].PrevBlock != lastHdrHash {
+			return err
+		}
+		// update backing file & headers map
+		appended, err := h.AppendHeaders(rawBytes)
+		if err != nil {
+			panic(err) // maybe truncate file ;-)
+		}
+		if appended != count {
+			panic("appended less headers than read")
+		}
+		// store headers and update h.tip
+		h.storeHeadersInMap(incoming)
+		tip, _ := ec.Tip()
+		fmt.Printf("stored %d headers, on top of %d new tip %d max %d\n", count, maybeTip, tip, gbr.Max)
+		return nil
 	}
-
-	fmt.Println("Subscribe Headers")
-	fmt.Println(" - height", hdrRes.Height, "maybeTip", maybeTip, "diff", hdrRes.Height-maybeTip)
-
-	// in case of network restart we want to cancel this thread and restart a new one
-
-	// make new cancellable context for network restarts
-	notifyCtx, cancelHeaders := context.WithCancel(ctx)
-	// store in ec
-	ec.cancelHeadersNotify = cancelHeaders
 
 	go func() {
 
@@ -198,110 +238,124 @@ func (ec *BtcElectrumClient) headersNotify(ctx context.Context) error {
 		for {
 			select {
 
-			case <-notifyCtx.Done():
-				fmt.Println("notifyCtx.Done - in headers notify - exiting thread")
+			case <-ctx.Done():
+				fmt.Println("ctx.Done - in headers notify - exiting thread")
 				return
 
-			case _, ok := <-hdrResNotifyCh:
-				if !ok {
-					fmt.Println("headers notify channel closed - exiting thread")
-					return
+			case <-time.After(time.Second * 10):
+				gbr, err := node.BlockHeaders(ctx, maybeTip+1, 2016)
+				if err != nil {
+					fmt.Printf(" %v\n", err)
+					continue
 				}
-
-				// read whatever is in the queue, usually one header at tip
-				for x := range hdrResNotifyCh {
-					fmt.Printf("new block: height %d %s\n", x.Height, x.Hex)
-					if x.Height > maybeTip {
-						n := x.Height - maybeTip
-						if n == 1 {
-							// simple case: just store it
-							fmt.Println("Storing header for height: ", x.Height)
-							b, err := hex.DecodeString(x.Hex)
-							if err != nil {
-								panic(err)
-							}
-							hdrsAppended, err := h.AppendHeaders(b)
-							if err != nil {
-								panic(err)
-							}
-							if hdrsAppended != 1 {
-								panic("appended less headers than read")
-							}
-							err = h.Store(b, x.Height)
-							if err != nil {
-								panic("could not store header in map")
-							}
-
-							// update tip / local tip / wallet tip /  notify listener
-							h.tip = x.Height
-							maybeTip = x.Height
-							ec.updateWalletTip()
-							ec.tipChanged()
-
-							// verify added header back from new tip
-							h.VerifyFromTip(2, false)
-
-						} else {
-							// Server can skip any amount of headers but we should
-							// trust that this SingleNode's tip is the tip ..maybe
-							fmt.Println("More than one header..")
-							numMissing := x.Height - maybeTip
-							from := maybeTip + 1
-							numToGet := int(numMissing)
-							fmt.Printf("Filling from height %d to height %d inclusive\n", from, x.Height)
-							// go get them with 'block.headers'
-							hdrsRes, err := node.BlockHeaders(ctx, from, numToGet)
-							if err != nil {
-								panic(err)
-							}
-							count := hdrsRes.Count
-
-							fmt.Println("Storing: ", count, " headers ", from, "..", from+int64(count)-1)
-
-							if count > 0 {
-								b, err := hex.DecodeString(hdrsRes.HexConcat)
-								if err != nil {
-									panic(err)
-								}
-								hdrsAppended, err := h.AppendHeaders(b)
-								if err != nil {
-									panic(err)
-								}
-								if hdrsAppended != int64(count) {
-									panic("only appended less headers than read")
-								}
-								err = h.Store(b, from)
-								if err != nil {
-									panic("could not store headers in map")
-								}
-
-								// update tip / local tip / wallet tip / notify listener
-								h.tip = x.Height
-								maybeTip = x.Height
-								ec.updateWalletTip()
-								ec.tipChanged()
-
-								// verify added headers back from new tip
-								h.VerifyFromTip(int64(count+1), false)
-							}
-						}
-					} else {
-						fmt.Printf("Already got a header for height %d - possible reorg (unhandled)\n", x.Height)
-					}
+				if gbr.Count <= 0 {
+					continue
 				}
+				err = updateHeaders(gbr)
+				if err != nil {
+					continue
+				}
+				maybeTip += int64(gbr.Count)
+				ec.updateWalletTip()
+				ec.tipChanged()
 			}
 		}
 		// serve until ^C
 	}()
 
 	return nil
+
+	// // read whatever is in the queue, usually one header at tip
+	// for x := range hdrResNotifyCh {
+	// 	fmt.Printf("new block: height %d %s\n", x.Height, x.Hex)
+	// 	if x.Height > maybeTip {
+	// 		n := x.Height - maybeTip
+	// 		if n == 1 {
+	// 			// simple case: just store it
+	// 			fmt.Println("Storing header for height: ", x.Height)
+	// 			b, err := hex.DecodeString(x.Hex)
+	// 			if err != nil {
+	// 				panic(err)
+	// 			}
+	// 			hdrsAppended, err := h.AppendHeaders(b)
+	// 			if err != nil {
+	// 				panic(err)
+	// 			}
+	// 			if hdrsAppended != 1 {
+	// 				panic("appended less headers than read")
+	// 			}
+	// 			err = h.Store(b, x.Height)
+	// 			if err != nil {
+	// 				panic("could not store header in map")
+	// 			}
+
+	// 			// update tip / local tip / wallet tip /  notify listener
+	// 			h.tip = x.Height
+	// 			maybeTip = x.Height
+	// 			ec.updateWalletTip()
+	// 			ec.tipChanged()
+
+	// 			// verify added header back from new tip
+	// 			h.VerifyFromTip(2, false)
+
+	// 		} else {
+	// 			// Server can skip any amount of headers but we should
+	// 			// trust that this SingleNode's tip is the tip ..maybe
+	// 			fmt.Println("More than one header..")
+	// 			numMissing := x.Height - maybeTip
+	// 			from := maybeTip + 1
+	// 			numToGet := int(numMissing)
+	// 			fmt.Printf("Filling from height %d to height %d inclusive\n", from, x.Height)
+	// 			// go get them with 'block.headers'
+	// 			hdrsRes, err := node.BlockHeaders(ctx, from, numToGet)
+	// 			if err != nil {
+	// 				panic(err)
+	// 			}
+	// 			count := hdrsRes.Count
+
+	// 			fmt.Println("Storing: ", count, " headers ", from, "..", from+int64(count)-1)
+
+	// 			if count > 0 {
+	// 				b, err := hex.DecodeString(hdrsRes.HexConcat)
+	// 				if err != nil {
+	// 					panic(err)
+	// 				}
+	// 				hdrsAppended, err := h.AppendHeaders(b)
+	// 				if err != nil {
+	// 					panic(err)
+	// 				}
+	// 				if hdrsAppended != int64(count) {
+	// 					panic("only appended less headers than read")
+	// 				}
+	// 				err = h.Store(b, from)
+	// 				if err != nil {
+	// 					panic("could not store headers in map")
+	// 				}
+
+	// 				// update tip / local tip / wallet tip / notify listener
+	// 				h.tip = x.Height
+	// 				maybeTip = x.Height
+	// 				ec.updateWalletTip()
+	// 				ec.tipChanged()
+
+	// 				// verify added headers back from new tip
+	// 				h.VerifyFromTip(int64(count+1), false)
+	// 			}
+	// 		}
+	// 	} else {
+	// 		fmt.Printf("Already got a header for height %d - possible reorg (unhandled)\n", x.Height)
+	// 	}
+	// }
 }
 
+///////////////////////////
 // ElectrumClient interface
 
 // Tip returns the (local) block headers tip height and client headers sync status.
 func (ec *BtcElectrumClient) Tip() (int64, bool) {
 	h := ec.clientHeaders
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
 	return h.tip, h.synced
 }
 
@@ -309,8 +363,8 @@ func (ec *BtcElectrumClient) Tip() (int64, bool) {
 // will return nil.
 func (ec *BtcElectrumClient) GetBlockHeader(height int64) *wire.BlockHeader {
 	h := ec.clientHeaders
-	h.hdrsMtx.Lock()
-	defer h.hdrsMtx.Unlock()
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
 	// return nil for now. If there is a need for blocks before the last checkpoint
 	// consider making a server call
 	return h.hdrs[height]
@@ -321,8 +375,8 @@ func (ec *BtcElectrumClient) GetBlockHeader(height int64) *wire.BlockHeader {
 // will return error.
 func (ec *BtcElectrumClient) GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error) {
 	h := ec.clientHeaders
-	h.hdrsMtx.Lock()
-	defer h.hdrsMtx.Unlock()
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
 	if h.startPoint > startHeight {
 		// error for now. If there is a need for blocks before the last checkpoint
 		// consider making a server call
@@ -344,12 +398,16 @@ func (ec *BtcElectrumClient) GetBlockHeaders(startHeight, count int64) ([]*wire.
 
 func (ec *BtcElectrumClient) GetHeaderForBlockHash(blkHash *chainhash.Hash) *wire.BlockHeader {
 	h := ec.clientHeaders
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
 	height := h.blkHdrs[*blkHash]
 	return ec.GetBlockHeader(height)
 }
 
 func (ec *BtcElectrumClient) RegisterTipChangeNotify() (<-chan int64, error) {
 	h := ec.clientHeaders
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
 	if !h.synced {
 		return nil, errors.New("client's header chain is not synced")
 	}
@@ -359,6 +417,8 @@ func (ec *BtcElectrumClient) RegisterTipChangeNotify() (<-chan int64, error) {
 
 func (ec *BtcElectrumClient) UnregisterTipChangeNotify() {
 	h := ec.clientHeaders
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
 	if h.tipChange != nil {
 		close(ec.clientHeaders.tipChange)
 		ec.clientHeaders.tipChange = nil
@@ -367,6 +427,8 @@ func (ec *BtcElectrumClient) UnregisterTipChangeNotify() {
 
 func (ec *BtcElectrumClient) tipChanged() {
 	h := ec.clientHeaders
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
 	if h.tipChange != nil {
 		h.tipChange <- h.tip
 	}

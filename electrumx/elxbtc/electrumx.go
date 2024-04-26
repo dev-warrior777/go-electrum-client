@@ -16,8 +16,8 @@ import (
 type server struct {
 	conn                 *electrumx.ServerConn
 	scripthashNotifyChan <-chan *electrumx.ScripthashStatusResult
-	headersNotifyChan    <-chan *electrumx.HeadersNotifyResult
-	connected            bool
+	// headersNotifyChan    <-chan *electrumx.HeadersNotifyResult
+	connected bool
 }
 
 type SingleNode struct {
@@ -70,7 +70,6 @@ func NewSingleNode(cfg *electrumx.NodeConfig) (*SingleNode, error) {
 		server: &server{
 			conn:                 nil,
 			scripthashNotifyChan: nil,
-			headersNotifyChan:    nil,
 			connected:            false,
 		},
 	}
@@ -101,7 +100,6 @@ func (s *SingleNode) start(clientCtx context.Context) error {
 	}
 
 	s.server.conn = sc
-	s.server.headersNotifyChan = sc.GetHeadersNotify()
 	s.server.scripthashNotifyChan = sc.GetScripthashNotify()
 	s.server.connected = true
 
@@ -154,10 +152,6 @@ func (s *SingleNode) run(clientCtx context.Context) {
 				s.server.connected = false
 				s.serverMtx.Unlock()
 				break newServer
-			case hdrs := <-s.server.headersNotifyChan:
-				if hdrs != nil && s.serverRunning() {
-					s.headersNotify <- hdrs
-				}
 			case status := <-s.server.scripthashNotifyChan:
 				if status != nil && s.serverRunning() {
 					s.scripthashNotify <- status
@@ -176,10 +170,9 @@ func (s *SingleNode) run(clientCtx context.Context) {
 			if err == nil {
 				s.serverMtx.Lock()
 				s.server.conn = sc
-				s.server.headersNotifyChan = sc.GetHeadersNotify()
 				s.server.scripthashNotifyChan = sc.GetScripthashNotify()
 				s.server.connected = true
-				// notify client to resubscribe to headers and scripthashes
+				// notify client to resubscribe to scripthashes
 				s.restarting <- &electrumx.NetworkRestart{
 					Time: time.Now(),
 				}
@@ -197,7 +190,6 @@ func (s *SingleNode) RegisterNetworkRestart() <-chan *electrumx.NetworkRestart {
 func (s *SingleNode) Stop() {
 	fmt.Println("stopping single node...")
 	close(s.restarting)
-	close(s.headersNotify)
 	close(s.scripthashNotify)
 	if !s.serverRunning() {
 		fmt.Println("..server not running")
