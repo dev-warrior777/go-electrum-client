@@ -192,6 +192,31 @@ func main() {
 		os.Exit(1)
 	}
 
+	// // bcrt1qmurgx56cv82p4u3jqzf9ndwnsyw5gudguh77wp
+	// // tb1qqf85rm98kcls6s83kyumefdqaajkyuj0nun7wu
+	// start := time.Now().Unix()
+	// for i := 0; i < 10000; i++ {
+	// 	fmt.Printf("%d\n", i)
+	// 	var addr string
+	// 	switch net {
+	// 	case "regtest":
+	// 		addr = "bcrt1qmurgx56cv82p4u3jqzf9ndwnsyw5gudguh77wp"
+	// 	case "testnet, testnet3":
+	// 		addr = "tb1qqf85rm98kcls6s83kyumefdqaajkyuj0nun7wu"
+	// 	case "mainnet":
+	// 		addr = ""
+	// 	}
+	// 	h, err := ec.GetAddressHistory(clientCtx, addr)
+	// 	if err != nil {
+	// 		fmt.Printf("\n")
+	// 	}
+	// 	for i, hist := range h {
+	// 		fmt.Printf("%d %v %d %s\n", i, hist.Height, hist.Fee, hist.TxHash)
+	// 	}
+	// }
+	// end := time.Now().Unix()
+	// fmt.Printf("elapsed %ds\n", end-start)
+
 	// for testing only
 	err = btc.RPCServe(ec)
 	if err != nil {

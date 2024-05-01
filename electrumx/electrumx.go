@@ -69,6 +69,7 @@ type ElectrumXNode interface {
 	SubscribeScripthashNotify(ctx context.Context, scripthash string) (*ScripthashStatusResult, error)
 	UnsubscribeScripthashNotify(ctx context.Context, scripthash string)
 
+	BlockHeader(ctx context.Context, height int64) (string, error)
 	BlockHeaders(ctx context.Context, startHeight int64, blockCount int) (*GetBlockHeadersResult, error)
 	GetHistory(ctx context.Context, scripthash string) (HistoryResult, error)
 	GetListUnspent(ctx context.Context, scripthash string) (ListUnspentResult, error)

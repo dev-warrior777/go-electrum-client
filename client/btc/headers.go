@@ -4,8 +4,8 @@ package btc
 // Backed by a file in the datadir of the chain (main, test, reg nets)
 // We store here as a map and not a tree so we must trust the server if
 // SingleNode. When grabbing new blocks some attempt is made to understand
-// forks but the true longest chain with the most work cannot be known
-// without connecting to many servers using MultiNode.
+// reorgs but the true longest chain with the most work cannot be known
+// without connecting to many servers using MultiNode which is a TODO:
 
 import (
 	"bytes"
@@ -34,13 +34,14 @@ type Headers struct {
 	// checkpoint height to start the file. For regtest that is genesis.
 	net *chaincfg.Params
 	// decoded headers stored by height
-	hdrsMtx    sync.RWMutex
-	hdrs       map[int64]*wire.BlockHeader
-	blkHdrs    map[chainhash.Hash]int64
-	startPoint int64
-	tip        int64
-	synced     bool
-	tipChange  chan int64
+	hdrsMtx      sync.RWMutex
+	hdrs         map[int64]*wire.BlockHeader
+	blkHdrs      map[chainhash.Hash]int64
+	startPoint   int64
+	tip          int64
+	synced       bool
+	tipChangeMtx sync.Mutex
+	tipChange    chan int64
 }
 
 func NewHeaders(cfg *client.ClientConfig) *Headers {
@@ -77,7 +78,7 @@ func getStartPointHeight(cfg *client.ClientConfig) int64 {
 
 // Get the 'blockchain_headers' file size. Error is returned unexamined as
 // we assume the file exists and ENOENT will not be valid.
-func (h *Headers) StatFileSize() (int64, error) {
+func (h *Headers) statFileSize() (int64, error) {
 	fi, err := os.Stat(h.hdrFilePath)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -86,40 +87,40 @@ func (h *Headers) StatFileSize() (int64, error) {
 	return fi.Size(), nil
 }
 
-// Read num headers from offset in 'blockchain_headers' file
-func (h *Headers) ReadHeaders(num, height int64) (int32, error) {
-	begin := int64(height * HEADER_SIZE)
-	f, err := os.OpenFile(h.hdrFilePath, os.O_CREATE|os.O_RDWR, 0664)
-	if err != nil {
-		return 0, err
-	}
-	f.Seek(begin, 0)
-	bytesToRead := num * HEADER_SIZE
-	b := make([]byte, bytesToRead)
-	bytesRead, err := f.Read(b)
-	if err != nil {
-		return 0, err
-	}
-	if bytesRead == 0 { // empty
-		return 0, nil
-	}
-	if bytesRead < int(bytesToRead) {
-		if bytesRead%HEADER_SIZE != 0 {
-			return 0, errors.New("corrupt file")
-		}
-		headersRead := int32(bytesRead / HEADER_SIZE)
-		err = h.Store(b, height)
-		return headersRead, err
-	}
-	return 0, nil
-}
+// // Read num headers from offset in 'blockchain_headers' file
+// func (h *Headers) readHeaders(num, height int64) (int32, error) {
+// 	begin := int64(height * HEADER_SIZE)
+// 	f, err := os.OpenFile(h.hdrFilePath, os.O_CREATE|os.O_RDWR, 0664)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+// 	f.Seek(begin, 0)
+// 	bytesToRead := num * HEADER_SIZE
+// 	b := make([]byte, bytesToRead)
+// 	bytesRead, err := f.Read(b)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+// 	if bytesRead == 0 { // empty
+// 		return 0, nil
+// 	}
+// 	if bytesRead < int(bytesToRead) {
+// 		if bytesRead%HEADER_SIZE != 0 {
+// 			return 0, errors.New("corrupt file")
+// 		}
+// 		headersRead := int32(bytesRead / HEADER_SIZE)
+// 		err = h.store(b, height)
+// 		return headersRead, err
+// 	}
+// 	return 0, nil
+// }
 
-// AppendHeaders appends headers from server 'blockchain.block.header(s)' calls
+// appendHeadersFile appends headers from server 'blockchain.block.header(s)' calls
 // to 'blockchain_headers' file. Also appends headers received from the
 // 'blockchain.headers.subscribe' events. Returns the number of headers written.
-func (h *Headers) AppendHeaders(rawHdrs []byte) (int64, error) {
+func (h *Headers) appendHeadersFile(rawHdrs []byte) (int64, error) {
 	numBytes := len(rawHdrs)
-	numHdrs, err := h.BytesToNumHdrs(int64(numBytes))
+	numHdrs, err := h.bytesToNumHdrs(int64(numBytes))
 	if err != nil {
 		return 0, err
 	}
@@ -128,22 +129,20 @@ func (h *Headers) AppendHeaders(rawHdrs []byte) (int64, error) {
 		return 0, err
 	}
 	defer hdrFile.Close()
-
 	_, err = hdrFile.Write(rawHdrs)
 	if err != nil {
 		return 0, err
 	}
-
 	return numHdrs, nil
 }
 
-func (h *Headers) ReadAllBytesFromFile() ([]byte, error) {
+func (h *Headers) readAllBytesFromFile() ([]byte, error) {
 	hdrFile, err := os.OpenFile(h.hdrFilePath, os.O_CREATE|os.O_RDWR, 0664)
 	if err != nil {
 		return nil, err
 	}
 	defer hdrFile.Close()
-	fsize, err := h.StatFileSize()
+	fsize, err := h.statFileSize()
 	if err != nil {
 		return nil, err
 	}
@@ -161,8 +160,9 @@ func (h *Headers) ReadAllBytesFromFile() ([]byte, error) {
 
 // store 'numHdrs' headers starting at height 'height' in 'hdrs' map
 // 'b' should have exactly 'numHdrs' x 'HEADER_SIZE' bytes.
-func (h *Headers) Store(b []byte, startHeight int64) error {
-	numHdrs, err := h.BytesToNumHdrs(int64(len(b)))
+// updates h.Tip for successful additions
+func (h *Headers) store(b []byte, startHeight int64) error {
+	numHdrs, err := h.bytesToNumHdrs(int64(len(b)))
 	if err != nil {
 		return err
 	}
@@ -184,9 +184,41 @@ func (h *Headers) Store(b []byte, startHeight int64) error {
 	return nil
 }
 
-// Verify headers prev hash back from tip. If all is true depth is ignored
+func (h *Headers) getTip() int64 {
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
+	return h.tip
+}
+
+func (h *Headers) getTipBlock() *wire.BlockHeader {
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
+	return h.hdrs[h.tip]
+}
+
+func (h *Headers) checkCanConnect(incomingHdr *wire.BlockHeader) bool {
+	ourTipHeader := h.getTipBlock()
+	ourHash := ourTipHeader.BlockHash()
+	return ourHash == incomingHdr.PrevBlock
+}
+
+// storeOneHdr stores one wire block header at h.tip+1 and updates h.Tip
+// the header is assumed to be valid and can connect
+func (h *Headers) storeOneHdr(blkHdr *wire.BlockHeader) {
+	h.hdrsMtx.Lock()
+	defer h.hdrsMtx.Unlock()
+	at := h.tip + 1
+	h.hdrs[at] = blkHdr
+	blkHash := blkHdr.BlockHash()
+	h.blkHdrs[blkHash] = at
+	h.tip = at
+}
+
+// Verify headers prev hash back from tip. If 'all' is true 'depth' is ignored
 // and the whole chain is verified
-func (h *Headers) VerifyFromTip(depth int64, all bool) error {
+func (h *Headers) verifyFromTip(depth int64, all bool) error {
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
 	downTo := h.tip - depth
 	if downTo < 0 || all {
 		downTo = h.startPoint
@@ -205,11 +237,11 @@ func (h *Headers) VerifyFromTip(depth int64, all bool) error {
 	return nil
 }
 
-func (h *Headers) VerifyAll() error {
-	return h.VerifyFromTip(0, true)
+func (h *Headers) verifyAll() error {
+	return h.verifyFromTip(0, true)
 }
 
-func (h *Headers) DumpAt(height int64) {
+func (h *Headers) dumpAt(height int64) {
 	h.hdrsMtx.Lock()
 	defer h.hdrsMtx.Unlock()
 	hdr := h.hdrs[height]
@@ -225,14 +257,14 @@ func (h *Headers) DumpAt(height int64) {
 	fmt.Println("============================")
 }
 
-func (h *Headers) DumpAll() {
+func (h *Headers) dumpAll() {
 	var k int64
 	for k = 0; k <= h.tip; k++ {
-		h.DumpAt(k)
+		h.dumpAt(k)
 	}
 }
 
-func (h *Headers) BytesToNumHdrs(numBytes int64) (int64, error) {
+func (h *Headers) bytesToNumHdrs(numBytes int64) (int64, error) {
 	if numBytes%HEADER_SIZE != 0 {
 		return 0, errors.New(
 			"invalid bytes length - not a multiple of header size")

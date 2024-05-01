@@ -255,6 +255,13 @@ func (s *SingleNode) UnsubscribeScripthashNotify(ctx context.Context, scripthash
 	s.server.conn.UnsubscribeScripthash(ctx, scripthash)
 }
 
+func (s *SingleNode) BlockHeader(ctx context.Context, height int64) (string, error) {
+	if !s.serverRunning() {
+		return "", ErrServerNotRunning
+	}
+	return s.server.conn.BlockHeader(ctx, uint32(height))
+}
+
 func (s *SingleNode) BlockHeaders(ctx context.Context, startHeight int64, blockCount int) (*electrumx.GetBlockHeadersResult, error) {
 	if !s.serverRunning() {
 		return nil, ErrServerNotRunning

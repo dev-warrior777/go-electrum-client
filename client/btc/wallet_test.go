@@ -68,6 +68,4 @@ func TestWalletCreation(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Println("Current Internal address", adrI)
-
-	ec.GetWallet().Close()
 }

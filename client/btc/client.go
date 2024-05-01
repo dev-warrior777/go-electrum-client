@@ -24,18 +24,18 @@ type BtcElectrumClient struct {
 	// client copy of blockchain headers
 	clientHeaders *Headers
 	// cancel stale addressStatusNotify thread after network restart
-	cancelAddressStatusNotify context.CancelFunc
-	// cancel stale headersNotify thread after network restart
-	cancelHeadersNotify context.CancelFunc
+	cancelAddressStatusThreads context.CancelFunc
+	// cancel stale headersNotify & headersQueue thread after network restart
+	cancelHeadersThreads context.CancelFunc
 }
 
 func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 	ec := BtcElectrumClient{
-		ClientConfig:              cfg,
-		Wallet:                    nil,
-		Node:                      nil,
-		cancelAddressStatusNotify: nil,
-		cancelHeadersNotify:       nil,
+		ClientConfig:               cfg,
+		Wallet:                     nil,
+		Node:                       nil,
+		cancelAddressStatusThreads: nil,
+		cancelHeadersThreads:       nil,
 	}
 	ec.clientHeaders = NewHeaders(cfg)
 	return &ec
@@ -147,18 +147,18 @@ func (ec *BtcElectrumClient) listenNetworkRestarted(ctx context.Context) error {
 					continue
 				}
 				fmt.Printf("network restart at %v\n", nr.Time)
-				if ec.cancelHeadersNotify != nil {
-					ec.cancelHeadersNotify()
-					ec.cancelHeadersNotify = nil
+				if ec.cancelHeadersThreads != nil {
+					ec.cancelHeadersThreads()
+					ec.cancelHeadersThreads = nil
 				} else {
 					fmt.Println("network restart cancelHeadersNotify == <nil>")
 				}
 				ec.syncHeaders(ctx)
 				w := ec.GetWallet()
 				if w != nil {
-					if ec.cancelAddressStatusNotify != nil {
-						ec.cancelAddressStatusNotify()
-						ec.cancelAddressStatusNotify = nil
+					if ec.cancelAddressStatusThreads != nil {
+						ec.cancelAddressStatusThreads()
+						ec.cancelAddressStatusThreads = nil
 					} else {
 						fmt.Println("network restart cancelAddressStatusNotify == <nil>")
 					}
@@ -172,7 +172,6 @@ func (ec *BtcElectrumClient) listenNetworkRestarted(ctx context.Context) error {
 
 func (ec *BtcElectrumClient) Stop() {
 	fmt.Printf("client stopping\n")
-	ec.CloseWallet()
 	node := ec.GetNode()
 	if node != nil {
 		node.Stop()
@@ -242,13 +241,6 @@ func (ec *BtcElectrumClient) LoadWallet(pw string) error {
 		return err
 	}
 	return nil
-}
-
-func (ec *BtcElectrumClient) CloseWallet() {
-	w := ec.GetWallet()
-	if w != nil {
-		w.Close()
-	}
 }
 
 // Interface methods in client_headers.go

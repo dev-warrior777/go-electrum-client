@@ -187,9 +187,6 @@ type ElectrumWallet interface {
 
 	// Update the height of the tip from the headers chain & the blockchain sync status.
 	UpdateTip(newTip int64, synced bool)
-
-	// Cleanly disconnect from the wallet
-	Close()
 }
 
 // Errors

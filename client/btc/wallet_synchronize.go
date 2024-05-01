@@ -157,7 +157,7 @@ func (ec *BtcElectrumClient) addressStatusNotify(ctx context.Context) error {
 	// make new cancellable context for network restarts
 	notifyCtx, cancelAddressStatus := context.WithCancel(ctx)
 	// store in ec
-	ec.cancelAddressStatusNotify = cancelAddressStatus
+	ec.cancelAddressStatusThreads = cancelAddressStatus
 
 	go func() {
 

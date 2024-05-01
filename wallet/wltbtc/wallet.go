@@ -549,14 +549,6 @@ func (w *BtcElectrumWallet) UpdateTip(newTip int64, synced bool) {
 	w.blockchainSynced = synced
 }
 
-func (w *BtcElectrumWallet) Close() {
-	if w.running {
-		// Any other teardown here .. long running threads, etc.
-		w.running = false
-	}
-	fmt.Println("btc wallet closed")
-}
-
 /////////////////////////////
 // implementations in send.go
 

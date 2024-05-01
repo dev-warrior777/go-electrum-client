@@ -111,26 +111,26 @@ func TestAppendHeaders(t *testing.T) {
 	}
 
 	var totalHdrs int64 = 0
-	numHdrs, err := h.AppendHeaders(hdrFileReg[:160])
+	numHdrs, err := h.appendHeadersFile(hdrFileReg[:160])
 	if err != nil {
 		log.Fatal(err)
 	}
 	totalHdrs += numHdrs
 	fmt.Println(numHdrs, " headers stored")
-	numHdrs, err = h.AppendHeaders(hdrFileReg[160:320])
+	numHdrs, err = h.appendHeadersFile(hdrFileReg[160:320])
 	if err != nil {
 		log.Fatal(err)
 	}
 	totalHdrs += numHdrs
 	fmt.Println(numHdrs, " headers stored")
-	numHdrs, err = h.AppendHeaders(hdrFileReg[320:])
+	numHdrs, err = h.appendHeadersFile(hdrFileReg[320:])
 	if err != nil {
 		log.Fatal(err)
 	}
 	totalHdrs += numHdrs
 	fmt.Println(numHdrs, " headers stored")
 
-	fsize, err := h.StatFileSize()
+	fsize, err := h.statFileSize()
 	if err != nil {
 		fmt.Println(err.Error())
 		log.Fatal(err)
@@ -145,13 +145,13 @@ func TestAppendHeaders(t *testing.T) {
 	maybeTip := totalHdrs - 1
 
 	// read back bytes from file
-	b, err := h.ReadAllBytesFromFile()
+	b, err := h.readAllBytesFromFile()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// store all bytes into the map
-	err = h.Store(b, 0)
+	err = h.store(b, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func TestAppendHeaders(t *testing.T) {
 
 	// verify chain
 	fmt.Println("verifying back from tip at height", h.tip)
-	err = h.VerifyAll()
+	err = h.verifyAll()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestReadStoreHeaderFile(t *testing.T) {
 	// store headers
 	cfg, _ := makeRegtestConfig()
 	h := NewHeaders(cfg)
-	err = h.Store(b, 0)
+	err = h.store(b, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -258,39 +258,39 @@ var hdr3 = []byte{
 func TestStore(t *testing.T) {
 	cfg, _ := makeRegtestConfig()
 	h := NewHeaders(cfg)
-	err := h.Store(hdr, 0)
+	err := h.store(hdr, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 	h.ClearMaps()
-	err = h.Store(hdr3, 0)
+	err = h.store(hdr3, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 	h.ClearMaps()
-	err = h.Store(hdr3, 100)
+	err = h.store(hdr3, 100)
 	if err != nil {
 		log.Fatal(err)
 	}
 	h.ClearMaps()
-	err = h.Store(hdr, 0)
+	err = h.store(hdr, 0)
 	if err != nil {
 		log.Fatal("error expected")
 	}
 	h.ClearMaps()
-	err = h.Store(hdr3, 0)
+	err = h.store(hdr3, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 	// extra bytes are ignored
 	h.ClearMaps()
-	err = h.Store(hdrBadLenMore, 0)
+	err = h.store(hdrBadLenMore, 0)
 	if err == nil {
 		log.Fatal("error expected")
 	}
 	// less than expected size is not ignored
 	h.ClearMaps()
-	err = h.Store(hdrBadLenLess, 0)
+	err = h.store(hdrBadLenLess, 0)
 	if err == nil {
 		log.Fatal("error expected")
 	}
@@ -299,28 +299,28 @@ func TestStore(t *testing.T) {
 func TestMapIter(t *testing.T) {
 	cfg, _ := makeRegtestConfig()
 	h := NewHeaders(cfg)
-	err := h.Store(hdrFileReg, 0)
+	err := h.store(hdrFileReg, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 	numBytes := int64(len(hdrFileReg))
-	numHeaders, err := h.BytesToNumHdrs(numBytes)
+	numHeaders, err := h.bytesToNumHdrs(numBytes)
 	if err != nil {
 		log.Fatal(err)
 	}
 	h.tip = numHeaders - 1
-	h.DumpAll()
+	h.dumpAll()
 }
 
 func TestStoreHashes(t *testing.T) {
 	cfg, _ := makeRegtestConfig()
 	h := NewHeaders(cfg)
-	err := h.Store(hdrFileReg, 0)
+	err := h.store(hdrFileReg, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 	numBytes := int64(len(hdrFileReg))
-	numHeaders, err := h.BytesToNumHdrs(numBytes)
+	numHeaders, err := h.bytesToNumHdrs(numBytes)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -43,10 +43,10 @@ type ClientConfig struct {
 	DB wallet.Datastore
 
 	// If you wish to connect to a single trusted electrumX peer server set this.
-	// SingleNode servers will error if not provided
+	// SingleNode servers will error if not provided. MultiNode not yet impl.
 	TrustedPeer net.Addr
 
-	// A Tor proxy can be set here causing the wallet will use Tor. TODO:
+	// A Tor proxy can be set here. TODO:
 	Proxy proxy.Dialer
 
 	// The default fee-per-byte for each level
