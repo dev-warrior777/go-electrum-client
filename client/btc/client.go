@@ -20,7 +20,7 @@ import (
 type BtcElectrumClient struct {
 	ClientConfig *client.ClientConfig
 	Wallet       wallet.ElectrumWallet
-	Node         electrumx.ElectrumXNode
+	X            electrumx.ElectrumX
 	// client copy of blockchain headers
 	clientHeaders *Headers
 	// cancel stale addressStatusNotify thread after network restart
@@ -33,7 +33,7 @@ func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 	ec := BtcElectrumClient{
 		ClientConfig:               cfg,
 		Wallet:                     nil,
-		Node:                       nil,
+		X:                          nil,
 		cancelAddressStatusThreads: nil,
 		cancelHeadersThreads:       nil,
 	}
@@ -53,8 +53,8 @@ func (ec *BtcElectrumClient) GetWallet() wallet.ElectrumWallet {
 	return ec.Wallet
 }
 
-func (ec *BtcElectrumClient) GetNode() electrumx.ElectrumXNode {
-	return ec.Node
+func (ec *BtcElectrumClient) GetX() electrumx.ElectrumX {
+	return ec.X
 }
 
 func (ec *BtcElectrumClient) walletExists() bool {
@@ -98,12 +98,12 @@ func (ec *BtcElectrumClient) getDatastore() error {
 
 // createNode creates a single unconnected ElectrumX node
 func (ec *BtcElectrumClient) createNode(_ client.NodeType) error {
-	nodeCfg := ec.GetConfig().MakeNodeConfig()
+	nodeCfg := ec.GetConfig().MakeElectrumXConfig()
 	n, err := elxbtc.NewSingleNode(nodeCfg)
 	if err != nil {
 		return err
 	}
-	ec.Node = n
+	ec.X = n
 	return nil
 }
 
@@ -114,7 +114,7 @@ func (ec *BtcElectrumClient) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = ec.Node.Start(ctx)
+	err = ec.X.Start(ctx)
 	if err != nil {
 		return err
 	}
@@ -130,9 +130,9 @@ func (ec *BtcElectrumClient) Start(ctx context.Context) error {
 }
 
 func (ec *BtcElectrumClient) listenNetworkRestarted(ctx context.Context) error {
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return ErrNoNode
+		return ErrNoElectrumX
 	}
 	networkRestartCh := node.RegisterNetworkRestart()
 	go func() {
@@ -172,7 +172,7 @@ func (ec *BtcElectrumClient) listenNetworkRestarted(ctx context.Context) error {
 
 func (ec *BtcElectrumClient) Stop() {
 	fmt.Printf("client stopping\n")
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node != nil {
 		node.Stop()
 	}

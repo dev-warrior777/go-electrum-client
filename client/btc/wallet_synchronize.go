@@ -144,7 +144,7 @@ func (ec *BtcElectrumClient) removeSubscription(pkScript string) error {
 
 // addressStatusNotify listens for address status change notifications
 func (ec *BtcElectrumClient) addressStatusNotify(ctx context.Context) error {
-	node := ec.GetNode()
+	node := ec.GetX()
 
 	scripthashNotifyCh, err := node.GetScripthashNotify()
 	if err != nil {
@@ -212,9 +212,9 @@ func (ec *BtcElectrumClient) addressStatusNotify(ctx context.Context) error {
 // to the electrumX server and can be a zero length string if the subscription
 // is new and has no history yet.
 func (ec *BtcElectrumClient) SubscribeAddressNotify(ctx context.Context, newSub *wallet.Subscription) (string, error) {
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return "", ErrNoNode
+		return "", ErrNoElectrumX
 	}
 	subscribed, err := ec.isSubscribed(newSub.PkScript)
 	if err != nil {
@@ -242,7 +242,7 @@ func (ec *BtcElectrumClient) SubscribeAddressNotify(ctx context.Context, newSub 
 // UnsubscribeAddressNotify both unsubscribes from notifications for an address
 // _and_ removes the subscription details from the wallet database.
 func (ec *BtcElectrumClient) UnsubscribeAddressNotify(ctx context.Context, pkScript string) {
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
 		return
 	}
@@ -265,9 +265,9 @@ func (ec *BtcElectrumClient) UnsubscribeAddressNotify(ctx context.Context, pkScr
 // GetAddressHistoryFromNode requests address history from ElectrumX  for a
 // subscribed address.
 func (ec *BtcElectrumClient) GetAddressHistoryFromNode(ctx context.Context, subscription *wallet.Subscription) (electrumx.HistoryResult, error) {
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return nil, ErrNoNode
+		return nil, ErrNoElectrumX
 	}
 	res, err := node.GetHistory(ctx, subscription.ElectrumScripthash)
 	if err != nil {
@@ -286,9 +286,9 @@ func (ec *BtcElectrumClient) GetAddressHistoryFromNode(ctx context.Context, subs
 // from ElectrumX keyed on a txid. This txid is usually taken from an ElectrumX
 // history list.
 func (ec *BtcElectrumClient) GetRawTransactionFromNode(ctx context.Context, txid string) (*wire.MsgTx, time.Time, error) {
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return nil, time.Time{}, ErrNoNode
+		return nil, time.Time{}, ErrNoElectrumX
 	}
 	txres, err := node.GetRawTransaction(ctx, txid)
 	if err != nil {

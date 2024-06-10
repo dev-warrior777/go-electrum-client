@@ -12,7 +12,7 @@ package client
 //	  /      \
 //	 /        \
 //
-// Wallet     Node
+// Wallet      X
 //
 // The client interface describes the behaviors of the client controller.
 // It is implemented for each coin asset client.
@@ -44,7 +44,7 @@ type ElectrumClient interface {
 	//
 	GetConfig() *ClientConfig
 	GetWallet() wallet.ElectrumWallet
-	GetNode() electrumx.ElectrumXNode
+	GetX() electrumx.ElectrumX
 	//
 	RegisterTipChangeNotify() (<-chan int64, error)
 	UnregisterTipChangeNotify()

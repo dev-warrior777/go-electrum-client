@@ -19,7 +19,7 @@ import (
 /////////////////////////////////////////////////////////////////////////
 
 var ErrNoWallet error = errors.New("no wallet")
-var ErrNoNode error = errors.New("no node")
+var ErrNoElectrumX error = errors.New("no ElectrumX")
 
 // SyncWallet sets up address notifications for subscribed addresses in the
 // wallet db. This will update txns, utxos, stxos wallet db tables with any
@@ -204,9 +204,9 @@ func (ec *BtcElectrumClient) Broadcast(ctx context.Context, rawTx []byte) (strin
 	if w == nil {
 		return "", ErrNoWallet
 	}
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return "", ErrNoNode
+		return "", ErrNoElectrumX
 	}
 	if rawTx == nil {
 		return "", errors.New("nil Tx")
@@ -325,9 +325,9 @@ func (ec *BtcElectrumClient) UnusedAddress(ctx context.Context) (string, error) 
 	if w == nil {
 		return "", ErrNoWallet
 	}
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return "", ErrNoNode
+		return "", ErrNoElectrumX
 	}
 	address, err := w.GetUnusedAddress(wallet.RECEIVING)
 	if err != nil {
@@ -369,9 +369,9 @@ func (ec *BtcElectrumClient) ChangeAddress(ctx context.Context) (string, error) 
 	if w == nil {
 		return "", ErrNoWallet
 	}
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return "", ErrNoNode
+		return "", ErrNoElectrumX
 	}
 	address, err := w.GetUnusedAddress(wallet.CHANGE)
 	if err != nil {

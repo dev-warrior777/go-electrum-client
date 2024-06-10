@@ -31,11 +31,11 @@ func TestNodeCreate(t *testing.T) {
 		t.Fatal("client is not a *BtcElectrumClient")
 	}
 	ec.createNode(client.SingleNode)
-	err := ec.Node.Start(context.Background())
+	err := ec.X.Start(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	n := c.GetNode()
+	n := c.GetX()
 	if n == nil {
 		t.Fatal("node is nil")
 	}

@@ -17,9 +17,9 @@ func (ec *BtcElectrumClient) RescanWallet(ctx context.Context) error {
 	if w == nil {
 		return ErrNoWallet
 	}
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return ErrNoNode
+		return ErrNoElectrumX
 	}
 
 	// highest key index we will try for now

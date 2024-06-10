@@ -13,8 +13,9 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
-type ElectrumXInterface struct {
+type SingleNode struct {
 	started          bool
+	restarting       chan *electrumx.NetworkRestart
 	config           *electrumx.ElectrumXConfig
 	connectOpts      *electrumx.ConnectOpts
 	serverAddr       string
@@ -24,11 +25,12 @@ type ElectrumXInterface struct {
 	server           *electrumx.Server
 }
 
-func NewElectrumXInterface(cfg *electrumx.ElectrumXConfig) (*ElectrumXInterface, error) {
-	if cfg.TrustedPeer == nil {
-		return nil, errors.New("trusted peer required in config")
-	}
+func NewSingleNode(cfg *electrumx.ElectrumXConfig) (*SingleNode, error) {
 	trustedServer := cfg.TrustedPeer
+	if trustedServer == nil {
+		return nil, errors.New(
+			"SingleNode requires a trusted ElectrumX server (in the config)")
+	}
 	netProto := trustedServer.Network()
 	addr := trustedServer.String()
 	host, _, err := net.SplitHostPort(addr)
@@ -50,8 +52,9 @@ func NewElectrumXInterface(cfg *electrumx.ElectrumXConfig) (*ElectrumXInterface,
 		DebugLogger: electrumx.StderrPrinter,
 	}
 
-	n := ElectrumXInterface{
+	n := SingleNode{
 		started:          false,
+		restarting:       make(chan *electrumx.NetworkRestart),
 		config:           cfg,
 		connectOpts:      connectOpts,
 		serverAddr:       addr,
@@ -67,7 +70,7 @@ func NewElectrumXInterface(cfg *electrumx.ElectrumXConfig) (*ElectrumXInterface,
 	return &n, nil
 }
 
-func (s *ElectrumXInterface) Start(clientCtx context.Context) error {
+func (s *SingleNode) Start(clientCtx context.Context) error {
 	if s.started {
 		return errors.New("already started")
 	}
@@ -79,7 +82,7 @@ func (s *ElectrumXInterface) Start(clientCtx context.Context) error {
 	return nil
 }
 
-func (s *ElectrumXInterface) start(clientCtx context.Context) error {
+func (s *SingleNode) start(clientCtx context.Context) error {
 	network := s.config.Params.Name
 	genesis := s.config.Params.GenesisHash.String()
 	fmt.Println("starting single node on", network, "genesis", genesis)
@@ -129,7 +132,7 @@ func (s *ElectrumXInterface) start(clientCtx context.Context) error {
 	return nil
 }
 
-func (s *ElectrumXInterface) run(clientCtx context.Context) {
+func (s *SingleNode) run(clientCtx context.Context) {
 
 	// Monitor connection loop
 
@@ -169,6 +172,10 @@ func (s *ElectrumXInterface) run(clientCtx context.Context) {
 				s.server.HeadersNotifyChan = sc.GetHeadersNotify()
 				s.server.ScripthashNotifyChan = sc.GetScripthashNotify()
 				s.server.Connected = true
+				// notify client to resubscribe to headers and scripthashes
+				s.restarting <- &electrumx.NetworkRestart{
+					Time: time.Now(),
+				}
 				s.serverMtx.Unlock()
 				break
 			}
@@ -176,18 +183,33 @@ func (s *ElectrumXInterface) run(clientCtx context.Context) {
 	}
 }
 
-func (s *ElectrumXInterface) Stop() {
+func (s *SingleNode) RegisterNetworkRestart() <-chan *electrumx.NetworkRestart {
+	return s.restarting
 }
 
-var ErrServerNotRunning error = errors.New("server not running")
+func (s *SingleNode) Stop() {
+	fmt.Println("stopping single node...")
+	close(s.restarting)
+	close(s.headersNotify)
+	close(s.scripthashNotify)
+	if !s.serverRunning() {
+		fmt.Println("..server not running")
+		return
+	}
+	s.server.Conn.Shutdown()
+	<-s.server.Conn.Done()
+	fmt.Println("..stopped server")
+}
 
-func (s *ElectrumXInterface) serverRunning() bool {
+// var ErrServerNotRunning error = errors.New("server not running")
+
+func (s *SingleNode) serverRunning() bool {
 	s.serverMtx.Lock()
 	defer s.serverMtx.Unlock()
 	return s.server.Connected
 }
 
-func (s *ElectrumXInterface) GetHeadersNotify() (<-chan *electrumx.HeadersNotifyResult, error) {
+func (s *SingleNode) GetHeadersNotify() (<-chan *electrumx.HeadersNotifyResult, error) {
 	s.serverMtx.Lock()
 	defer s.serverMtx.Unlock()
 	if !s.server.Connected {
@@ -196,14 +218,14 @@ func (s *ElectrumXInterface) GetHeadersNotify() (<-chan *electrumx.HeadersNotify
 	return s.headersNotify, nil
 }
 
-func (s *ElectrumXInterface) SubscribeHeaders(ctx context.Context) (*electrumx.HeadersNotifyResult, error) {
+func (s *SingleNode) SubscribeHeaders(ctx context.Context) (*electrumx.HeadersNotifyResult, error) {
 	if !s.serverRunning() {
 		return nil, ErrServerNotRunning
 	}
 	return s.server.Conn.SubscribeHeaders(ctx)
 }
 
-func (s *ElectrumXInterface) GetScripthashNotify() (<-chan *electrumx.ScripthashStatusResult, error) {
+func (s *SingleNode) GetScripthashNotify() (<-chan *electrumx.ScripthashStatusResult, error) {
 	s.serverMtx.Lock()
 	defer s.serverMtx.Unlock()
 	if !s.server.Connected {
@@ -212,72 +234,88 @@ func (s *ElectrumXInterface) GetScripthashNotify() (<-chan *electrumx.Scripthash
 	return s.scripthashNotify, nil
 }
 
-func (s *ElectrumXInterface) SubscribeScripthashNotify(ctx context.Context, scripthash string) (*electrumx.ScripthashStatusResult, error) {
+func (s *SingleNode) SubscribeScripthashNotify(ctx context.Context, scripthash string) (*electrumx.ScripthashStatusResult, error) {
 	if !s.serverRunning() {
 		return nil, ErrServerNotRunning
 	}
 	return s.server.Conn.SubscribeScripthash(ctx, scripthash)
 }
 
-func (s *ElectrumXInterface) UnsubscribeScripthashNotify(ctx context.Context, scripthash string) {
+func (s *SingleNode) UnsubscribeScripthashNotify(ctx context.Context, scripthash string) {
 	if !s.serverRunning() {
 		return
 	}
 	s.server.Conn.UnsubscribeScripthash(ctx, scripthash)
 }
 
-func (s *ElectrumXInterface) BlockHeader(ctx context.Context, height int64) (string, error) {
+func (s *SingleNode) BlockHeader(ctx context.Context, height int64) (string, error) {
 	if !s.serverRunning() {
 		return "", ErrServerNotRunning
 	}
 	return s.server.Conn.BlockHeader(ctx, uint32(height))
 }
 
-func (s *ElectrumXInterface) BlockHeaders(ctx context.Context, startHeight int64, blockCount int) (*electrumx.GetBlockHeadersResult, error) {
+func (s *SingleNode) BlockHeaders(ctx context.Context, startHeight int64, blockCount int) (*electrumx.GetBlockHeadersResult, error) {
 	if !s.serverRunning() {
 		return nil, ErrServerNotRunning
 	}
 	return s.server.Conn.BlockHeaders(ctx, startHeight, blockCount)
 }
 
-func (s *ElectrumXInterface) GetHistory(ctx context.Context, scripthash string) (electrumx.HistoryResult, error) {
+func (s *SingleNode) GetHistory(ctx context.Context, scripthash string) (electrumx.HistoryResult, error) {
 	if !s.serverRunning() {
 		return nil, ErrServerNotRunning
 	}
 	return s.server.Conn.GetHistory(ctx, scripthash)
 }
 
-func (s *ElectrumXInterface) GetListUnspent(ctx context.Context, scripthash string) (electrumx.ListUnspentResult, error) {
+func (s *SingleNode) GetListUnspent(ctx context.Context, scripthash string) (electrumx.ListUnspentResult, error) {
 	if !s.serverRunning() {
 		return nil, ErrServerNotRunning
 	}
 	return s.server.Conn.GetListUnspent(ctx, scripthash)
 }
 
-func (s *ElectrumXInterface) GetTransaction(ctx context.Context, txid string) (*electrumx.GetTransactionResult, error) {
+func (s *SingleNode) GetTransaction(ctx context.Context, txid string) (*electrumx.GetTransactionResult, error) {
 	if !s.serverRunning() {
 		return nil, ErrServerNotRunning
 	}
 	return s.server.Conn.GetTransaction(ctx, txid)
 }
 
-func (s *ElectrumXInterface) GetRawTransaction(ctx context.Context, txid string) (string, error) {
+func (s *SingleNode) GetRawTransaction(ctx context.Context, txid string) (string, error) {
 	if !s.serverRunning() {
 		return "", ErrServerNotRunning
 	}
 	return s.server.Conn.GetRawTransaction(ctx, txid)
 }
 
-func (s *ElectrumXInterface) Broadcast(ctx context.Context, rawTx string) (string, error) {
+func (s *SingleNode) Broadcast(ctx context.Context, rawTx string) (string, error) {
 	if !s.serverRunning() {
 		return "", ErrServerNotRunning
 	}
 	return s.server.Conn.Broadcast(ctx, rawTx)
 }
 
-func (s *ElectrumXInterface) EstimateFeeRate(ctx context.Context, confTarget int64) (int64, error) {
+func (s *SingleNode) EstimateFeeRate(ctx context.Context, confTarget int64) (int64, error) {
 	if !s.serverRunning() {
 		return 0, ErrServerNotRunning
 	}
 	return s.server.Conn.EstimateFee(ctx, confTarget)
+}
+
+// /////////////////////////////////////////////////////////////////////////////
+// MultiNode
+// //////////
+type MultiNode struct {
+	// nodeConfig *electrumx.NodeConfig
+	// serverMap  map[string]*electrumx.ServerConn
+}
+
+func (m *MultiNode) Start(ctx context.Context) error {
+	// TODO:
+	return nil
+}
+func (m *MultiNode) Stop() {
+	// TODO:
 }

@@ -164,7 +164,7 @@ func main() {
 		// err := ec.RecreateWallet("abc", mnemonic)
 		ec.LoadWallet("abc")
 		if err != nil {
-			ec.GetNode().Stop()
+			ec.GetX().Stop()
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}

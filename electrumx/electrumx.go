@@ -10,6 +10,13 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+type Server struct {
+	Conn                 *ServerConn
+	ScripthashNotifyChan <-chan *ScripthashStatusResult
+	HeadersNotifyChan    <-chan *HeadersNotifyResult
+	Connected            bool
+}
+
 type ServerAddr struct {
 	Net, Addr string
 }
@@ -24,11 +31,11 @@ func (a ServerAddr) String() string {
 // Ensure simpleAddr implements the net.Addr interface.
 var _ net.Addr = ServerAddr{}
 
-type NodeConfig struct {
+type ElectrumXConfig struct {
 	// The blockchain, Bitcoin, Dash, etc
 	Chain wallet.CoinType
 
-	// Network parameters. Set mainnet, testnet using this.
+	// NetType parameters. Set mainnet, testnet using this.
 	Params *chaincfg.Params
 
 	// The user-agent that shall be visible to the network
@@ -38,6 +45,7 @@ type NodeConfig struct {
 	DataDir string
 
 	// If you wish to connect to a single trusted electrumX peer set this.
+	// For now it *must be set* while we move to multi-node electrum interface
 	TrustedPeer net.Addr
 
 	// A Tor proxy can be set here causing the wallet will use Tor. TODO:
@@ -47,11 +55,11 @@ type NodeConfig struct {
 	Testing bool
 }
 
-type Network string
+type Nettype string
 
-var Regtest Network = "regtest"
-var Testnet Network = "testnet"
-var Mainnet Network = "mainnet"
+var Regtest Nettype = "regtest"
+var Testnet Nettype = "testnet"
+var Mainnet Nettype = "mainnet"
 
 var DebugMode bool
 
@@ -59,7 +67,7 @@ type NetworkRestart struct {
 	Time time.Time
 }
 
-type ElectrumXNode interface {
+type ElectrumX interface {
 	Start(ctx context.Context) error
 	RegisterNetworkRestart() <-chan *NetworkRestart
 	Stop()

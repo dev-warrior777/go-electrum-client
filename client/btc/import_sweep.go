@@ -36,9 +36,9 @@ func (ec *BtcElectrumClient) getPubKeyHashUtxos(ctx context.Context, keyPair *bt
 	inputList := make([]wallet.InputInfo, 0, 1)
 	pubKey := keyPair.SerializePubKey()
 
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return inputList, ErrNoNode
+		return inputList, ErrNoElectrumX
 	}
 	// make address p2pkh
 	pkHash := btcutil.Hash160(pubKey)
@@ -79,9 +79,9 @@ func (ec *BtcElectrumClient) getWitnessPubKeyHashUtxos(ctx context.Context, keyP
 	inputList := make([]wallet.InputInfo, 0, 1)
 	pubKey := keyPair.SerializePubKey()
 
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return inputList, ErrNoNode
+		return inputList, ErrNoElectrumX
 	}
 	// make address p2wpkh
 	pkHash := btcutil.Hash160(pubKey)

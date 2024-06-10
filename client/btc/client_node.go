@@ -11,9 +11,9 @@ import (
 
 // Return the raw transaction bytes for a txid.
 func (ec *BtcElectrumClient) GetRawTransaction(ctx context.Context, txid string) ([]byte, error) {
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return nil, ErrNoNode
+		return nil, ErrNoElectrumX
 	}
 	txStr, err := node.GetRawTransaction(ctx, txid)
 	if err != nil {
@@ -24,9 +24,9 @@ func (ec *BtcElectrumClient) GetRawTransaction(ctx context.Context, txid string)
 
 // Return the transaction info for a txid.
 func (ec *BtcElectrumClient) GetTransaction(ctx context.Context, txid string) (*electrumx.GetTransactionResult, error) {
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return nil, ErrNoNode
+		return nil, ErrNoElectrumX
 	}
 	res, err := node.GetTransaction(ctx, txid)
 	if err != nil {
@@ -37,9 +37,9 @@ func (ec *BtcElectrumClient) GetTransaction(ctx context.Context, txid string) (*
 
 // Return the transaction history of any address.
 func (ec *BtcElectrumClient) GetAddressHistory(ctx context.Context, addr string) (electrumx.HistoryResult, error) {
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return nil, ErrNoNode
+		return nil, ErrNoElectrumX
 	}
 	scripthash, err := addrToElectrumScripthash(addr, ec.GetConfig().Params)
 	if err != nil {
@@ -49,9 +49,9 @@ func (ec *BtcElectrumClient) GetAddressHistory(ctx context.Context, addr string)
 }
 
 func (ec *BtcElectrumClient) GetAddressUnspent(ctx context.Context, addr string) (electrumx.ListUnspentResult, error) {
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return nil, ErrNoNode
+		return nil, ErrNoElectrumX
 	}
 	scripthash, err := addrToElectrumScripthash(addr, ec.GetConfig().Params)
 	if err != nil {

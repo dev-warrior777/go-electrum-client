@@ -42,8 +42,7 @@ type ClientConfig struct {
 	// An implementation of the Datastore interface
 	DB wallet.Datastore
 
-	// If you wish to connect to a single trusted electrumX peer server set this.
-	// SingleNode servers will error if not provided. MultiNode not yet impl.
+	// If you wish to connect to a trusted electrumX peer server first set this.
 	TrustedPeer net.Addr
 
 	// A Tor proxy can be set here. TODO:
@@ -102,8 +101,8 @@ func (cc *ClientConfig) MakeWalletConfig() *wallet.WalletConfig {
 	return &wc
 }
 
-func (cc *ClientConfig) MakeNodeConfig() *electrumx.NodeConfig {
-	nc := electrumx.NodeConfig{
+func (cc *ClientConfig) MakeElectrumXConfig() *electrumx.ElectrumXConfig {
+	nc := electrumx.ElectrumXConfig{
 		Chain:       cc.Chain,
 		Params:      cc.Params,
 		UserAgent:   cc.UserAgent,

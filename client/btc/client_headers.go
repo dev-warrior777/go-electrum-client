@@ -59,7 +59,7 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 	var doneGathering = false
 	var startHeight = startPointHeight + numHeaders
 
-	node := ec.GetNode()
+	node := ec.GetX()
 
 	hdrsRes, err := node.BlockHeaders(ctx, startHeight, blockCount)
 	if err != nil {
@@ -164,9 +164,9 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 //     protocol does not guarantee notification of all intermediate block headers
 func (ec *BtcElectrumClient) headersNotify(ctx context.Context) error {
 	h := ec.clientHeaders
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return ErrNoNode
+		return ErrNoElectrumX
 	}
 	// in case of network restart we want to cancel these notification processing
 	// threads and restart new ones for a new SingleNode connection
@@ -277,9 +277,9 @@ func (ec *BtcElectrumClient) syncHeadersOntoOurTip(notifyCtx context.Context, se
 }
 
 func (ec *BtcElectrumClient) updateFromBlocks(notifyCtx context.Context, from, to int64) (int64, error) {
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return 0, ErrNoNode
+		return 0, ErrNoElectrumX
 	}
 	var headersConnected int64
 	fmt.Printf("updateFromBlocks: from %d to %d inclusive\n", from, to)
@@ -298,9 +298,9 @@ func (ec *BtcElectrumClient) updateFromBlocks(notifyCtx context.Context, from, t
 }
 
 func (ec *BtcElectrumClient) updateFromChunk(notifyCtx context.Context, from, to int64) (int64, error) {
-	node := ec.GetNode()
+	node := ec.GetX()
 	if node == nil {
-		return 0, ErrNoNode
+		return 0, ErrNoElectrumX
 	}
 	var headersConnected int64
 	fmt.Printf("updateFromChunk: from %d to %d inclusive\n", from, to)
