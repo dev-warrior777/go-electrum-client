@@ -2,282 +2,237 @@ package elxbtc
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
-	"fmt"
-	"net"
-	"sync"
-	"time"
 
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
 type ElectrumXInterface struct {
-	started          bool
 	config           *electrumx.ElectrumXConfig
-	connectOpts      *electrumx.ConnectOpts
-	serverAddr       string
 	scripthashNotify chan *electrumx.ScripthashStatusResult
 	headersNotify    chan *electrumx.HeadersNotifyResult
-	serverMtx        sync.Mutex
-	server           *electrumx.Server
+	network          *electrumx.Network
 }
 
-func NewElectrumXInterface(cfg *electrumx.ElectrumXConfig) (*ElectrumXInterface, error) {
-	if cfg.TrustedPeer == nil {
-		return nil, errors.New("trusted peer required in config")
-	}
-	trustedServer := cfg.TrustedPeer
-	netProto := trustedServer.Network()
-	addr := trustedServer.String()
-	host, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		return nil, err
-	}
-	var tlsConfig *tls.Config = nil
-	if netProto == "ssl" {
-		rootCAs, _ := x509.SystemCertPool()
-		tlsConfig = &tls.Config{
-			InsecureSkipVerify: true,
-			RootCAs:            rootCAs,
-			MinVersion:         tls.VersionTLS12, // works ok
-			ServerName:         host,
-		}
-	}
-	connectOpts := &electrumx.ConnectOpts{
-		TLSConfig:   tlsConfig,
-		DebugLogger: electrumx.StderrPrinter,
-	}
-
-	n := ElectrumXInterface{
-		started:          false,
-		config:           cfg,
-		connectOpts:      connectOpts,
-		serverAddr:       addr,
+func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterface, error) {
+	x := ElectrumXInterface{
+		config:           config,
 		scripthashNotify: make(chan *electrumx.ScripthashStatusResult, 16), // 128 bytes/slot
 		headersNotify:    make(chan *electrumx.HeadersNotifyResult, 16),    // 168 bytes/slot
-		server: &electrumx.Server{
-			Conn:                 nil,
-			ScripthashNotifyChan: nil,
-			HeadersNotifyChan:    nil,
-			Connected:            false,
-		},
+		network:          nil,
 	}
-	return &n, nil
+	return &x, nil
 }
 
-func (s *ElectrumXInterface) Start(clientCtx context.Context) error {
-	if s.started {
-		return errors.New("already started")
-	}
-	err := s.start(clientCtx)
+func (x *ElectrumXInterface) Start(clientCtx context.Context) error {
+	n := electrumx.NewNetwork(x.config)
+	err := n.Start(clientCtx)
 	if err != nil {
 		return err
 	}
-	s.started = true
+	x.network = n
 	return nil
 }
 
-func (s *ElectrumXInterface) start(clientCtx context.Context) error {
-	network := s.config.Params.Name
-	genesis := s.config.Params.GenesisHash.String()
-	fmt.Println("starting single node on", network, "genesis", genesis)
-
-	// connect to electrumX
-	sc, err := electrumx.ConnectServer(clientCtx, s.serverAddr, s.connectOpts)
-	if err != nil {
-		return err
-	}
-
-	s.server.Conn = sc
-	s.server.HeadersNotifyChan = sc.GetHeadersNotify()
-	s.server.ScripthashNotifyChan = sc.GetScripthashNotify()
-	s.server.Connected = true
-
-	fmt.Printf("** Connected to %s using %s **\n", network, sc.Proto())
-
-	feats, err := sc.Features(clientCtx)
-	if err != nil {
-		return err
-	}
-
-	if feats.Genesis != genesis {
-		return errors.New("wrong genesis hash for Bitcoin")
-	}
-
-	// now server is up check if we have required functions like GetTransaction
-	// which is not supported on at least one server .. maybe more.
-	switch network {
-	case "testnet", "testnet3":
-		txid := "581d837b8bcca854406dc5259d1fb1e0d314fcd450fb2d4654e78c48120e0135"
-		_, err := sc.GetTransaction(clientCtx, txid)
-		if err != nil {
-			return err
-		}
-	case "mainnet":
-		txid := "f53a8b83f85dd1ce2a6ef4593e67169b90aaeb402b3cf806b37afc634ef71fbc"
-		_, err := sc.GetTransaction(clientCtx, txid)
-		if err != nil {
-			return err
-		}
-		// ignore regtest
-	}
-
-	go s.run(clientCtx)
-
-	return nil
+func (x *ElectrumXInterface) Stop() {
+	// nothing for now
 }
 
-func (s *ElectrumXInterface) run(clientCtx context.Context) {
+// func (x *ElectrumXInterface) start(clientCtx context.Context) error {
 
-	// Monitor connection loop
+// 	return nil
 
-	for {
-	newServer:
-		for {
-			select {
-			case <-clientCtx.Done():
-				return
-			case <-s.server.Conn.Done():
-				s.serverMtx.Lock()
-				s.server.Connected = false
-				s.serverMtx.Unlock()
-				break newServer
-			case hdrs := <-s.server.HeadersNotifyChan:
-				if hdrs != nil && s.serverRunning() {
-					s.headersNotify <- hdrs
-				}
-			case status := <-s.server.ScripthashNotifyChan:
-				if status != nil && s.serverRunning() {
-					s.scripthashNotify <- status
-				}
-			}
-		}
+// network := x.config.Params.Name
+// genesis := x.config.Paramx.GenesisHash.String()
+// fmt.Println("starting single node on", network, "genesis", genesis)
 
-		fmt.Println("disconnected: will try a new connection in 5 sec")
+// // connect to electrumX
+// sc, err := electrumx.ConnectServer(clientCtx, x.serverAddr, x.connectOpts)
+// if err != nil {
+// 	return err
+// }
 
-		for {
-			time.Sleep(5 * time.Second)
-			fmt.Println("trying to make a new connection")
+// x.server.Conn = sc
+// x.server.HeadersNotifyChan = sc.GetHeadersNotify()
+// x.server.ScripthashNotifyChan = sc.GetScripthashNotify()
+// x.server.Connected = true
 
-			// connect to electrumX
-			sc, err := electrumx.ConnectServer(clientCtx, s.serverAddr, s.connectOpts)
-			if err == nil {
-				s.serverMtx.Lock()
-				s.server.Conn = sc
-				s.server.HeadersNotifyChan = sc.GetHeadersNotify()
-				s.server.ScripthashNotifyChan = sc.GetScripthashNotify()
-				s.server.Connected = true
-				s.serverMtx.Unlock()
-				break
-			}
-		}
+// fmt.Printf("** Connected to %s using %s **\n", network, sc.Proto())
+
+// feats, err := sc.Features(clientCtx)
+// if err != nil {
+// 	return err
+// }
+
+// if feats.Genesis != genesis {
+// 	return errors.New("wrong genesis hash for Bitcoin")
+// }
+
+// // now server is up check if we have required functions like GetTransaction
+// // which is not supported on at least one server .. maybe more.
+// switch network {
+// case "testnet", "testnet3":
+// 	txid := "581d837b8bcca854406dc5259d1fb1e0d314fcd450fb2d4654e78c48120e0135"
+// 	_, err := sc.GetTransaction(clientCtx, txid)
+// 	if err != nil {
+// 		return err
+// 	}
+// case "mainnet":
+// 	txid := "f53a8b83f85dd1ce2a6ef4593e67169b90aaeb402b3cf806b37afc634ef71fbc"
+// 	_, err := sc.GetTransaction(clientCtx, txid)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	// ignore regtest
+// }
+
+// go x.run(clientCtx)
+
+// return nil
+// }
+
+// func (x *ElectrumXInterface) run(clientCtx context.Context) {
+
+// 	// Monitor connection loop
+
+// 	for {
+// 	newServer:
+// 		for {
+// 			select {
+// 			case <-clientCtx.Done():
+// 				return
+// 			case <-x.server.Conn.Done():
+// 				x.serverMtx.Lock()
+// 				x.server.Connected = false
+// 				x.serverMtx.Unlock()
+// 				break newServer
+// 			case hdrs := <-x.server.HeadersNotifyChan:
+// 				if hdrs != nil && x.networkRunning() {
+// 					x.headersNotify <- hdrs
+// 				}
+// 			case status := <-x.server.ScripthashNotifyChan:
+// 				if status != nil && x.networkRunning() {
+// 					x.scripthashNotify <- status
+// 				}
+// 			}
+// 		}
+
+// 		fmt.Println("disconnected: will try a new connection in 5 sec")
+
+// 		for {
+// 			time.Sleep(5 * time.Second)
+// 			fmt.Println("trying to make a new connection")
+
+// 			// connect to electrumX
+// 			sc, err := electrumx.ConnectServer(clientCtx, x.serverAddr, x.connectOpts)
+// 			if err == nil {
+// 				x.serverMtx.Lock()
+// 				x.server.Conn = sc
+// 				x.server.HeadersNotifyChan = sc.GetHeadersNotify()
+// 				x.server.ScripthashNotifyChan = sc.GetScripthashNotify()
+// 				x.server.Connected = true
+// 				x.serverMtx.Unlock()
+// 				break
+// 			}
+// 		}
+// 	}
+// }
+
+var ErrNoNetwork error = errors.New("network not running")
+
+// TODO: remove when removing single-node
+// func (x *SingleNode) RegisterNetworkRestart() <-chan *electrumx.NetworkRestart {
+// 	return make(chan *electrumx.NetworkRestart, 1)
+// }
+
+// TODO: remove when removing single-node
+func (x *ElectrumXInterface) GetHeadersNotify() (<-chan *electrumx.HeadersNotifyResult, error) {
+	if x.network != nil {
+		return nil, ErrNoNetwork
 	}
+	return x.headersNotify, nil
 }
 
-func (s *ElectrumXInterface) Stop() {
-}
-
-var ErrServerNotRunning error = errors.New("server not running")
-
-func (s *ElectrumXInterface) serverRunning() bool {
-	s.serverMtx.Lock()
-	defer s.serverMtx.Unlock()
-	return s.server.Connected
-}
-
-func (s *ElectrumXInterface) GetHeadersNotify() (<-chan *electrumx.HeadersNotifyResult, error) {
-	s.serverMtx.Lock()
-	defer s.serverMtx.Unlock()
-	if !s.server.Connected {
-		return nil, ErrServerNotRunning
+func (x *ElectrumXInterface) SubscribeHeaders(ctx context.Context) (*electrumx.HeadersNotifyResult, error) {
+	if x.network != nil {
+		return nil, ErrNoNetwork
 	}
-	return s.headersNotify, nil
+	return x.network.SubscribeHeaders(ctx)
 }
 
-func (s *ElectrumXInterface) SubscribeHeaders(ctx context.Context) (*electrumx.HeadersNotifyResult, error) {
-	if !s.serverRunning() {
-		return nil, ErrServerNotRunning
+func (x *ElectrumXInterface) GetScripthashNotify() (<-chan *electrumx.ScripthashStatusResult, error) {
+	if x.network != nil {
+		return nil, ErrNoNetwork
 	}
-	return s.server.Conn.SubscribeHeaders(ctx)
+	return x.scripthashNotify, nil
 }
 
-func (s *ElectrumXInterface) GetScripthashNotify() (<-chan *electrumx.ScripthashStatusResult, error) {
-	s.serverMtx.Lock()
-	defer s.serverMtx.Unlock()
-	if !s.server.Connected {
-		return nil, ErrServerNotRunning
+func (x *ElectrumXInterface) SubscribeScripthashNotify(ctx context.Context, scripthash string) (*electrumx.ScripthashStatusResult, error) {
+	if x.network != nil {
+		return nil, ErrNoNetwork
 	}
-	return s.scripthashNotify, nil
+	return x.network.SubscribeScripthashNotify(ctx, scripthash)
 }
 
-func (s *ElectrumXInterface) SubscribeScripthashNotify(ctx context.Context, scripthash string) (*electrumx.ScripthashStatusResult, error) {
-	if !s.serverRunning() {
-		return nil, ErrServerNotRunning
-	}
-	return s.server.Conn.SubscribeScripthash(ctx, scripthash)
-}
-
-func (s *ElectrumXInterface) UnsubscribeScripthashNotify(ctx context.Context, scripthash string) {
-	if !s.serverRunning() {
+func (x *ElectrumXInterface) UnsubscribeScripthashNotify(ctx context.Context, scripthash string) {
+	if x.network != nil {
 		return
 	}
-	s.server.Conn.UnsubscribeScripthash(ctx, scripthash)
+	x.network.UnsubscribeScripthashNotify(ctx, scripthash)
 }
 
-func (s *ElectrumXInterface) BlockHeader(ctx context.Context, height int64) (string, error) {
-	if !s.serverRunning() {
-		return "", ErrServerNotRunning
+func (x *ElectrumXInterface) BlockHeader(ctx context.Context, height int64) (string, error) {
+	if x.network != nil {
+		return "", ErrNoNetwork
 	}
-	return s.server.Conn.BlockHeader(ctx, uint32(height))
+	return x.network.BlockHeader(ctx, height)
 }
 
-func (s *ElectrumXInterface) BlockHeaders(ctx context.Context, startHeight int64, blockCount int) (*electrumx.GetBlockHeadersResult, error) {
-	if !s.serverRunning() {
-		return nil, ErrServerNotRunning
+func (x *ElectrumXInterface) BlockHeaders(ctx context.Context, startHeight int64, blockCount int) (*electrumx.GetBlockHeadersResult, error) {
+	if x.network != nil {
+		return nil, ErrNoNetwork
 	}
-	return s.server.Conn.BlockHeaders(ctx, startHeight, blockCount)
+	return x.network.BlockHeaders(ctx, startHeight, blockCount)
 }
 
-func (s *ElectrumXInterface) GetHistory(ctx context.Context, scripthash string) (electrumx.HistoryResult, error) {
-	if !s.serverRunning() {
-		return nil, ErrServerNotRunning
+func (x *ElectrumXInterface) GetHistory(ctx context.Context, scripthash string) (electrumx.HistoryResult, error) {
+	if x.network != nil {
+		return nil, ErrNoNetwork
 	}
-	return s.server.Conn.GetHistory(ctx, scripthash)
+	return x.network.GetHistory(ctx, scripthash)
 }
 
-func (s *ElectrumXInterface) GetListUnspent(ctx context.Context, scripthash string) (electrumx.ListUnspentResult, error) {
-	if !s.serverRunning() {
-		return nil, ErrServerNotRunning
+func (x *ElectrumXInterface) GetListUnspent(ctx context.Context, scripthash string) (electrumx.ListUnspentResult, error) {
+	if x.network != nil {
+		return nil, ErrNoNetwork
 	}
-	return s.server.Conn.GetListUnspent(ctx, scripthash)
+	return x.network.GetListUnspent(ctx, scripthash)
 }
 
-func (s *ElectrumXInterface) GetTransaction(ctx context.Context, txid string) (*electrumx.GetTransactionResult, error) {
-	if !s.serverRunning() {
-		return nil, ErrServerNotRunning
+func (x *ElectrumXInterface) GetTransaction(ctx context.Context, txid string) (*electrumx.GetTransactionResult, error) {
+	if x.network != nil {
+		return nil, ErrNoNetwork
 	}
-	return s.server.Conn.GetTransaction(ctx, txid)
+	return x.network.GetTransaction(ctx, txid)
 }
 
-func (s *ElectrumXInterface) GetRawTransaction(ctx context.Context, txid string) (string, error) {
-	if !s.serverRunning() {
-		return "", ErrServerNotRunning
+func (x *ElectrumXInterface) GetRawTransaction(ctx context.Context, txid string) (string, error) {
+	if x.network != nil {
+		return "", ErrNoNetwork
 	}
-	return s.server.Conn.GetRawTransaction(ctx, txid)
+	return x.network.GetRawTransaction(ctx, txid)
 }
 
-func (s *ElectrumXInterface) Broadcast(ctx context.Context, rawTx string) (string, error) {
-	if !s.serverRunning() {
-		return "", ErrServerNotRunning
+func (x *ElectrumXInterface) Broadcast(ctx context.Context, rawTx string) (string, error) {
+	if x.network != nil {
+		return "", ErrNoNetwork
 	}
-	return s.server.Conn.Broadcast(ctx, rawTx)
+	return x.network.Broadcast(ctx, rawTx)
 }
 
-func (s *ElectrumXInterface) EstimateFeeRate(ctx context.Context, confTarget int64) (int64, error) {
-	if !s.serverRunning() {
-		return 0, ErrServerNotRunning
+func (x *ElectrumXInterface) EstimateFeeRate(ctx context.Context, confTarget int64) (int64, error) {
+	if x.network != nil {
+		return 0, ErrNoNetwork
 	}
-	return s.server.Conn.EstimateFee(ctx, confTarget)
+	return x.network.EstimateFeeRate(ctx, confTarget)
 }

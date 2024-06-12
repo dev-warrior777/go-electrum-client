@@ -96,10 +96,21 @@ func (ec *BtcElectrumClient) getDatastore() error {
 	return nil
 }
 
-// createNode creates a single unconnected ElectrumX node
+// // createNode creates a single unconnected ElectrumX node
+// func (ec *BtcElectrumClient) createNode(_ client.NodeType) error {
+// 	nodeCfg := ec.GetConfig().MakeElectrumXConfig()
+// 	n, err := elxbtc.NewSingleNode(nodeCfg)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	ec.X = n
+// 	return nil
+// }
+
+// TODO: refactor this: createElectrumXInterface creates an unconnected ElectrumXInterface
 func (ec *BtcElectrumClient) createNode(_ client.NodeType) error {
 	nodeCfg := ec.GetConfig().MakeElectrumXConfig()
-	n, err := elxbtc.NewSingleNode(nodeCfg)
+	n, err := elxbtc.NewElectrumXInterface(nodeCfg)
 	if err != nil {
 		return err
 	}
@@ -134,39 +145,39 @@ func (ec *BtcElectrumClient) listenNetworkRestarted(ctx context.Context) error {
 	if node == nil {
 		return ErrNoElectrumX
 	}
-	networkRestartCh := node.RegisterNetworkRestart()
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				fmt.Println("listenNetworkRestarted thread exit")
-				return
-			case nr := <-networkRestartCh:
-				if nr == nil {
-					// fmt.Println("network restart nr == <nil>")
-					continue
-				}
-				fmt.Printf("network restart at %v\n", nr.Time)
-				if ec.cancelHeadersThreads != nil {
-					ec.cancelHeadersThreads()
-					ec.cancelHeadersThreads = nil
-				} else {
-					fmt.Println("network restart cancelHeadersNotify == <nil>")
-				}
-				ec.syncHeaders(ctx)
-				w := ec.GetWallet()
-				if w != nil {
-					if ec.cancelAddressStatusThreads != nil {
-						ec.cancelAddressStatusThreads()
-						ec.cancelAddressStatusThreads = nil
-					} else {
-						fmt.Println("network restart cancelAddressStatusNotify == <nil>")
-					}
-					ec.SyncWallet(ctx)
-				}
-			}
-		}
-	}()
+	// networkRestartCh := node.RegisterNetworkRestart()
+	// go func() {
+	// 	for {
+	// 		select {
+	// 		case <-ctx.Done():
+	// 			fmt.Println("listenNetworkRestarted thread exit")
+	// 			return
+	// 		case nr := <-networkRestartCh:
+	// 			if nr == nil {
+	// 				// fmt.Println("network restart nr == <nil>")
+	// 				continue
+	// 			}
+	// 			fmt.Printf("network restart at %v\n", nr.Time)
+	// 			if ec.cancelHeadersThreads != nil {
+	// 				ec.cancelHeadersThreads()
+	// 				ec.cancelHeadersThreads = nil
+	// 			} else {
+	// 				fmt.Println("network restart cancelHeadersNotify == <nil>")
+	// 			}
+	// 			ec.syncHeaders(ctx)
+	// 			w := ec.GetWallet()
+	// 			if w != nil {
+	// 				if ec.cancelAddressStatusThreads != nil {
+	// 					ec.cancelAddressStatusThreads()
+	// 					ec.cancelAddressStatusThreads = nil
+	// 				} else {
+	// 					fmt.Println("network restart cancelAddressStatusNotify == <nil>")
+	// 				}
+	// 				ec.SyncWallet(ctx)
+	// 			}
+	// 		}
+	// 	}
+	// }()
 	return nil
 }
 

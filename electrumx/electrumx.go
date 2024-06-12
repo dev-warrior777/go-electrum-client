@@ -69,10 +69,17 @@ type NetworkRestart struct {
 
 type ElectrumX interface {
 	Start(ctx context.Context) error
-	RegisterNetworkRestart() <-chan *NetworkRestart
+
+	// TODO: remove when removing single-node
+	// RegisterNetworkRestart() <-chan *NetworkRestart
+
+	// remove .. ctx stops everything
 	Stop()
+
+	// TODO: remove when removing single-node
 	GetHeadersNotify() (<-chan *HeadersNotifyResult, error)
 	SubscribeHeaders(ctx context.Context) (*HeadersNotifyResult, error)
+
 	GetScripthashNotify() (<-chan *ScripthashStatusResult, error)
 	SubscribeScripthashNotify(ctx context.Context, scripthash string) (*ScripthashStatusResult, error)
 	UnsubscribeScripthashNotify(ctx context.Context, scripthash string)

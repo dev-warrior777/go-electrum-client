@@ -183,7 +183,7 @@ func (s *SingleNode) run(clientCtx context.Context) {
 	}
 }
 
-func (s *SingleNode) RegisterNetworkRestart() <-chan *electrumx.NetworkRestart {
+func (s *SingleNode) RegisterNetworkRestartXXX() <-chan *electrumx.NetworkRestart {
 	return s.restarting
 }
 
@@ -201,7 +201,7 @@ func (s *SingleNode) Stop() {
 	fmt.Println("..stopped server")
 }
 
-// var ErrServerNotRunning error = errors.New("server not running")
+var ErrServerNotRunning error = errors.New("server not running")
 
 func (s *SingleNode) serverRunning() bool {
 	s.serverMtx.Lock()
@@ -302,20 +302,4 @@ func (s *SingleNode) EstimateFeeRate(ctx context.Context, confTarget int64) (int
 		return 0, ErrServerNotRunning
 	}
 	return s.server.Conn.EstimateFee(ctx, confTarget)
-}
-
-// /////////////////////////////////////////////////////////////////////////////
-// MultiNode
-// //////////
-type MultiNode struct {
-	// nodeConfig *electrumx.NodeConfig
-	// serverMap  map[string]*electrumx.ServerConn
-}
-
-func (m *MultiNode) Start(ctx context.Context) error {
-	// TODO:
-	return nil
-}
-func (m *MultiNode) Stop() {
-	// TODO:
 }
