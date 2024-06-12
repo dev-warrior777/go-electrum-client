@@ -40,7 +40,6 @@ const (
 
 type ElectrumClient interface {
 	Start(ctx context.Context) error
-	Stop()
 	//
 	GetConfig() *ClientConfig
 	GetWallet() wallet.ElectrumWallet

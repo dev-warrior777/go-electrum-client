@@ -1,4 +1,4 @@
-package btc
+package electrumx
 
 import (
 	"bytes"
@@ -11,26 +11,24 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
-// syncHeaders uodates the client headers and then subscribes for new update
+// syncHeaders uodates the network's headers and then subscribes for new update
 // tip notifications and listens for them
-// syncHeaders is part of the ElectrumClient interface inmplementation
-func (ec *BtcElectrumClient) syncHeaders(ctx context.Context) error {
-	err := ec.syncClientHeaders(ctx)
+func (n *Node) syncHeaders(ctx context.Context) error {
+	err := n.syncNetworkHeaders(ctx)
 	if err != nil {
 		return err
 	}
-	return ec.headersNotify(ctx)
+	return n.headersNotify(ctx)
 }
 
-// syncClientHeaders reads blockchain_headers file, then gets any missing block
+// syncNetworkHeaders reads blockchain_headers file, then gets any missing block
 // from end of file to current tip from server. The current set of headers is
 // also stored in headers map and the chain verified by checking previous block
 // hashes backwards from local Tip.
-func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
-	h := ec.clientHeaders
+func (n *Node) syncNetworkHeaders(ctx context.Context) error {
+	h := n.networkHeaders
 
 	// we start from a recent height for testnet/mainnet
 	startPointHeight := h.startPoint
@@ -59,9 +57,7 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 	var doneGathering = false
 	var startHeight = startPointHeight + numHeaders
 
-	node := ec.GetX()
-
-	hdrsRes, err := node.BlockHeaders(ctx, startHeight, blockCount)
+	hdrsRes, err := n.blockHeaders(ctx, startHeight, blockCount)
 	if err != nil {
 		return err
 	}
@@ -98,7 +94,7 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 			return nil
 
 		case <-time.After(time.Second):
-			hdrsRes, err := node.BlockHeaders(ctx, startHeight, blockCount)
+			hdrsRes, err := n.blockHeaders(ctx, startHeight, blockCount)
 			if err != nil {
 				return err
 			}
@@ -149,8 +145,7 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 
 	h.synced = true
 	fmt.Println("headers synced up to tip ", h.tip)
-	ec.updateWalletTip()
-	ec.tipChanged()
+	n.tipChanged()
 	return nil
 }
 
@@ -161,28 +156,16 @@ func (ec *BtcElectrumClient) syncClientHeaders(ctx context.Context) error {
 // ElectrumX Documentation Note:
 //   - should a new block arrive quickly, perhaps while the server is still processing
 //     prior blocks, the server may only notify of the most recent chain tip. The
-//     protocol does not guarantee notification of all intermediate block headers
-func (ec *BtcElectrumClient) headersNotify(ctx context.Context) error {
-	h := ec.clientHeaders
-	node := ec.GetX()
-	if node == nil {
-		return ErrNoElectrumX
-	}
-	// in case of network restart we want to cancel these notification processing
-	// threads and restart new ones for a new SingleNode connection
-	notifyCtx, cancelHeaders := context.WithCancel(ctx)
-	// store cancel func
-	ec.cancelHeadersThreads = cancelHeaders
-	// get a channel to receive notifications from this electrumx connection
-	hdrsNotifyChan, err := node.GetHeadersNotify()
-	if err != nil {
-		return err
-	}
+//     protocol does not guarantee notification of all intermediate block headers.
+func (n *Node) headersNotify(ctx context.Context) error {
+	h := n.networkHeaders
+	// get a channel to receive notifications from this server connection
+	hdrsNotifyChan := n.getHeadersNotify()
 	// start headers queue
-	hdrsQueueChan := make(chan *electrumx.HeadersNotifyResult, 1)
-	go ec.headerQueue(notifyCtx, hdrsQueueChan)
+	hdrsQueueChan := make(chan *HeadersNotifyResult, 1)
+	go n.headerQueue(ctx, hdrsQueueChan)
 	// subscribe headers returns latest header the server knows
-	hdrRes, err := node.SubscribeHeaders(ctx)
+	hdrRes, err := n.subscribeHeaders(ctx)
 	if err != nil {
 		return err
 	}
@@ -194,7 +177,7 @@ func (ec *BtcElectrumClient) headersNotify(ctx context.Context) error {
 		fmt.Println("=== Waiting for headers ===")
 		for {
 			select {
-			case <-notifyCtx.Done():
+			case <-ctx.Done():
 				fmt.Println("notifyCtx.Done - in headers notify - exiting thread")
 				close(hdrsQueueChan)
 				return
@@ -211,8 +194,8 @@ func (ec *BtcElectrumClient) headersNotify(ctx context.Context) error {
 	return nil
 }
 
-func (ec *BtcElectrumClient) headerQueue(notifyCtx context.Context, hdrsQueueChan <-chan *electrumx.HeadersNotifyResult) {
-	h := ec.clientHeaders
+func (n *Node) headerQueue(notifyCtx context.Context, hdrsQueueChan <-chan *HeadersNotifyResult) {
+	h := n.networkHeaders
 	fmt.Println("headrs queue started")
 	for {
 		select {
@@ -245,7 +228,7 @@ func (ec *BtcElectrumClient) headerQueue(notifyCtx context.Context, hdrsQueueCha
 			fmt.Printf(" - we do not yet have header for height %d, our tip is %d\n", hdrRes.Height, ourTip)
 			if hdrRes.Height == (ourTip + 1) {
 				// simple case one header incoming .. try connect on top of our chain
-				if !ec.connectTip(hdrRes.Hex) {
+				if !n.connectTip(hdrRes.Hex) {
 					fmt.Printf(" - possible reorg at server height %d - ignoring for now - TODO:\n", hdrRes.Height)
 				}
 				// connected the block & updated our headers tip
@@ -253,7 +236,7 @@ func (ec *BtcElectrumClient) headerQueue(notifyCtx context.Context, hdrsQueueCha
 				continue
 			}
 			// two or more headers that we do not have yet
-			n, err := ec.syncHeadersOntoOurTip(notifyCtx, hdrRes.Height)
+			n, err := n.syncHeadersOntoOurTip(notifyCtx, hdrRes.Height)
 			if err != nil {
 				panic(err)
 			}
@@ -263,32 +246,28 @@ func (ec *BtcElectrumClient) headerQueue(notifyCtx context.Context, hdrsQueueCha
 	}
 }
 
-func (ec *BtcElectrumClient) syncHeadersOntoOurTip(notifyCtx context.Context, serverHeight int64) (int64, error) {
-	h := ec.clientHeaders
+func (n *Node) syncHeadersOntoOurTip(notifyCtx context.Context, serverHeight int64) (int64, error) {
+	h := n.networkHeaders
 	ourTip := h.getTip()
 	numMissing := serverHeight - ourTip
 	from := ourTip + 1
 	to := serverHeight
 	fmt.Printf("syncHeadersFromTip: ourTip %d server height %d\n", ourTip, serverHeight)
 	if numMissing > 10 { // per electrum
-		return ec.updateFromChunk(notifyCtx, from, to)
+		return n.updateFromChunk(notifyCtx, from, to)
 	}
-	return ec.updateFromBlocks(notifyCtx, from, to)
+	return n.updateFromBlocks(notifyCtx, from, to)
 }
 
-func (ec *BtcElectrumClient) updateFromBlocks(notifyCtx context.Context, from, to int64) (int64, error) {
-	node := ec.GetX()
-	if node == nil {
-		return 0, ErrNoElectrumX
-	}
+func (n *Node) updateFromBlocks(notifyCtx context.Context, from, to int64) (int64, error) {
 	var headersConnected int64
 	fmt.Printf("updateFromBlocks: from %d to %d inclusive\n", from, to)
 	for i := from; i <= to; i++ {
-		header, err := node.BlockHeader(notifyCtx, i)
+		header, err := n.blockHeader(notifyCtx, i)
 		if err != nil {
 			break
 		}
-		if !ec.connectTip(header) {
+		if !n.connectTip(header) {
 			break
 		}
 		headersConnected++
@@ -297,15 +276,11 @@ func (ec *BtcElectrumClient) updateFromBlocks(notifyCtx context.Context, from, t
 	return headersConnected, nil
 }
 
-func (ec *BtcElectrumClient) updateFromChunk(notifyCtx context.Context, from, to int64) (int64, error) {
-	node := ec.GetX()
-	if node == nil {
-		return 0, ErrNoElectrumX
-	}
+func (n *Node) updateFromChunk(notifyCtx context.Context, from, to int64) (int64, error) {
 	var headersConnected int64
 	fmt.Printf("updateFromChunk: from %d to %d inclusive\n", from, to)
 	reqCount := int(to - from + 1)
-	hdrsRes, err := node.BlockHeaders(notifyCtx, from, reqCount)
+	hdrsRes, err := n.blockHeaders(notifyCtx, from, reqCount)
 	if err != nil {
 		fmt.Printf("BlockHeaders failed - %v\n", err)
 		return 0, nil
@@ -330,7 +305,7 @@ func (ec *BtcElectrumClient) updateFromChunk(notifyCtx context.Context, from, to
 	}
 	for i := 0; i < hdrsRes.Count; i++ {
 		header := hdrsRes.HexConcat[i*OneHdrLen : (i+1)*OneHdrLen]
-		if !ec.connectTip(header) {
+		if !n.connectTip(header) {
 			break
 		}
 		headersConnected++
@@ -338,8 +313,8 @@ func (ec *BtcElectrumClient) updateFromChunk(notifyCtx context.Context, from, to
 	return headersConnected, nil
 }
 
-func (ec *BtcElectrumClient) connectTip(serverHeader string) bool {
-	h := ec.clientHeaders
+func (n *Node) connectTip(serverHeader string) bool {
+	h := n.networkHeaders
 	incomingHdr, incomingHdrBytes, err := convertStringHdrToBlkHdr(serverHeader)
 	if err != nil {
 		// this assertion would just trigger server change for MultiNode
@@ -375,62 +350,12 @@ func convertStringHdrToBlkHdr(svrHdr string) (*wire.BlockHeader, []byte, error) 
 	return hdr, rawBytes, nil
 }
 
-// // preValidateheaders validates incoming headers before storing in file and map
-// func (ec *BtcElectrumClient) preValidateHeaders(gbr *electrumx.GetBlockHeadersResult, tip int64) error {
-// 	h := ec.clientHeaders
-// 	rawBytes, err := hex.DecodeString(gbr.HexConcat)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	// validate incoming bytes as multiple of HEADER_SIZE
-// 	rawBytesLen := int64(len(rawBytes))
-// 	n, err := h.bytesToNumHdrs(rawBytesLen)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	count := int64(gbr.Count)
-// 	if n != count {
-// 		return fmt.Errorf("bad GetBlockHeadersResult")
-// 	}
-// 	// convert to BlockHeader
-// 	incoming := make([]*wire.BlockHeader, 0)
-// 	var i int64
-// 	for i = 0; i < count; i++ {
-// 		b := rawBytes[i*HEADER_SIZE : (i+1)*HEADER_SIZE]
-// 		r := bytes.NewBuffer(b)
-// 		blkHdr := &wire.BlockHeader{}
-// 		err = blkHdr.Deserialize(r)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		incoming = append(incoming, blkHdr)
-// 	}
-// 	// verify backwards except the first incoming header
-// 	for i := count - 1; i > 0; i-- {
-// 		prev := incoming[i].PrevBlock
-// 		hash := incoming[i-1].BlockHash()
-// 		if prev != hash {
-// 			return err
-// 		}
-// 	}
-// 	// check no missing by verifying first incoming prev against last stored
-// 	// block hash.
-// 	h.hdrsMtx.RLock()
-// 	lastHdr := h.hdrs[tip]
-// 	h.hdrsMtx.RUnlock()
-// 	lastHdrHash := lastHdr.BlockHash()
-// 	if incoming[0].PrevBlock != lastHdrHash {
-// 		return err
-// 	}
-// 	return nil
-// }
-
 ///////////////////////////
 // ElectrumClient interface
 
 // Tip returns the (local) block headers tip height and client headers sync status.
-func (ec *BtcElectrumClient) Tip() (int64, bool) {
-	h := ec.clientHeaders
+func (n *Node) tip() (int64, bool) {
+	h := n.networkHeaders
 	h.hdrsMtx.RLock()
 	defer h.hdrsMtx.RUnlock()
 	return h.tip, h.synced
@@ -438,8 +363,8 @@ func (ec *BtcElectrumClient) Tip() (int64, bool) {
 
 // GetBlockHeader returns the client's block header for height. If out of range
 // will return nil.
-func (ec *BtcElectrumClient) GetBlockHeader(height int64) *wire.BlockHeader {
-	h := ec.clientHeaders
+func (n *Node) getBlockHeader(height int64) *wire.BlockHeader {
+	h := n.networkHeaders
 	h.hdrsMtx.RLock()
 	defer h.hdrsMtx.RUnlock()
 	// return nil for now. If there is a need for blocks before the last checkpoint
@@ -450,8 +375,8 @@ func (ec *BtcElectrumClient) GetBlockHeader(height int64) *wire.BlockHeader {
 // GetBlockHeaders returns the client's block headers for the requested range.
 // If startHeight < startPoint or startHeight > tip or startHeight+count > tip
 // will return error.
-func (ec *BtcElectrumClient) GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error) {
-	h := ec.clientHeaders
+func (n *Node) getBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error) {
+	h := n.networkHeaders
 	h.hdrsMtx.RLock()
 	defer h.hdrsMtx.RUnlock()
 	if h.startPoint > startHeight {
@@ -473,16 +398,16 @@ func (ec *BtcElectrumClient) GetBlockHeaders(startHeight, count int64) ([]*wire.
 	return headers, nil
 }
 
-func (ec *BtcElectrumClient) GetHeaderForBlockHash(blkHash *chainhash.Hash) *wire.BlockHeader {
-	h := ec.clientHeaders
+func (n *Node) GetHeaderForBlockHash(blkHash *chainhash.Hash) *wire.BlockHeader {
+	h := n.networkHeaders
 	h.hdrsMtx.RLock()
 	defer h.hdrsMtx.RUnlock()
 	height := h.blkHdrs[*blkHash]
-	return ec.GetBlockHeader(height)
+	return h.hdrs[height]
 }
 
-func (ec *BtcElectrumClient) RegisterTipChangeNotify() (<-chan int64, error) {
-	h := ec.clientHeaders
+func (n *Node) RegisterTipChangeNotify() (<-chan int64, error) {
+	h := n.networkHeaders
 	h.tipChangeMtx.Lock()
 	defer h.tipChangeMtx.Unlock()
 	if !h.synced {
@@ -492,18 +417,18 @@ func (ec *BtcElectrumClient) RegisterTipChangeNotify() (<-chan int64, error) {
 	return h.tipChange, nil
 }
 
-func (ec *BtcElectrumClient) UnregisterTipChangeNotify() {
-	h := ec.clientHeaders
+func (n *Node) UnregisterTipChangeNotify() {
+	h := n.networkHeaders
 	h.tipChangeMtx.Lock()
 	defer h.tipChangeMtx.Unlock()
 	if h.tipChange != nil {
-		close(ec.clientHeaders.tipChange)
-		ec.clientHeaders.tipChange = nil
+		close(n.networkHeaders.tipChange)
+		h.tipChange = nil
 	}
 }
 
-func (ec *BtcElectrumClient) tipChanged() {
-	h := ec.clientHeaders
+func (n *Node) tipChanged() {
+	h := n.networkHeaders
 	h.tipChangeMtx.Lock()
 	defer h.tipChangeMtx.Unlock()
 	if h.tipChange != nil {

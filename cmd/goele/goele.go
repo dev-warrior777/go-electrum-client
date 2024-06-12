@@ -134,7 +134,6 @@ func main() {
 	clientCtx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
 	err = ec.Start(clientCtx)
 	if err != nil {
-		ec.Stop()
 		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
 		os.Exit(1)
 	}
@@ -155,7 +154,6 @@ func main() {
 		// err := ec.RecreateWallet("abc", mnemonic)
 		err := ec.LoadWallet("abc")
 		if err != nil {
-			ec.Stop()
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}
@@ -164,7 +162,6 @@ func main() {
 		// err := ec.RecreateWallet("abc", mnemonic)
 		ec.LoadWallet("abc")
 		if err != nil {
-			ec.GetX().Stop()
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}
@@ -172,22 +169,19 @@ func main() {
 		// production usage: load the client's wallet
 		err := ec.LoadWallet(pass)
 		if err != nil {
-			ec.Stop()
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}
 	default:
-		ec.Stop()
 		fmt.Printf("unknown net %s - exiting\n", net)
 		os.Exit(1)
 	}
 
 	// Set up Notify for all our already given out receive addresses (getunusedaddress)
 	// and broadcasted change addresses in order to receive any changes to the state of
-	// the address history back from the node
+	// the address history back from electrumx
 	err = ec.SyncWallet(clientCtx)
 	if err != nil {
-		ec.Stop()
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
@@ -217,15 +211,18 @@ func main() {
 	// end := time.Now().Unix()
 	// fmt.Printf("elapsed %ds\n", end-start)
 
+	fmt.Println("")
+	fmt.Println("       -------------")
+	fmt.Println("       Ctl-c to exit")
+	fmt.Println("       -------------")
+	fmt.Println("")
+
 	// for testing only
 	err = btc.RPCServe(ec)
 	if err != nil {
-		ec.Stop()
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
 
 	// SIGINT kills the node server(s) & test rpc server
-
-	ec.Stop()
 }

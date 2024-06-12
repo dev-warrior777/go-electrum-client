@@ -3,7 +3,6 @@ package btc
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path"
 
@@ -21,23 +20,14 @@ type BtcElectrumClient struct {
 	ClientConfig *client.ClientConfig
 	Wallet       wallet.ElectrumWallet
 	X            electrumx.ElectrumX
-	// client copy of blockchain headers
-	clientHeaders *Headers
-	// cancel stale addressStatusNotify thread after network restart
-	cancelAddressStatusThreads context.CancelFunc
-	// cancel stale headersNotify & headersQueue thread after network restart
-	cancelHeadersThreads context.CancelFunc
 }
 
 func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 	ec := BtcElectrumClient{
-		ClientConfig:               cfg,
-		Wallet:                     nil,
-		X:                          nil,
-		cancelAddressStatusThreads: nil,
-		cancelHeadersThreads:       nil,
+		ClientConfig: cfg,
+		Wallet:       nil,
+		X:            nil,
 	}
-	ec.clientHeaders = NewHeaders(cfg)
 	return &ec
 }
 
@@ -96,17 +86,6 @@ func (ec *BtcElectrumClient) getDatastore() error {
 	return nil
 }
 
-// // createNode creates a single unconnected ElectrumX node
-// func (ec *BtcElectrumClient) createNode(_ client.NodeType) error {
-// 	nodeCfg := ec.GetConfig().MakeElectrumXConfig()
-// 	n, err := elxbtc.NewSingleNode(nodeCfg)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	ec.X = n
-// 	return nil
-// }
-
 // TODO: refactor this: createElectrumXInterface creates an unconnected ElectrumXInterface
 func (ec *BtcElectrumClient) createNode(_ client.NodeType) error {
 	nodeCfg := ec.GetConfig().MakeElectrumXConfig()
@@ -129,65 +108,11 @@ func (ec *BtcElectrumClient) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = ec.syncHeaders(ctx)
-	if err != nil {
-		return err
-	}
-	err = ec.listenNetworkRestarted(ctx)
-	if err != nil {
-		return err
-	}
+	// err = ec.syncHeaders(ctx)
+	// if err != nil {
+	// 	return err
+	// }
 	return nil
-}
-
-func (ec *BtcElectrumClient) listenNetworkRestarted(ctx context.Context) error {
-	node := ec.GetX()
-	if node == nil {
-		return ErrNoElectrumX
-	}
-	// networkRestartCh := node.RegisterNetworkRestart()
-	// go func() {
-	// 	for {
-	// 		select {
-	// 		case <-ctx.Done():
-	// 			fmt.Println("listenNetworkRestarted thread exit")
-	// 			return
-	// 		case nr := <-networkRestartCh:
-	// 			if nr == nil {
-	// 				// fmt.Println("network restart nr == <nil>")
-	// 				continue
-	// 			}
-	// 			fmt.Printf("network restart at %v\n", nr.Time)
-	// 			if ec.cancelHeadersThreads != nil {
-	// 				ec.cancelHeadersThreads()
-	// 				ec.cancelHeadersThreads = nil
-	// 			} else {
-	// 				fmt.Println("network restart cancelHeadersNotify == <nil>")
-	// 			}
-	// 			ec.syncHeaders(ctx)
-	// 			w := ec.GetWallet()
-	// 			if w != nil {
-	// 				if ec.cancelAddressStatusThreads != nil {
-	// 					ec.cancelAddressStatusThreads()
-	// 					ec.cancelAddressStatusThreads = nil
-	// 				} else {
-	// 					fmt.Println("network restart cancelAddressStatusNotify == <nil>")
-	// 				}
-	// 				ec.SyncWallet(ctx)
-	// 			}
-	// 		}
-	// 	}
-	// }()
-	return nil
-}
-
-func (ec *BtcElectrumClient) Stop() {
-	fmt.Printf("client stopping\n")
-	node := ec.GetX()
-	if node != nil {
-		node.Stop()
-	}
-	fmt.Printf("client stopped\n")
 }
 
 // CreateWallet makes a new wallet with a new seed. The password is to encrypt
@@ -254,7 +179,7 @@ func (ec *BtcElectrumClient) LoadWallet(pw string) error {
 	return nil
 }
 
-// Interface methods in client_headers.go
+// Interface methods in blockchain.go
 //
 // Tip() (int64, bool)
 // GetBlockHeader(height int64) *wire.BlockHeader

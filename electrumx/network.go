@@ -8,9 +8,12 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+
+	"github.com/btcsuite/btcd/wire"
 )
 
 var ErrNoNetwork = errors.New("network not started")
+var ErrNoLeader = errors.New("no leader node is assigned")
 
 var nodeId uint32
 
@@ -31,27 +34,38 @@ func newMultiNodeWithId(trusted bool, node *Node) *MultiNode {
 	return m
 }
 
-func (m *MultiNode) getId() uint32 {
-	return m.id
-}
-
 type Network struct {
-	config   *ElectrumXConfig
-	started  bool
-	startMtx sync.Mutex
-	nodes    []*MultiNode
-	leader   *MultiNode
-	nodesMtx sync.Mutex
+	config              *ElectrumXConfig
+	started             bool
+	startMtx            sync.Mutex
+	nodes               []*MultiNode
+	leader              *MultiNode
+	nodesMtx            sync.Mutex
+	headers             *Headers
+	rcvTipChangeNotify  chan int64
+	rcvScripthashNotify chan *ScripthashStatusResult
 }
 
 func NewNetwork(config *ElectrumXConfig) *Network {
+	h := NewHeaders(config)
 	n := &Network{
-		config:  config,
-		started: false,
-		nodes:   make([]*MultiNode, 0),
-		leader:  nil, // explicit for readability
+		config:              config,
+		started:             false,
+		nodes:               make([]*MultiNode, 0),
+		leader:              nil,
+		headers:             h,
+		rcvTipChangeNotify:  make(chan int64, 1),
+		rcvScripthashNotify: make(chan *ScripthashStatusResult, 16),
 	}
 	return n
+}
+
+func (n *Network) GetTipChangeNotify() chan int64 {
+	return n.rcvTipChangeNotify
+}
+
+func (n *Network) GetScripthashNotify() chan *ScripthashStatusResult {
+	return n.rcvScripthashNotify
 }
 
 func (n *Network) Start(ctx context.Context) error {
@@ -67,10 +81,10 @@ func (n *Network) Start(ctx context.Context) error {
 }
 
 func (n *Network) start(ctx context.Context) error {
-	// start from our trusted node
+	// start from our trusted node as leader
 	n.nodesMtx.Lock()
 	defer n.nodesMtx.Unlock()
-	node, err := newNode(n.config.TrustedPeer)
+	node, err := newNode(n.config.TrustedPeer, true, n.headers, n.rcvTipChangeNotify, n.rcvScripthashNotify)
 	if err != nil {
 		return err
 	}
@@ -92,14 +106,10 @@ func (n *Network) start(ctx context.Context) error {
 }
 
 func (n *Network) addPeer(m *MultiNode) {
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
 	n.nodes = append(n.nodes, m)
 }
 
 func (n *Network) removePeer(m *MultiNode) error {
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
 	nodesLen := len(n.nodes)
 	if nodesLen < 2 {
 		return fmt.Errorf("cannot remove peer node - ony have %d node(s) in peer list", nodesLen)
@@ -127,36 +137,17 @@ func (n *Network) removePeer(m *MultiNode) error {
 // API
 // -----------------------------------------------------------------------------
 
-// TODO: remove when remove single-node
-func (n *Network) GetHeadersNotify() (<-chan *HeadersNotifyResult, error) {
-	if !n.started {
-		return nil, ErrNoNetwork
-	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	// return x.network.HeadersNotify, nil
-	return nil, nil
-}
-
-func (n *Network) SubscribeHeaders(ctx context.Context) (*HeadersNotifyResult, error) {
-	if !n.started {
-		return nil, ErrNoNetwork
-	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	// return x.server.Conn.SubscribeHeaders(ctx)
-	return nil, nil
-}
-
-func (n *Network) GetScripthashNotify() (<-chan *ScripthashStatusResult, error) {
-	if !n.started {
-		return nil, ErrNoNetwork
-	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	// return x.scripthashNotify, nil
-	return nil, nil
-}
+// func (n *Network) SubscribeHeaders(ctx context.Context) (*HeadersNotifyResult, error) {
+// 	if !n.started {
+// 		return nil, ErrNoNetwork
+// 	}
+// 	n.nodesMtx.Lock()
+// 	defer n.nodesMtx.Unlock()
+// 	if n.leader == nil {
+// 		return nil, ErrNoLeader
+// 	}
+// 	n.leader.node.SubscribeHeaders(ctx)
+// }
 
 func (n *Network) SubscribeScripthashNotify(ctx context.Context, scripthash string) (*ScripthashStatusResult, error) {
 	if !n.started {
@@ -164,8 +155,10 @@ func (n *Network) SubscribeScripthashNotify(ctx context.Context, scripthash stri
 	}
 	n.nodesMtx.Lock()
 	defer n.nodesMtx.Unlock()
-	// return x.server.Conn.SubscribeScripthash(ctx, scripthash)
-	return nil, nil
+	if n.leader == nil {
+		return nil, ErrNoLeader
+	}
+	return n.leader.node.subscribeScripthashNotify(ctx, scripthash)
 }
 
 func (n *Network) UnsubscribeScripthashNotify(ctx context.Context, scripthash string) {
@@ -174,27 +167,31 @@ func (n *Network) UnsubscribeScripthashNotify(ctx context.Context, scripthash st
 	}
 	n.nodesMtx.Lock()
 	defer n.nodesMtx.Unlock()
-	// x.server.Conn.UnsubscribeScripthash(ctx, scripthash)
+	n.leader.node.unsubscribeScripthashNotify(ctx, scripthash)
 }
 
-func (n *Network) BlockHeader(ctx context.Context, height int64) (string, error) {
-	if !n.started {
-		return "", ErrNoNetwork
-	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	// return x.server.Conn.BlockHeader(ctx, uint32(height))
-	return "", nil
-}
-
-func (n *Network) BlockHeaders(ctx context.Context, startHeight int64, blockCount int) (*GetBlockHeadersResult, error) {
+func (n *Network) BlockHeader(height int64) (*wire.BlockHeader, error) {
 	if !n.started {
 		return nil, ErrNoNetwork
 	}
 	n.nodesMtx.Lock()
 	defer n.nodesMtx.Unlock()
-	// return x.server.Conn.BlockHeaders(ctx, startHeight, blockCount)
-	return nil, nil
+	if n.leader == nil {
+		return nil, ErrNoLeader
+	}
+	return n.leader.node.getBlockHeader(height), nil
+}
+
+func (n *Network) BlockHeaders(startHeight int64, blockCount int64) ([]*wire.BlockHeader, error) {
+	if !n.started {
+		return nil, ErrNoNetwork
+	}
+	n.nodesMtx.Lock()
+	defer n.nodesMtx.Unlock()
+	if n.leader == nil {
+		return nil, ErrNoLeader
+	}
+	return n.leader.node.getBlockHeaders(startHeight, blockCount)
 }
 
 func (n *Network) GetHistory(ctx context.Context, scripthash string) (HistoryResult, error) {
@@ -203,8 +200,10 @@ func (n *Network) GetHistory(ctx context.Context, scripthash string) (HistoryRes
 	}
 	n.nodesMtx.Lock()
 	defer n.nodesMtx.Unlock()
-	// return x.server.Conn.GetHistory(ctx, scripthash)
-	return nil, nil
+	if n.leader == nil {
+		return nil, ErrNoLeader
+	}
+	return n.leader.node.getHistory(ctx, scripthash)
 }
 
 func (n *Network) GetListUnspent(ctx context.Context, scripthash string) (ListUnspentResult, error) {
@@ -213,8 +212,10 @@ func (n *Network) GetListUnspent(ctx context.Context, scripthash string) (ListUn
 	}
 	n.nodesMtx.Lock()
 	defer n.nodesMtx.Unlock()
-	// return x.server.Conn.GetListUnspent(ctx, scripthash)
-	return nil, nil
+	if n.leader == nil {
+		return nil, ErrNoLeader
+	}
+	return n.leader.node.getListUnspent(ctx, scripthash)
 }
 
 func (n *Network) GetTransaction(ctx context.Context, txid string) (*GetTransactionResult, error) {
@@ -223,8 +224,13 @@ func (n *Network) GetTransaction(ctx context.Context, txid string) (*GetTransact
 	}
 	n.nodesMtx.Lock()
 	defer n.nodesMtx.Unlock()
-	// return x.server.Conn.GetTransaction(ctx, txid)
-	return nil, nil
+	if n.leader == nil {
+		return nil, ErrNoLeader
+	}
+	if n.leader == nil {
+		return nil, ErrNoLeader
+	}
+	return n.leader.node.getTransaction(ctx, txid)
 }
 
 func (n *Network) GetRawTransaction(ctx context.Context, txid string) (string, error) {
@@ -233,8 +239,10 @@ func (n *Network) GetRawTransaction(ctx context.Context, txid string) (string, e
 	}
 	n.nodesMtx.Lock()
 	defer n.nodesMtx.Unlock()
-	// return x.server.Conn.GetRawTransaction(ctx, txid)
-	return "", nil
+	if n.leader == nil {
+		return "", ErrNoLeader
+	}
+	return n.leader.node.getRawTransaction(ctx, txid)
 }
 
 func (n *Network) Broadcast(ctx context.Context, rawTx string) (string, error) {
@@ -243,8 +251,10 @@ func (n *Network) Broadcast(ctx context.Context, rawTx string) (string, error) {
 	}
 	n.nodesMtx.Lock()
 	defer n.nodesMtx.Unlock()
-	// return x.server.Conn.Broadcast(ctx, rawTx)
-	return "", nil
+	if n.leader == nil {
+		return "", ErrNoLeader
+	}
+	return n.leader.node.broadcast(ctx, rawTx)
 }
 
 func (n *Network) EstimateFeeRate(ctx context.Context, confTarget int64) (int64, error) {
@@ -253,6 +263,8 @@ func (n *Network) EstimateFeeRate(ctx context.Context, confTarget int64) (int64,
 	}
 	n.nodesMtx.Lock()
 	defer n.nodesMtx.Unlock()
-	// return x.server.Conn.EstimateFee(ctx, confTarget)
-	return 0, nil
+	if n.leader == nil {
+		return 0, ErrNoLeader
+	}
+	return n.leader.node.estimateFeeRate(ctx, confTarget)
 }

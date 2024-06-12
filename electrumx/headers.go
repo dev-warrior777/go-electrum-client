@@ -1,4 +1,4 @@
-package btc
+package electrumx
 
 // This is the Client's copy of the blockchain headers for a blockchain.
 // Backed by a file in the datadir of the chain (main, test, reg nets)
@@ -18,7 +18,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/dev-warrior777/go-electrum-client/client"
 )
 
 const (
@@ -44,7 +43,7 @@ type Headers struct {
 	tipChange    chan int64
 }
 
-func NewHeaders(cfg *client.ClientConfig) *Headers {
+func NewHeaders(cfg *ElectrumXConfig) *Headers {
 	filePath := filepath.Join(cfg.DataDir, HEADER_FILE_NAME)
 	hdrsMapInitSize := 2 * ELECTRUM_MAGIC_NUMHDR //4032
 	hdrsMap := make(map[int64]*wire.BlockHeader, hdrsMapInitSize)
@@ -63,15 +62,21 @@ func NewHeaders(cfg *client.ClientConfig) *Headers {
 }
 
 // stored Headers start from here
-func getStartPointHeight(cfg *client.ClientConfig) int64 {
+func getStartPointHeight(cfg *ElectrumXConfig) int64 {
 	var startAtHeight int64 = 0
-	switch cfg.Params {
-	case &chaincfg.RegressionNetParams:
-		startAtHeight = 0
-	case &chaincfg.TestNet3Params:
-		startAtHeight = int64(2560000)
-	case &chaincfg.MainNetParams:
-		startAtHeight = int64(823000)
+	chain := cfg.Chain.String()
+	switch chain {
+	case "Bitcoin":
+		switch cfg.Params {
+		case &chaincfg.RegressionNetParams:
+			startAtHeight = 0
+		case &chaincfg.TestNet3Params:
+			startAtHeight = int64(2560000)
+		case &chaincfg.MainNetParams:
+			startAtHeight = int64(823000)
+		}
+	default:
+		fmt.Printf("headers.go: unimplemented chain: %s\n", chain)
 	}
 	return startAtHeight
 }

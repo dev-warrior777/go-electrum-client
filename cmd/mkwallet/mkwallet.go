@@ -193,7 +193,6 @@ func main() {
 	// start client, create node & sync headers
 	err = ec.Start(context.Background())
 	if err != nil {
-		ec.Stop()
 		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
 		os.Exit(1)
 	}
@@ -221,6 +220,4 @@ func main() {
 			fmt.Println(err)
 		}
 	}
-
-	ec.Stop()
 }

@@ -36,8 +36,10 @@ func (e *Ec) RPCEcho(request map[string]string, response *map[string]string) err
 
 // Get the blockchain tip and sync status
 func (e *Ec) Tip() (int64, bool) {
-	h := e.EleClient.clientHeaders
-	return h.tip, h.synced
+	// TODO: get from blockchain.go
+	// h := e.EleClient.clientHeaders
+	// return h.tip, h.synced
+	return 0, false
 }
 func (e *Ec) RPCTip(request map[string]string, response *map[string]string) error {
 	r := *response

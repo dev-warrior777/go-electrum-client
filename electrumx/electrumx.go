@@ -3,18 +3,18 @@ package electrumx
 import (
 	"context"
 	"net"
-	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	"golang.org/x/net/proxy"
 )
 
 type Server struct {
-	Conn                 *ServerConn
-	ScripthashNotifyChan <-chan *ScripthashStatusResult
-	HeadersNotifyChan    <-chan *HeadersNotifyResult
-	Connected            bool
+	conn                 *ServerConn
+	scripthashNotifyChan <-chan *ScripthashStatusResult
+	headersNotifyChan    <-chan *HeadersNotifyResult
+	connected            bool
 }
 
 type ServerAddr struct {
@@ -63,29 +63,19 @@ var Mainnet Nettype = "mainnet"
 
 var DebugMode bool
 
-type NetworkRestart struct {
-	Time time.Time
-}
-
 type ElectrumX interface {
 	Start(ctx context.Context) error
 
-	// TODO: remove when removing single-node
-	// RegisterNetworkRestart() <-chan *NetworkRestart
-
-	// remove .. ctx stops everything
-	Stop()
-
-	// TODO: remove when removing single-node
-	GetHeadersNotify() (<-chan *HeadersNotifyResult, error)
-	SubscribeHeaders(ctx context.Context) (*HeadersNotifyResult, error)
+	GetTipChangeNotify() (<-chan int64, error)
 
 	GetScripthashNotify() (<-chan *ScripthashStatusResult, error)
 	SubscribeScripthashNotify(ctx context.Context, scripthash string) (*ScripthashStatusResult, error)
 	UnsubscribeScripthashNotify(ctx context.Context, scripthash string)
 
-	BlockHeader(ctx context.Context, height int64) (string, error)
-	BlockHeaders(ctx context.Context, startHeight int64, blockCount int) (*GetBlockHeadersResult, error)
+	BlockHeader(height int64) (*wire.BlockHeader, error)
+	BlockHeaders(startHeight int64, blockCount int64) ([]*wire.BlockHeader, error)
+	// BlockHeader(ctx context.Context, height int64) (string, error)
+	// BlockHeaders(ctx context.Context, startHeight int64, blockCount int) (*GetBlockHeadersResult, error)
 	GetHistory(ctx context.Context, scripthash string) (HistoryResult, error)
 	GetListUnspent(ctx context.Context, scripthash string) (ListUnspentResult, error)
 	GetTransaction(ctx context.Context, txid string) (*GetTransactionResult, error)
