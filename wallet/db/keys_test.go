@@ -1,12 +1,12 @@
 package db
 
 import (
-	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
 	"sync"
 	"testing"
 
+	"github.com/decred/dcrd/crypto/rand"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 

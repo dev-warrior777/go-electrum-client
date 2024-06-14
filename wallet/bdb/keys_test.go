@@ -2,12 +2,12 @@ package bdb
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/hex"
 	"os"
 	"sync"
 	"testing"
 
+	"github.com/decred/dcrd/crypto/rand"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	bolt "go.etcd.io/bbolt"
 )

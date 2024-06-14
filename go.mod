@@ -8,6 +8,7 @@ require (
 	github.com/btcsuite/btcd/btcutil v1.1.5
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/btcsuite/btcwallet/wallet/txauthor v1.3.4
+	github.com/decred/dcrd/crypto/rand v1.0.0
 	github.com/decred/go-socks v1.1.0
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/spf13/cast v1.6.0
@@ -29,6 +30,6 @@ require (
 	github.com/btcsuite/btcwallet/wallet/txrules v1.2.1
 	github.com/decred/dcrd/crypto/blake256 v1.0.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0
-	golang.org/x/crypto v0.21.0
-	golang.org/x/sys v0.18.0 // indirect
+	golang.org/x/crypto v0.24.0
+	golang.org/x/sys v0.21.0 // indirect
 )

@@ -24,13 +24,16 @@ type ClientConfig struct {
 	// The blockchain, Bitcoin, Dash, etc
 	Chain wallet.CoinType
 
-	// Network parameters. Set mainnet, testnet using this.
+	// Size of a block header for this chain - defaults to 80 bytes.
+	BlockHeaderSize int
+
+	// Network parameters.
 	Params *chaincfg.Params
 
 	// Store the seed in encrypted storage
 	StoreEncSeed bool
 
-	// The user-agent that shall be visible to the network
+	// The user-agent visible to the network
 	UserAgent string
 
 	// Location of the data directory
@@ -42,7 +45,9 @@ type ClientConfig struct {
 	// An implementation of the Datastore interface
 	DB wallet.Datastore
 
-	// If you wish to connect to a trusted electrumX peer server first set this.
+	// Currently we use this electrumX server to bootstrap others so it should
+	// be set. Later we could use a file of somewhat trusted servers. See Also:
+	// servers_testnet.json from the electrum project and copied here.
 	TrustedPeer net.Addr
 
 	// A Tor proxy can be set here. TODO:
@@ -58,8 +63,7 @@ type ClientConfig struct {
 
 	// External API to query to look up fees. If this field is nil then the default fees will be used.
 	// If the API is unreachable then the default fees will likewise be used. If the API returns a fee
-	// greater than MaxFee then the MaxFee will be used in place. The API response must be formatted as
-	// { "fastestFee": 40, "halfHourFee": 20, "hourFee": 10 }
+	// greater than MaxFee then the MaxFee will be used instead.
 	FeeAPI url.URL
 
 	// Disable the exchange rate provider
@@ -76,6 +80,7 @@ func NewDefaultConfig() *ClientConfig {
 	return &ClientConfig{
 		Chain:                wallet.Bitcoin,
 		Params:               &chaincfg.MainNetParams,
+		BlockHeaderSize:      80,
 		UserAgent:            appName,
 		DataDir:              btcutil.AppDataDir(appName, false),
 		DbType:               DbTypeBolt,
@@ -103,13 +108,14 @@ func (cc *ClientConfig) MakeWalletConfig() *wallet.WalletConfig {
 
 func (cc *ClientConfig) MakeElectrumXConfig() *electrumx.ElectrumXConfig {
 	nc := electrumx.ElectrumXConfig{
-		Chain:       cc.Chain,
-		Params:      cc.Params,
-		UserAgent:   cc.UserAgent,
-		DataDir:     cc.DataDir,
-		TrustedPeer: cc.TrustedPeer,
-		Proxy:       cc.Proxy,
-		Testing:     cc.Testing,
+		Chain:           cc.Chain,
+		Params:          cc.Params,
+		BlockHeaderSize: cc.BlockHeaderSize,
+		UserAgent:       cc.UserAgent,
+		DataDir:         cc.DataDir,
+		TrustedPeer:     cc.TrustedPeer,
+		Proxy:           cc.Proxy,
+		Testing:         cc.Testing,
 	}
 	return &nc
 }

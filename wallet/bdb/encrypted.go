@@ -1,7 +1,6 @@
 package bdb
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/decred/dcrd/crypto/rand"
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/nacl/secretbox"
@@ -83,7 +83,7 @@ func (e *EncDB) GetDecrypted(pw string) ([]byte, error) {
 func encryptBytes(unencrypted []byte, password string) ([]byte, error) {
 	secretKey := getEncryptionKey32(password)
 	var nonce [24]byte
-	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+	if _, err := io.ReadFull(rand.Reader(), nonce[:]); err != nil {
 		return nil, err
 	}
 	encrypted := secretbox.Seal(nonce[:], unencrypted, &nonce, &secretKey)

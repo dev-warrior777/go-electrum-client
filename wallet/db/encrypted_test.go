@@ -1,12 +1,13 @@
 package db
 
 import (
-	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"sync"
 	"testing"
+
+	"github.com/decred/dcrd/crypto/rand"
 )
 
 const pw = "abc"

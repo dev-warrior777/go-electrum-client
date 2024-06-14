@@ -1,13 +1,13 @@
 package bdb
 
 import (
-	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"os"
 	"sync"
 	"testing"
 
+	"github.com/decred/dcrd/crypto/rand"
 	bolt "go.etcd.io/bbolt"
 )
 

@@ -35,10 +35,13 @@ type ElectrumXConfig struct {
 	// The blockchain, Bitcoin, Dash, etc
 	Chain wallet.CoinType
 
-	// NetType parameters. Set mainnet, testnet using this.
+	// Size of a block header for this chain, normally 80 bytes.
+	BlockHeaderSize int
+
+	// NetType parameters..
 	Params *chaincfg.Params
 
-	// The user-agent that shall be visible to the network
+	// The user-agent visible to the network
 	UserAgent string
 
 	// Location of the data directory
