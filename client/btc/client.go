@@ -17,9 +17,10 @@ import (
 
 // BtcElectrumClient
 type BtcElectrumClient struct {
-	ClientConfig *client.ClientConfig
-	Wallet       wallet.ElectrumWallet
-	X            electrumx.ElectrumX
+	ClientConfig    *client.ClientConfig
+	Wallet          wallet.ElectrumWallet
+	X               electrumx.ElectrumX
+	tipChangeNotify <-chan int64
 }
 
 func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
@@ -108,10 +109,11 @@ func (ec *BtcElectrumClient) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// err = ec.syncHeaders(ctx)
-	// if err != nil {
-	// 	return err
-	// }
+	ec.tipChangeNotify, err = ec.X.GetTipChangeNotify()
+	if err != nil {
+		return err
+	}
+	go ec.tipChange(ctx)
 	return nil
 }
 

@@ -189,10 +189,58 @@ func (h *Headers) store(b []byte, startHeight int64) error {
 	return nil
 }
 
+// tip returns the stored block headers tip height.
 func (h *Headers) getTip() int64 {
 	h.hdrsMtx.RLock()
 	defer h.hdrsMtx.RUnlock()
 	return h.tip
+}
+
+// GetBlockHeader returns the block header for height. If out of range will
+// return nil.
+func (h *Headers) getBlockHeader(height int64) (*wire.BlockHeader, error) {
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
+	// If there is a need for blocks before the last checkpoint consider making
+	// a server call
+	hdr := h.hdrs[height]
+	if hdr == nil {
+		return nil, fmt.Errorf("no block stored for height %d", height)
+	}
+	return hdr, nil
+}
+
+// getBlockHeaders returns the stored block headers for the requested range.
+// If startHeight < startPoint or startHeight > tip or startHeight+count > tip
+// will return error.
+func (h *Headers) getBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error) {
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
+	if h.startPoint > startHeight {
+		// error for now. If there is a need for blocks before the last checkpoint
+		// consider making a server call
+		return nil, errors.New("requested start height < start of stored blocks")
+	}
+	if startHeight > h.tip {
+		return nil, errors.New("requested start height > local tip")
+	}
+	blkEndRange := startHeight + count
+	if blkEndRange > h.tip {
+		return nil, errors.New("requested range is past the local tip")
+	}
+	var headers = make([]*wire.BlockHeader, 0, 3)
+	for i := startHeight; i < blkEndRange; i++ {
+		headers = append(headers, h.hdrs[i])
+	}
+	return headers, nil
+}
+
+func (n *Node) getHeaderForBlockHash(blkHash *chainhash.Hash) *wire.BlockHeader {
+	h := n.networkHeaders
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
+	height := h.blkHdrs[*blkHash]
+	return h.hdrs[height]
 }
 
 func (h *Headers) getTipBlock() *wire.BlockHeader {

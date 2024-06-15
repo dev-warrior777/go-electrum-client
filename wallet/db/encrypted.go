@@ -1,7 +1,6 @@
 package db
 
 import (
-	// "crypto/rand"
 	"database/sql"
 	"errors"
 	"fmt"

@@ -57,8 +57,8 @@ type ElectrumClient interface {
 	ImportAndSweep(ctx context.Context, keyPairs []string) error
 	//
 	// Small subset of electrum-like methods
-	Tip() (int64, bool)
-	GetBlockHeader(height int64) *wire.BlockHeader
+	Tip() int64
+	GetBlockHeader(height int64) (*wire.BlockHeader, error)
 	GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error)
 	Spend(pw string, amount int64, toAddress string, feeLevel wallet.FeeLevel) (int, string, string, error)
 	GetPrivKeyForAddress(pw, addr string) (string, error)

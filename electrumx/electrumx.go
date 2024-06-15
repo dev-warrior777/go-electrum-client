@@ -69,16 +69,15 @@ var DebugMode bool
 type ElectrumX interface {
 	Start(ctx context.Context) error
 
+	GetTip() int64
+	GetBlockHeader(height int64) (*wire.BlockHeader, error)
+	GetBlockHeaders(startHeight int64, blockCount int64) ([]*wire.BlockHeader, error)
 	GetTipChangeNotify() (<-chan int64, error)
 
-	GetScripthashNotify() (<-chan *ScripthashStatusResult, error)
 	SubscribeScripthashNotify(ctx context.Context, scripthash string) (*ScripthashStatusResult, error)
 	UnsubscribeScripthashNotify(ctx context.Context, scripthash string)
+	GetScripthashNotify() (<-chan *ScripthashStatusResult, error)
 
-	BlockHeader(height int64) (*wire.BlockHeader, error)
-	BlockHeaders(startHeight int64, blockCount int64) ([]*wire.BlockHeader, error)
-	// BlockHeader(ctx context.Context, height int64) (string, error)
-	// BlockHeaders(ctx context.Context, startHeight int64, blockCount int) (*GetBlockHeadersResult, error)
 	GetHistory(ctx context.Context, scripthash string) (HistoryResult, error)
 	GetListUnspent(ctx context.Context, scripthash string) (ListUnspentResult, error)
 	GetTransaction(ctx context.Context, txid string) (*GetTransactionResult, error)

@@ -544,9 +544,8 @@ func (w *BtcElectrumWallet) UnFreezeUTXO(op *wire.OutPoint) error {
 }
 
 // Update the wallet's view of the blockchain
-func (w *BtcElectrumWallet) UpdateTip(newTip int64, synced bool) {
+func (w *BtcElectrumWallet) UpdateTip(newTip int64) {
 	w.blockchainTip = newTip
-	w.blockchainSynced = synced
 }
 
 /////////////////////////////

@@ -69,8 +69,6 @@ func newNode(
 		state:       DISCONNECTED,
 		connectOpts: connectOpts,
 		serverAddr:  addr,
-		// scripthashNotify: make(chan *electrumx.ScripthashStatusResult, 16), // 128 bytes/slot
-		// headersNotify:    make(chan *electrumx.HeadersNotifyResult, 16),    // 168 bytes/slot
 		server: &Server{
 			conn:                 nil,
 			scripthashNotifyChan: nil,
@@ -91,6 +89,7 @@ func (n *Node) start(ctx context.Context, network, nettype, genesis string) erro
 	n.state = CONNECTING
 	sc, err := ConnectServer(ctx, n.serverAddr, n.connectOpts)
 	if err != nil {
+		n.state = DISCONNECTED
 		return err
 	}
 	n.state = CONNECTED
@@ -101,17 +100,60 @@ func (n *Node) start(ctx context.Context, network, nettype, genesis string) erro
 	// check genesis
 	feats, err := sc.Features(ctx)
 	if err != nil {
-		sc.cancel()
 		n.state = DISCONNECTED
+		sc.cancel()
 		return err
 	}
 	if feats.Genesis != genesis {
-		sc.cancel()
 		n.state = DISCONNECTED
+		sc.cancel()
 		return fmt.Errorf("wrong genesis hash for %s %s", network, nettype)
 	}
 	// now server is connected check if we have required functions like
 	// GetTransaction which is not supported on some servers.
+	if !testNeededServerFns(ctx, sc, network, nettype) {
+		n.state = DISCONNECTED
+		sc.cancel()
+		return errors.New("server does not implement needed function")
+	}
+	// Node is up and ready - if not leader then we exit here
+	if !n.leader {
+		return nil
+	}
+	// leader sync headers
+	n.syncingHeaders = true
+	err = n.syncHeaders(ctx)
+	if err != nil {
+		n.state = DISCONNECTED
+		sc.cancel()
+		return err
+	}
+	n.syncingHeaders = false
+	n.runLeader(ctx)
+	return nil
+}
+
+// promoteToLeader makes a non-leader responsible for incoming notifications
+func (n *Node) promoteToLeader(ctx context.Context) error {
+	n.leader = true
+	n.runLeader(ctx)
+	return nil
+}
+
+// run listens for incoming finding new peers
+func (n *Node) runLeader(ctx context.Context) {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+				// TODO: find new server peers
+			}
+		}
+	}()
+}
+
+func testNeededServerFns(ctx context.Context, sc *ServerConn, network, nettype string) bool {
 	switch network {
 	case "Bitcoin":
 		switch nettype {
@@ -119,63 +161,18 @@ func (n *Node) start(ctx context.Context, network, nettype, genesis string) erro
 			txid := "581d837b8bcca854406dc5259d1fb1e0d314fcd450fb2d4654e78c48120e0135"
 			_, err := sc.GetTransaction(ctx, txid)
 			if err != nil {
-				sc.cancel()
-				n.state = DISCONNECTED
-				return err
+				return false
 			}
 		case "mainnet":
 			txid := "f53a8b83f85dd1ce2a6ef4593e67169b90aaeb402b3cf806b37afc634ef71fbc"
 			_, err := sc.GetTransaction(ctx, txid)
 			if err != nil {
-				sc.cancel()
-				n.state = DISCONNECTED
-				return err
+				return false
 			}
 			// ignore regtest
 		}
 	}
-	// Node is up and ready - if not leader then we exit here
-	if !n.leader {
-		return nil
-	}
-
-	// leader sync headers
-	n.syncingHeaders = true
-	err = n.syncHeaders(ctx)
-	if err != nil {
-		sc.cancel()
-		n.state = DISCONNECTED
-		return err
-	}
-	n.syncingHeaders = false
-
-	return nil
-}
-
-func (n *Node) isLeader() bool {
-	return n.leader
-}
-
-// promoteToLeader makes a non-leader responsible for incoming headers notifications
-func (n *Node) promoteToLeader() error {
-	// TODO:
-	return nil
-}
-
-// run listens for incoming header & scripthash notifications
-func (n *Node) runLeader(ctx context.Context) error {
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			}
-			// TODO:
-		}
-	}()
-
-	return nil
+	return true
 }
 
 //-----------------------------------------------------------------------------

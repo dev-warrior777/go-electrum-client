@@ -166,7 +166,7 @@ func (ec *BtcElectrumClient) GetWalletTx(txid string) (int, bool, []byte, error)
 		return 0, false, txn.Bytes, nil
 	}
 	// mined
-	maybeTip, _ := ec.Tip()
+	maybeTip := ec.Tip()
 	conf := maybeTip - txn.Height
 	// definitely client tip is behind electrumx
 	if conf < 0 {

@@ -60,71 +60,72 @@ func NewNetwork(config *ElectrumXConfig) *Network {
 	return n
 }
 
-func (n *Network) GetTipChangeNotify() chan int64 {
-	return n.rcvTipChangeNotify
+func (net *Network) GetTipChangeNotify() <-chan int64 {
+	return net.rcvTipChangeNotify
 }
 
-func (n *Network) GetScripthashNotify() chan *ScripthashStatusResult {
-	return n.rcvScripthashNotify
+func (net *Network) GetScripthashNotify() <-chan *ScripthashStatusResult {
+	return net.rcvScripthashNotify
 }
 
-func (n *Network) Start(ctx context.Context) error {
-	if n.config.TrustedPeer == nil {
+func (net *Network) Start(ctx context.Context) error {
+	if net.config.TrustedPeer == nil {
 		return errors.New("a trusted peer is required in config")
 	}
-	n.startMtx.Lock()
-	defer n.startMtx.Unlock()
-	if n.started {
+	net.startMtx.Lock()
+	defer net.startMtx.Unlock()
+	if net.started {
 		return errors.New("network already started")
 	}
-	return n.start(ctx)
+	return net.start(ctx)
 }
 
-func (n *Network) start(ctx context.Context) error {
+func (net *Network) start(ctx context.Context) error {
 	// start from our trusted node as leader
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	node, err := newNode(n.config.TrustedPeer, true, n.headers, n.rcvTipChangeNotify, n.rcvScripthashNotify)
+	net.nodesMtx.Lock()
+	defer net.nodesMtx.Unlock()
+	node, err := newNode(
+		net.config.TrustedPeer, true, net.headers, net.rcvTipChangeNotify, net.rcvScripthashNotify)
 	if err != nil {
 		return err
 	}
-	network := n.config.Chain.String()
-	nettype := n.config.Params.Name
-	genesis := n.config.Params.GenesisHash.String()
+	network := net.config.Chain.String()
+	nettype := net.config.Params.Name
+	genesis := net.config.Params.GenesisHash.String()
 	err = node.start(ctx, network, nettype, genesis)
 	if err != nil {
 		return err
 	}
 	m := newMultiNodeWithId(true, node)
-	n.addPeer(m)
-	n.leader = m
+	net.addPeer(m)
+	net.leader = m
 
 	// TODO: ...bootstrap peers loop with leader
 
-	n.started = true
+	net.started = true
 	return nil
 }
 
-func (n *Network) addPeer(m *MultiNode) {
-	n.nodes = append(n.nodes, m)
+func (net *Network) addPeer(m *MultiNode) {
+	net.nodes = append(net.nodes, m)
 }
 
-func (n *Network) removePeer(m *MultiNode) error {
-	nodesLen := len(n.nodes)
+func (net *Network) removePeer(m *MultiNode) error {
+	nodesLen := len(net.nodes)
 	if nodesLen < 2 {
 		return fmt.Errorf("cannot remove peer node - ony have %d node(s) in peer list", nodesLen)
 	}
-	currNodes := n.nodes
+	currNodes := net.nodes
 	newNodes := make([]*MultiNode, 0, nodesLen-1)
 	for _, multi := range currNodes {
 		if m.id != multi.id {
 			newNodes = append(newNodes, multi)
 		}
 	}
-	n.nodes = newNodes
-	if n.leader.id == m.id {
+	net.nodes = newNodes
+	if net.leader.id == m.id {
 		// make a new random leader - there are 1 or more nodes in the slice
-		n.leader = newNodes[0]
+		net.leader = newNodes[0]
 	}
 	return nil
 }
@@ -133,138 +134,127 @@ func (n *Network) removePeer(m *MultiNode) error {
 // Nodes monitor
 // -----------------------------------------------------------------------------
 
-// -----------------------------------------------------------------------------
-// API
-// -----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// API Local headers
+//-----------------------------------------------------------------------------
 
-// func (n *Network) SubscribeHeaders(ctx context.Context) (*HeadersNotifyResult, error) {
-// 	if !n.started {
-// 		return nil, ErrNoNetwork
-// 	}
-// 	n.nodesMtx.Lock()
-// 	defer n.nodesMtx.Unlock()
-// 	if n.leader == nil {
-// 		return nil, ErrNoLeader
-// 	}
-// 	n.leader.node.SubscribeHeaders(ctx)
-// }
-
-func (n *Network) SubscribeScripthashNotify(ctx context.Context, scripthash string) (*ScripthashStatusResult, error) {
-	if !n.started {
-		return nil, ErrNoNetwork
-	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	if n.leader == nil {
-		return nil, ErrNoLeader
-	}
-	return n.leader.node.subscribeScripthashNotify(ctx, scripthash)
-}
-
-func (n *Network) UnsubscribeScripthashNotify(ctx context.Context, scripthash string) {
-	if !n.started {
-		return
-	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	n.leader.node.unsubscribeScripthashNotify(ctx, scripthash)
-}
-
-func (n *Network) BlockHeader(height int64) (*wire.BlockHeader, error) {
-	if !n.started {
-		return nil, ErrNoNetwork
-	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	if n.leader == nil {
-		return nil, ErrNoLeader
-	}
-	return n.leader.node.getBlockHeader(height), nil
-}
-
-func (n *Network) BlockHeaders(startHeight int64, blockCount int64) ([]*wire.BlockHeader, error) {
-	if !n.started {
-		return nil, ErrNoNetwork
-	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	if n.leader == nil {
-		return nil, ErrNoLeader
-	}
-	return n.leader.node.getBlockHeaders(startHeight, blockCount)
-}
-
-func (n *Network) GetHistory(ctx context.Context, scripthash string) (HistoryResult, error) {
-	if !n.started {
-		return nil, ErrNoNetwork
-	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	if n.leader == nil {
-		return nil, ErrNoLeader
-	}
-	return n.leader.node.getHistory(ctx, scripthash)
-}
-
-func (n *Network) GetListUnspent(ctx context.Context, scripthash string) (ListUnspentResult, error) {
-	if !n.started {
-		return nil, ErrNoNetwork
-	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	if n.leader == nil {
-		return nil, ErrNoLeader
-	}
-	return n.leader.node.getListUnspent(ctx, scripthash)
-}
-
-func (n *Network) GetTransaction(ctx context.Context, txid string) (*GetTransactionResult, error) {
-	if !n.started {
-		return nil, ErrNoNetwork
-	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	if n.leader == nil {
-		return nil, ErrNoLeader
-	}
-	if n.leader == nil {
-		return nil, ErrNoLeader
-	}
-	return n.leader.node.getTransaction(ctx, txid)
-}
-
-func (n *Network) GetRawTransaction(ctx context.Context, txid string) (string, error) {
-	if !n.started {
-		return "", ErrNoNetwork
-	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	if n.leader == nil {
-		return "", ErrNoLeader
-	}
-	return n.leader.node.getRawTransaction(ctx, txid)
-}
-
-func (n *Network) Broadcast(ctx context.Context, rawTx string) (string, error) {
-	if !n.started {
-		return "", ErrNoNetwork
-	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	if n.leader == nil {
-		return "", ErrNoLeader
-	}
-	return n.leader.node.broadcast(ctx, rawTx)
-}
-
-func (n *Network) EstimateFeeRate(ctx context.Context, confTarget int64) (int64, error) {
-	if !n.started {
+func (net *Network) Tip() (int64, error) {
+	if !net.started {
 		return 0, ErrNoNetwork
 	}
-	n.nodesMtx.Lock()
-	defer n.nodesMtx.Unlock()
-	if n.leader == nil {
+	return net.headers.getTip(), nil
+}
+
+func (net *Network) BlockHeader(height int64) (*wire.BlockHeader, error) {
+	if !net.started {
+		return nil, ErrNoNetwork
+	}
+	return net.headers.getBlockHeader(height)
+}
+
+func (net *Network) BlockHeaders(startHeight int64, blockCount int64) ([]*wire.BlockHeader, error) {
+	if !net.started {
+		return nil, ErrNoNetwork
+	}
+	return net.headers.getBlockHeaders(startHeight, blockCount)
+}
+
+// -----------------------------------------------------------------------------
+// API Pass thru
+// -----------------------------------------------------------------------------
+
+func (net *Network) SubscribeScripthashNotify(ctx context.Context, scripthash string) (*ScripthashStatusResult, error) {
+	if !net.started {
+		return nil, ErrNoNetwork
+	}
+	net.nodesMtx.Lock()
+	defer net.nodesMtx.Unlock()
+	if net.leader == nil {
+		return nil, ErrNoLeader
+	}
+	return net.leader.node.subscribeScripthashNotify(ctx, scripthash)
+}
+
+func (net *Network) UnsubscribeScripthashNotify(ctx context.Context, scripthash string) {
+	if !net.started {
+		return
+	}
+	net.nodesMtx.Lock()
+	defer net.nodesMtx.Unlock()
+	net.leader.node.unsubscribeScripthashNotify(ctx, scripthash)
+}
+
+func (net *Network) GetHistory(ctx context.Context, scripthash string) (HistoryResult, error) {
+	if !net.started {
+		return nil, ErrNoNetwork
+	}
+	net.nodesMtx.Lock()
+	defer net.nodesMtx.Unlock()
+	if net.leader == nil {
+		return nil, ErrNoLeader
+	}
+	return net.leader.node.getHistory(ctx, scripthash)
+}
+
+func (net *Network) GetListUnspent(ctx context.Context, scripthash string) (ListUnspentResult, error) {
+	if !net.started {
+		return nil, ErrNoNetwork
+	}
+	net.nodesMtx.Lock()
+	defer net.nodesMtx.Unlock()
+	if net.leader == nil {
+		return nil, ErrNoLeader
+	}
+	return net.leader.node.getListUnspent(ctx, scripthash)
+}
+
+func (net *Network) GetTransaction(ctx context.Context, txid string) (*GetTransactionResult, error) {
+	if !net.started {
+		return nil, ErrNoNetwork
+	}
+	net.nodesMtx.Lock()
+	defer net.nodesMtx.Unlock()
+	if net.leader == nil {
+		return nil, ErrNoLeader
+	}
+	if net.leader == nil {
+		return nil, ErrNoLeader
+	}
+	return net.leader.node.getTransaction(ctx, txid)
+}
+
+func (net *Network) GetRawTransaction(ctx context.Context, txid string) (string, error) {
+	if !net.started {
+		return "", ErrNoNetwork
+	}
+	net.nodesMtx.Lock()
+	defer net.nodesMtx.Unlock()
+	if net.leader == nil {
+		return "", ErrNoLeader
+	}
+	return net.leader.node.getRawTransaction(ctx, txid)
+}
+
+func (net *Network) Broadcast(ctx context.Context, rawTx string) (string, error) {
+	if !net.started {
+		return "", ErrNoNetwork
+	}
+	net.nodesMtx.Lock()
+	defer net.nodesMtx.Unlock()
+	if net.leader == nil {
+		return "", ErrNoLeader
+	}
+	return net.leader.node.broadcast(ctx, rawTx)
+}
+
+func (net *Network) EstimateFeeRate(ctx context.Context, confTarget int64) (int64, error) {
+	if !net.started {
+		return 0, ErrNoNetwork
+	}
+	net.nodesMtx.Lock()
+	defer net.nodesMtx.Unlock()
+	if net.leader == nil {
 		return 0, ErrNoLeader
 	}
-	return n.leader.node.estimateFeeRate(ctx, confTarget)
+	return net.leader.node.estimateFeeRate(ctx, confTarget)
 }

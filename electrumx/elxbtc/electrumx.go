@@ -31,54 +31,32 @@ func (x *ElectrumXInterface) Start(ctx context.Context) error {
 	return nil
 }
 
-// func (x *ElectrumXInterface) run(clientCtx context.Context) {
-
-// 	// Monitor connection loop
-
-// 	for {
-// 	newServer:
-// 		for {
-// 			select {
-// 			case <-clientCtx.Done():
-// 				return
-// 			case <-x.server.Conn.Done():
-// 				x.serverMtx.Lock()
-// 				x.server.Connected = false
-// 				x.serverMtx.Unlock()
-// 				break newServer
-// 			case hdrs := <-x.server.HeadersNotifyChan:
-// 				if hdrs != nil && x.networkRunning() {
-// 					x.headersNotify <- hdrs
-// 				}
-// 			case status := <-x.server.ScripthashNotifyChan:
-// 				if status != nil && x.networkRunning() {
-// 					x.scripthashNotify <- status
-// 				}
-// 			}
-// 		}
-
-// 		fmt.Println("disconnected: will try a new connection in 5 sec")
-
-// 		for {
-// 			time.Sleep(5 * time.Second)
-// 			fmt.Println("trying to make a new connection")
-
-// 			// connect to electrumX
-// 			sc, err := electrumx.ConnectServer(clientCtx, x.serverAddr, x.connectOpts)
-// 			if err == nil {
-// 				x.serverMtx.Lock()
-// 				x.server.Conn = sc
-// 				x.server.HeadersNotifyChan = sc.GetHeadersNotify()
-// 				x.server.ScripthashNotifyChan = sc.GetScripthashNotify()
-// 				x.server.Connected = true
-// 				x.serverMtx.Unlock()
-// 				break
-// 			}
-// 		}
-// 	}
-// }
-
 var ErrNoNetwork error = errors.New("network not running")
+
+func (x *ElectrumXInterface) GetTip() int64 {
+	if x.network == nil {
+		return 0
+	}
+	tip, err := x.network.Tip()
+	if err != nil {
+		return 0
+	}
+	return tip
+}
+
+func (x *ElectrumXInterface) GetBlockHeader(height int64) (*wire.BlockHeader, error) {
+	if x.network == nil {
+		return nil, ErrNoNetwork
+	}
+	return x.network.BlockHeader(height)
+}
+
+func (x *ElectrumXInterface) GetBlockHeaders(startHeight int64, blockCount int64) ([]*wire.BlockHeader, error) {
+	if x.network == nil {
+		return nil, ErrNoNetwork
+	}
+	return x.network.BlockHeaders(startHeight, blockCount)
+}
 
 func (x *ElectrumXInterface) GetTipChangeNotify() (<-chan int64, error) {
 	if x.network == nil {
@@ -106,20 +84,6 @@ func (x *ElectrumXInterface) UnsubscribeScripthashNotify(ctx context.Context, sc
 		return
 	}
 	x.network.UnsubscribeScripthashNotify(ctx, scripthash)
-}
-
-func (x *ElectrumXInterface) BlockHeader(height int64) (*wire.BlockHeader, error) {
-	if x.network == nil {
-		return nil, ErrNoNetwork
-	}
-	return x.network.BlockHeader(height)
-}
-
-func (x *ElectrumXInterface) BlockHeaders(startHeight int64, blockCount int64) ([]*wire.BlockHeader, error) {
-	if x.network == nil {
-		return nil, ErrNoNetwork
-	}
-	return x.network.BlockHeaders(startHeight, blockCount)
 }
 
 func (x *ElectrumXInterface) GetHistory(ctx context.Context, scripthash string) (electrumx.HistoryResult, error) {

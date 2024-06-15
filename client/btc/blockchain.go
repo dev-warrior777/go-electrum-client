@@ -1,27 +1,44 @@
 package btc
 
-import "github.com/btcsuite/btcd/wire"
+import (
+	"context"
+	"errors"
+	"fmt"
 
-func (ec *BtcElectrumClient) Tip() (tip int64, synced bool) {
-	// TODO: get tip from electrumx
-	return 0, false
+	"github.com/btcsuite/btcd/wire"
+)
+
+func (ec *BtcElectrumClient) Tip() (tip int64) {
+	return ec.GetX().GetTip()
+}
+
+func (ec *BtcElectrumClient) tipChange(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case t, ok := <-ec.tipChangeNotify:
+			if ok {
+				fmt.Printf("tip change %d\n", t)
+				// TODO: wire in for external caller
+			}
+		}
+	}
+}
+
+func (ec *BtcElectrumClient) GetBlockHeader(height int64) (*wire.BlockHeader, error) {
+	return ec.GetX().GetBlockHeader(height)
 }
 
 func (ec *BtcElectrumClient) GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error) {
-
-	return nil, nil
-}
-
-func (ec *BtcElectrumClient) GetBlockHeader(height int64) *wire.BlockHeader {
-
-	return nil
+	return ec.GetX().GetBlockHeaders(startHeight, count)
 }
 
 func (ec *BtcElectrumClient) RegisterTipChangeNotify() (<-chan int64, error) {
-
-	return nil, nil
+	// TODO: for external caller
+	return nil, errors.New("not yet implemented")
 }
 
 func (ec *BtcElectrumClient) UnregisterTipChangeNotify() {
-
+	// TODO: for external caller
 }

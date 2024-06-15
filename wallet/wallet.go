@@ -185,8 +185,8 @@ type ElectrumWallet interface {
 	// CPFP logic; rbf not supported
 	BumpFee(txid string) (*wire.MsgTx, error)
 
-	// Update the height of the tip from the headers chain & the blockchain sync status.
-	UpdateTip(newTip int64, synced bool)
+	// Update the height of the tip from the blockchain headers.
+	UpdateTip(newTip int64)
 }
 
 // Errors

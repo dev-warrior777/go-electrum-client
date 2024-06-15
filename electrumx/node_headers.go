@@ -9,7 +9,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -212,7 +211,7 @@ func (n *Node) headerQueue(notifyCtx context.Context, hdrsQueueChan <-chan *Head
 			ourTip := h.getTip()
 			if hdrRes.Height < h.startPoint {
 				// earlier than our starting checkpoint
-				// this condition would just trigger server change for MultiNode. SingleNode is 'trusted' ..maybe ;-)
+				// TODO: this condition should just trigger server change for MultiNode
 				fmt.Printf(" - server height %d is below our starting check point %d\n", hdrRes.Height, h.startPoint)
 				continue
 			}
@@ -233,15 +232,20 @@ func (n *Node) headerQueue(notifyCtx context.Context, hdrsQueueChan <-chan *Head
 				}
 				// connected the block & updated our headers tip
 				fmt.Printf(" - updated 1 header - our new tip is %d\n", h.getTip())
+				// notify client
+				n.rcvTipChangeNotify <- h.getTip()
 				continue
 			}
 			// two or more headers that we do not have yet
-			n, err := n.syncHeadersOntoOurTip(notifyCtx, hdrRes.Height)
+			numHdrs, err := n.syncHeadersOntoOurTip(notifyCtx, hdrRes.Height)
 			if err != nil {
 				panic(err)
 			}
 			// updating less hdrs than requested is not an error - we hope to get them next time
-			fmt.Printf(" - updated %d headers - our new tip is %d\n", n, h.getTip())
+			fmt.Printf(" - updated %d headers - our new tip is %d\n", numHdrs, h.getTip())
+			if numHdrs > 0 {
+				n.rcvTipChangeNotify <- h.getTip()
+			}
 		}
 	}
 }
@@ -322,6 +326,8 @@ func (n *Node) connectTip(serverHeader string) bool {
 	}
 	// check connect block
 	if !h.checkCanConnect(incomingHdr) {
+		fmt.Printf("checkCanConnect - cannot connect incoming prev %s to current tip %s \n",
+			incomingHdr.PrevBlock.String(), h.getTipBlock().BlockHash().String())
 		// fork maybe?
 		return false
 	}
@@ -350,62 +356,7 @@ func convertStringHdrToBlkHdr(svrHdr string) (*wire.BlockHeader, []byte, error) 
 	return hdr, rawBytes, nil
 }
 
-///////////////////////////
-// ElectrumClient interface
-
-// Tip returns the (local) block headers tip height and client headers sync status.
-func (n *Node) tip() (int64, bool) {
-	h := n.networkHeaders
-	h.hdrsMtx.RLock()
-	defer h.hdrsMtx.RUnlock()
-	return h.tip, h.synced
-}
-
-// GetBlockHeader returns the client's block header for height. If out of range
-// will return nil.
-func (n *Node) getBlockHeader(height int64) *wire.BlockHeader {
-	h := n.networkHeaders
-	h.hdrsMtx.RLock()
-	defer h.hdrsMtx.RUnlock()
-	// return nil for now. If there is a need for blocks before the last checkpoint
-	// consider making a server call
-	return h.hdrs[height]
-}
-
-// GetBlockHeaders returns the client's block headers for the requested range.
-// If startHeight < startPoint or startHeight > tip or startHeight+count > tip
-// will return error.
-func (n *Node) getBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error) {
-	h := n.networkHeaders
-	h.hdrsMtx.RLock()
-	defer h.hdrsMtx.RUnlock()
-	if h.startPoint > startHeight {
-		// error for now. If there is a need for blocks before the last checkpoint
-		// consider making a server call
-		return nil, errors.New("requested start height < start of stored blocks")
-	}
-	if startHeight > h.tip {
-		return nil, errors.New("requested start height > tip")
-	}
-	blkEndRange := startHeight + count
-	if blkEndRange > h.tip {
-		return nil, errors.New("requested range exceeds the tip")
-	}
-	var headers = make([]*wire.BlockHeader, 0, 3)
-	for i := startHeight; i < blkEndRange; i++ {
-		headers = append(headers, h.hdrs[i])
-	}
-	return headers, nil
-}
-
-func (n *Node) GetHeaderForBlockHash(blkHash *chainhash.Hash) *wire.BlockHeader {
-	h := n.networkHeaders
-	h.hdrsMtx.RLock()
-	defer h.hdrsMtx.RUnlock()
-	height := h.blkHdrs[*blkHash]
-	return h.hdrs[height]
-}
-
+// TODO move these back to client for client iface
 func (n *Node) RegisterTipChangeNotify() (<-chan int64, error) {
 	h := n.networkHeaders
 	h.tipChangeMtx.Lock()
@@ -417,6 +368,7 @@ func (n *Node) RegisterTipChangeNotify() (<-chan int64, error) {
 	return h.tipChange, nil
 }
 
+// TODO move these back to client for client iface
 func (n *Node) UnregisterTipChangeNotify() {
 	h := n.networkHeaders
 	h.tipChangeMtx.Lock()
@@ -427,6 +379,7 @@ func (n *Node) UnregisterTipChangeNotify() {
 	}
 }
 
+// TODO move these back to client for client iface
 func (n *Node) tipChanged() {
 	h := n.networkHeaders
 	h.tipChangeMtx.Lock()
