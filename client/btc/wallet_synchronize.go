@@ -334,12 +334,12 @@ func (ec *BtcElectrumClient) pkScriptToAddressPubkeyHash(pkScript []byte) (btcut
 }
 
 // updateWalletTip updates wallet's notion of the blockchain tip based on the
-// latest client headers' "maybe" tip. This would be used for example in
-// calculating tx confirmations .
-func (ec *BtcElectrumClient) updateWalletTip() {
+// latest electrumx headers' "maybe" tip. This would be used for example in
+// calculating tx confirmations.
+func (ec *BtcElectrumClient) updateWalletTip(tip int64) {
 	w := ec.GetWallet()
 	if w != nil {
-		w.UpdateTip(ec.Tip())
+		w.UpdateTip(tip)
 	}
 }
 

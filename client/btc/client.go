@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path"
+	"sync"
 
 	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
@@ -15,19 +16,25 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet/wltbtc"
 )
 
-// BtcElectrumClient
+// BtcElectrumClient - implements ElectrumClient interface
 type BtcElectrumClient struct {
-	ClientConfig    *client.ClientConfig
-	Wallet          wallet.ElectrumWallet
-	X               electrumx.ElectrumX
-	tipChangeNotify <-chan int64
+	ClientConfig *client.ClientConfig
+	Wallet       wallet.ElectrumWallet
+	X            electrumx.ElectrumX
+	// receive tip change from electrumx
+	rcvTipChangeNotify <-chan int64
+	// forward tip change notify to external user if connected
+	sendTipChangeNotify    chan int64
+	sendTipChangeNotifyMtx sync.Mutex
 }
 
 func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 	ec := BtcElectrumClient{
-		ClientConfig: cfg,
-		Wallet:       nil,
-		X:            nil,
+		ClientConfig:        cfg,
+		Wallet:              nil,
+		X:                   nil,
+		rcvTipChangeNotify:  nil,
+		sendTipChangeNotify: nil,
 	}
 	return &ec
 }
@@ -87,10 +94,10 @@ func (ec *BtcElectrumClient) getDatastore() error {
 	return nil
 }
 
-// TODO: refactor this: createElectrumXInterface creates an unconnected ElectrumXInterface
-func (ec *BtcElectrumClient) createNode(_ client.NodeType) error {
-	nodeCfg := ec.GetConfig().MakeElectrumXConfig()
-	n, err := elxbtc.NewElectrumXInterface(nodeCfg)
+// TODO: refactor this: createElectrumXInterface creates an ElectrumXInterface
+func (ec *BtcElectrumClient) createElectrumXInterface() error {
+	elxCfg := ec.GetConfig().MakeElectrumXConfig()
+	n, err := elxbtc.NewElectrumXInterface(elxCfg)
 	if err != nil {
 		return err
 	}
@@ -101,7 +108,7 @@ func (ec *BtcElectrumClient) createNode(_ client.NodeType) error {
 // client interface implementation
 
 func (ec *BtcElectrumClient) Start(ctx context.Context) error {
-	err := ec.createNode(client.SingleNode)
+	err := ec.createElectrumXInterface()
 	if err != nil {
 		return err
 	}
@@ -109,7 +116,7 @@ func (ec *BtcElectrumClient) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	ec.tipChangeNotify, err = ec.X.GetTipChangeNotify()
+	ec.rcvTipChangeNotify, err = ec.X.GetTipChangeNotify()
 	if err != nil {
 		return err
 	}
