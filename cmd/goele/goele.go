@@ -146,7 +146,7 @@ func main() {
 	// - use the mkwallet and rmwallet tools to create, recreate a wallet at the
 	//   configured location
 	// - the rmwallet tool removes a wallet from the configured location.
-	//   regtest & testnet only
+	//   regtest & testnet *only*
 
 	switch net {
 	case "regtest":

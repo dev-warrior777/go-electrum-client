@@ -20,7 +20,7 @@ func (ec *BtcElectrumClient) tipChange(ctx context.Context) {
 			return
 		case tip, ok := <-ec.rcvTipChangeNotify:
 			if ok {
-				fmt.Printf("tip change %d\n", tip)
+				fmt.Printf("tip change - new headers tip is %d\n", tip)
 				ec.updateWalletTip(tip)
 				// send tip change to an api user if channel exists
 				ec.sendTipChangeNotifyMtx.Lock()

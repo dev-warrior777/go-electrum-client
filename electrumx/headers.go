@@ -218,7 +218,7 @@ func (h *Headers) getBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader
 	defer h.hdrsMtx.RUnlock()
 	if h.startPoint > startHeight {
 		// error for now. If there is a need for blocks before the last checkpoint
-		// consider making a server call
+		// consider making a server call if api users need that.
 		return nil, errors.New("requested start height < start of stored blocks")
 	}
 	if startHeight > h.tip {
@@ -255,7 +255,7 @@ func (h *Headers) checkCanConnect(incomingHdr *wire.BlockHeader) bool {
 	return ourHash == incomingHdr.PrevBlock
 }
 
-// storeOneHdr stores one wire block header at h.tip+1 and updates h.Tip
+// storeOneHdr stores one wire block header at h.tip+1 and updates h.tip
 // the header is assumed to be valid and can connect
 func (h *Headers) storeOneHdr(blkHdr *wire.BlockHeader) {
 	h.hdrsMtx.Lock()

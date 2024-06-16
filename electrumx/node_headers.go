@@ -19,7 +19,8 @@ func (n *Node) syncHeaders(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return n.headersNotify(ctx)
+	// return n.headersNotify(ctx)
+	return nil
 }
 
 // syncNetworkHeaders reads blockchain_headers file, then gets any missing block
@@ -144,7 +145,6 @@ func (n *Node) syncNetworkHeaders(ctx context.Context) error {
 
 	h.synced = true
 	fmt.Println("headers synced up to tip ", h.tip)
-	n.tipChanged()
 	return nil
 }
 
@@ -160,6 +160,9 @@ func (n *Node) headersNotify(ctx context.Context) error {
 	h := n.networkHeaders
 	// get a channel to receive notifications from this server connection
 	hdrsNotifyChan := n.getHeadersNotify()
+	if hdrsNotifyChan == nil {
+		return errors.New("server headers notify channel is nil")
+	}
 	// start headers queue
 	hdrsQueueChan := make(chan *HeadersNotifyResult, 1)
 	go n.headerQueue(ctx, hdrsQueueChan)
@@ -177,11 +180,13 @@ func (n *Node) headersNotify(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				fmt.Println("notifyCtx.Done - in headers notify - exiting thread")
+				n.state = DISCONNECTING
+				fmt.Println("ctx.Done - in headers notify - exiting thread")
 				close(hdrsQueueChan)
 				return
 			case hdrNotifyRes, ok := <-hdrsNotifyChan:
 				if !ok {
+					n.state = DISCONNECTING
 					fmt.Println("headers notify channel was closed - exiting thread")
 					return
 				}
@@ -193,16 +198,18 @@ func (n *Node) headersNotify(ctx context.Context) error {
 	return nil
 }
 
-func (n *Node) headerQueue(notifyCtx context.Context, hdrsQueueChan <-chan *HeadersNotifyResult) {
+func (n *Node) headerQueue(ctx context.Context, hdrsQueueChan <-chan *HeadersNotifyResult) {
 	h := n.networkHeaders
 	fmt.Println("headrs queue started")
 	for {
 		select {
-		case <-notifyCtx.Done():
-			fmt.Println("notifyCtx.Done - in headers queue - exiting thread")
+		case <-ctx.Done():
+			n.state = DISCONNECTING
+			fmt.Println("ctx.Done - in headers queue - exiting thread")
 			return
 		case hdrRes, ok := <-hdrsQueueChan:
 			if !ok {
+				n.state = DISCONNECTING
 				fmt.Println("headers queue channel was closed - exiting thread")
 				return
 			}
@@ -237,7 +244,7 @@ func (n *Node) headerQueue(notifyCtx context.Context, hdrsQueueChan <-chan *Head
 				continue
 			}
 			// two or more headers that we do not have yet
-			numHdrs, err := n.syncHeadersOntoOurTip(notifyCtx, hdrRes.Height)
+			numHdrs, err := n.syncHeadersOntoOurTip(ctx, hdrRes.Height)
 			if err != nil {
 				panic(err)
 			}
@@ -356,35 +363,35 @@ func convertStringHdrToBlkHdr(svrHdr string) (*wire.BlockHeader, []byte, error) 
 	return hdr, rawBytes, nil
 }
 
-// TODO move these back to client for client iface
-func (n *Node) RegisterTipChangeNotify() (<-chan int64, error) {
-	h := n.networkHeaders
-	h.tipChangeMtx.Lock()
-	defer h.tipChangeMtx.Unlock()
-	if !h.synced {
-		return nil, errors.New("client's header chain is not synced")
-	}
-	h.tipChange = make(chan int64, 1)
-	return h.tipChange, nil
-}
+// // TODO move these back to client for client iface
+// func (n *Node) RegisterTipChangeNotify() (<-chan int64, error) {
+// 	h := n.networkHeaders
+// 	h.tipChangeMtx.Lock()
+// 	defer h.tipChangeMtx.Unlock()
+// 	if !h.synced {
+// 		return nil, errors.New("client's header chain is not synced")
+// 	}
+// 	h.tipChange = make(chan int64, 1)
+// 	return h.tipChange, nil
+// }
 
-// TODO move these back to client for client iface
-func (n *Node) UnregisterTipChangeNotify() {
-	h := n.networkHeaders
-	h.tipChangeMtx.Lock()
-	defer h.tipChangeMtx.Unlock()
-	if h.tipChange != nil {
-		close(n.networkHeaders.tipChange)
-		h.tipChange = nil
-	}
-}
+// // TODO move these back to client for client iface
+// func (n *Node) UnregisterTipChangeNotify() {
+// 	h := n.networkHeaders
+// 	h.tipChangeMtx.Lock()
+// 	defer h.tipChangeMtx.Unlock()
+// 	if h.tipChange != nil {
+// 		close(n.networkHeaders.tipChange)
+// 		h.tipChange = nil
+// 	}
+// }
 
-// TODO move these back to client for client iface
-func (n *Node) tipChanged() {
-	h := n.networkHeaders
-	h.tipChangeMtx.Lock()
-	defer h.tipChangeMtx.Unlock()
-	if h.tipChange != nil {
-		h.tipChange <- h.tip
-	}
-}
+// // TODO move these back to client for client iface
+// func (n *Node) tipChanged() {
+// 	h := n.networkHeaders
+// 	h.tipChangeMtx.Lock()
+// 	defer h.tipChangeMtx.Unlock()
+// 	if h.tipChange != nil {
+// 		h.tipChange <- h.tip
+// 	}
+// }

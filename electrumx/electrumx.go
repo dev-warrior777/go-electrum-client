@@ -11,10 +11,10 @@ import (
 )
 
 type Server struct {
-	conn                 *ServerConn
-	scripthashNotifyChan <-chan *ScripthashStatusResult
-	headersNotifyChan    <-chan *HeadersNotifyResult
-	connected            bool
+	conn *ServerConn
+	// scripthashNotifyChan <-chan *ScripthashStatusResult
+	// headersNotifyChan    <-chan *HeadersNotifyResult
+	connected bool
 }
 
 type ServerAddr struct {
@@ -24,6 +24,7 @@ type ServerAddr struct {
 func (a ServerAddr) Network() string {
 	return a.Net
 }
+
 func (a ServerAddr) String() string {
 	return a.Addr
 }

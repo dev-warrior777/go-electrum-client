@@ -94,7 +94,7 @@ func (ec *BtcElectrumClient) getDatastore() error {
 	return nil
 }
 
-// TODO: refactor this: createElectrumXInterface creates an ElectrumXInterface
+// createElectrumXInterface creates an ElectrumXInterface
 func (ec *BtcElectrumClient) createElectrumXInterface() error {
 	elxCfg := ec.GetConfig().MakeElectrumXConfig()
 	n, err := elxbtc.NewElectrumXInterface(elxCfg)
@@ -161,8 +161,8 @@ func (ec *BtcElectrumClient) RecreateWallet(ctx context.Context, pw, mnenomic st
 	if err != nil {
 		return err
 	}
-	// Do a rescan as alhough we have a wallet structure with a keychain we
-	// do not have any transaction history
+	// Do a rescan because alhough we have a wallet structure with a keychain
+	// we do not have any transaction history
 	err = ec.RescanWallet(ctx)
 	if err != nil {
 		return err
@@ -191,10 +191,10 @@ func (ec *BtcElectrumClient) LoadWallet(pw string) error {
 // Interface methods in blockchain.go
 //
 // Tip() (int64, bool)
-// GetBlockHeader(height int64) *wire.BlockHeader
-// GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error)
 // RegisterTipChangeNotify(tipChange func(height int64)) error
 // UnegisterTipChangeNotify()
+// GetBlockHeader(height int64) *wire.BlockHeader
+// GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error)
 
 // Interface methods in client_wallet.go
 //

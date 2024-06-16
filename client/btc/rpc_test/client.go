@@ -71,9 +71,7 @@ func (c *cmd) tip(client *rpc.Client) {
 	}
 	// fmt.Printf("client response %v\n", response)
 	tip := cast.ToString(response["tip"])
-	synced := cast.ToString(response["synced"])
 	fmt.Println("tip", tip)
-	fmt.Println("synced", synced)
 }
 
 // getbalance

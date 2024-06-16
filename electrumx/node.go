@@ -70,9 +70,8 @@ func newNode(
 		connectOpts: connectOpts,
 		serverAddr:  addr,
 		server: &Server{
-			conn:                 nil,
-			scripthashNotifyChan: nil,
-			connected:            false,
+			conn:      nil,
+			connected: false,
 		},
 		leader:              isLeader,
 		syncingHeaders:      false,
@@ -94,7 +93,6 @@ func (n *Node) start(ctx context.Context, network, nettype, genesis string) erro
 	}
 	n.state = CONNECTED
 	n.server.conn = sc
-	n.server.scripthashNotifyChan = sc.GetScripthashNotify()
 	n.server.connected = true
 	fmt.Printf("** Connected to %s using %s **\n", nettype, sc.Proto())
 	// check genesis
@@ -129,6 +127,18 @@ func (n *Node) start(ctx context.Context, network, nettype, genesis string) erro
 		return err
 	}
 	n.syncingHeaders = false
+	err = n.headersNotify(ctx)
+	if err != nil {
+		n.state = DISCONNECTED
+		sc.cancel()
+		return err
+	}
+	err = n.scriptHashNotify(ctx)
+	if err != nil {
+		n.state = DISCONNECTED
+		sc.cancel()
+		return err
+	}
 	n.runLeader(ctx)
 	return nil
 }
@@ -193,11 +203,11 @@ func (n *Node) subscribeHeaders(ctx context.Context) (*HeadersNotifyResult, erro
 	return n.server.conn.SubscribeHeaders(ctx)
 }
 
-func (n *Node) getScripthashNotify() (<-chan *ScripthashStatusResult, error) {
+func (n *Node) getScripthashNotify() <-chan *ScripthashStatusResult {
 	if n.state != CONNECTED {
-		return nil, ErrNotConnected
+		return nil
 	}
-	return n.server.conn.GetScripthashNotify(), nil
+	return n.server.conn.GetScripthashNotify()
 }
 
 func (n *Node) subscribeScripthashNotify(ctx context.Context, scripthash string) (*ScripthashStatusResult, error) {
