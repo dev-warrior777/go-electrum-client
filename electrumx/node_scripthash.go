@@ -11,6 +11,7 @@ func (n *Node) scriptHashNotify(nodeCtx context.Context) error {
 	if scriptHashNotifyChan == nil {
 		return errors.New("server scripthash notify channel is nil")
 	}
+	// TODO: range over incoming channel
 
 	go func() {
 		fmt.Println("leader node waiting for scripthash notifications")

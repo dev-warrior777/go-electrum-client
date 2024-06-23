@@ -25,7 +25,7 @@ type BtcElectrumClient struct {
 	rcvTipChangeNotify <-chan int64
 	// forward tip change notify to external user if connected
 	sendTipChangeNotify    chan int64
-	sendTipChangeNotifyMtx sync.Mutex
+	sendTipChangeNotifyMtx sync.RWMutex
 }
 
 func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {

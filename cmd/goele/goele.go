@@ -140,7 +140,7 @@ func main() {
 	}
 
 	feeRate, _ := ec.FeeRate(clientCtx, 6)
-	fmt.Println(feeRate)
+	fmt.Println("Fee rate: ", feeRate)
 
 	// to make the client's wallet:
 	// - for regtest/testnet testing recreate a wallet with a known set of keys.
@@ -167,7 +167,7 @@ func main() {
 			os.Exit(1)
 		}
 	case "mainnet":
-		// production usage: load the client's wallet
+		// production usage: load the client's wallet - needs -pass param
 		err := ec.LoadWallet(pass)
 		if err != nil {
 			fmt.Println(err, " - exiting")

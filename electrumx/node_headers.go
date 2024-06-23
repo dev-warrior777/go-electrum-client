@@ -256,8 +256,8 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *HeadersNotifyR
 				// connected the block & updated our headers tip
 				fmt.Printf(" - updated 1 header - our new tip is %d\n", h.getTip())
 				// notify client
-				fmt.Println("   ..not updating client thru rcvTipChangeNotify for now")
-				// n.rcvTipChangeNotify <- h.getTip()
+				fmt.Println("   ..updating client thru network's static rcvTipChangeNotify channel")
+				n.rcvTipChangeNotify <- h.getTip()
 				continue
 			}
 			// two or more headers that we do not have yet
@@ -268,8 +268,8 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *HeadersNotifyR
 			// updating less hdrs than requested is not an error - we hope to get them next time
 			fmt.Printf(" - updated %d headers - our new tip is %d\n", numHdrs, h.getTip())
 			if numHdrs > 0 {
-				// n.rcvTipChangeNotify <- h.getTip()
-				fmt.Println("   ..not updating client thru rcvTipChangeNotify for now")
+				fmt.Println("   ..updating client thru network's static rcvTipChangeNotify channel")
+				n.rcvTipChangeNotify <- h.getTip()
 			}
 		}
 	}
@@ -277,7 +277,7 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *HeadersNotifyR
 
 func (n *Node) syncHeadersOntoOurTip(nodeCtx context.Context, serverHeight int64) (int64, error) {
 	h := n.networkHeaders
-	ourTip := h.getTip()
+	ourTip := h.getTip() // locked
 	numMissing := serverHeight - ourTip
 	from := ourTip + 1
 	to := serverHeight
@@ -302,7 +302,7 @@ func (n *Node) updateFromBlocks(nodeCtx context.Context, from, to int64) (int64,
 			break
 		}
 		headersConnected++
-		time.Sleep(1000 * time.Millisecond) // for reducing session cost at electrumX server
+		time.Sleep(100 * time.Millisecond) // for reducing session cost at electrumX server
 	}
 	return headersConnected, nil
 }

@@ -85,6 +85,8 @@ func (s *session) runCostDecayLoop(nodeCtx context.Context) {
 			fmt.Println("nodeCtx.Done in runCostDecayLoop - exiting thread")
 			return
 		case <-t.C:
+			// TuningFactor times slower to give back credits for less and s
+			// smaller requests
 			if tune%TuningFactor == 0 {
 				s.reduceCost()
 			}

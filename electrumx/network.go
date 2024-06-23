@@ -56,7 +56,7 @@ func NewNetwork(config *ElectrumXConfig) *Network {
 		nodes:               make([]*MultiNode, 0),
 		leader:              nil,
 		headers:             h,
-		rcvTipChangeNotify:  make(chan int64, 1),
+		rcvTipChangeNotify:  make(chan int64), /// unbuffered
 		rcvScripthashNotify: make(chan *ScripthashStatusResult, 16),
 	}
 	return n
