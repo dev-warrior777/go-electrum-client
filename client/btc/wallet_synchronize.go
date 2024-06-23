@@ -159,7 +159,7 @@ func (ec *BtcElectrumClient) addressStatusNotify(ctx context.Context) error {
 			select {
 
 			case <-ctx.Done():
-				fmt.Println("notifyCtx.Done - in scripthash notify - exiting thread")
+				fmt.Println("ctx.Done - in client scripthash notify - exiting thread")
 				return
 
 			case status, ok := <-scripthashNotifyCh:

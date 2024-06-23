@@ -42,7 +42,8 @@ var (
 )
 
 // from electrum code - about 50% default server timeout for ping which is ~10m
-const pingInterval = 300 * time.Second
+// const pingInterval = 300 * time.Second
+const pingInterval = 10 * time.Second
 
 // ServerConn represents a connection to an Electrum server e.g. ElectrumX. It
 // is a single use type that must be replaced if the connection is lost. Use
@@ -100,7 +101,7 @@ func (sc *ServerConn) listen(ctx context.Context) {
 		msg, err := reader.ReadBytes(newline)
 		if err != nil {
 			if ctx.Err() == nil { // unexpected
-				sc.debug("ReadBytes: %v - conn closed", err)
+				fmt.Printf("ReadBytes: %v - conn closed", err)
 			}
 			sc.cancel()
 			return
@@ -109,7 +110,7 @@ func (sc *ServerConn) listen(ctx context.Context) {
 		var jsonResp response
 		err = json.Unmarshal(msg, &jsonResp)
 		if err != nil {
-			sc.debug("response Unmarshal error: %v", err)
+			fmt.Printf("response Unmarshal error: %v", err)
 			continue
 		}
 
@@ -125,11 +126,16 @@ func (sc *ServerConn) listen(ctx context.Context) {
 			}
 
 			if jsonResp.Method == "blockchain.headers.subscribe" {
+				fmt.Println("")
+				fmt.Println("---------------------------------------------------------------------------")
+				fmt.Println(" --- blockchain.headers.subscribe")
 				sc.headersTipChangeNotify(ntfnParams.Params)
 				continue
 			}
 
 			if jsonResp.Method == "blockchain.scripthash.subscribe" {
+				fmt.Println("---------------------------------------------------------------------------")
+				fmt.Println(" --- blockchain.scripthash.subscribe")
 				sc.scripthashStatusNotify(ntfnParams.Params)
 				continue
 			}
@@ -154,18 +160,19 @@ func (sc *ServerConn) pinger(ctx context.Context) {
 	for {
 		// listen => ReadBytes cannot wait forever. Reset the read deadline for
 		// the next ping's response, as the ping loop is running.
-		err := sc.conn.SetReadDeadline(time.Now().Add(pingInterval * 5 / 4))
+		newTime := time.Now().Add(pingInterval * 5 / 4)
+		// fmt.Printf("setReadDeadline %s\n", newTime.GoString())
+		err := sc.conn.SetReadDeadline(newTime)
 		if err != nil {
-			sc.debug("SetReadDeadline: %v", err) // just dropped conn, but for debugging...
+			// fmt.Printf("SetReadDeadline: %v", err) // just dropped conn, but for debugging...
 			sc.cancel()
 			return
 		}
 		if err = sc.Ping(ctx); err != nil {
-			sc.debug("Ping: %v", err)
+			fmt.Printf("Ping: %v", err)
 			sc.cancel()
 			return
 		}
-		// sc.debug("\nSuccessful PING\n")
 
 		select {
 		case <-ctx.Done():
@@ -266,7 +273,8 @@ func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*Server
 		debug:            logger,
 		respHandlers:     make(map[uint64]chan *response),
 		scripthashNotify: make(chan *ScripthashStatusResult, 1), // 128 bytes/slot
-		headersNotify:    make(chan *HeadersNotifyResult, 1),    // 168 bytes/slot
+		headersNotify:    make(chan *HeadersNotifyResult),       // 168 bytes/slot
+		// headersNotify:    make(chan *HeadersNotifyResult, 1),    // 168 bytes/slot
 	}
 
 	// Wrap the context with a cancel function for internal shutdown, and so the
@@ -285,7 +293,6 @@ func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*Server
 
 	go sc.listen(ctx) // must be running to receive response & notifications
 	go sc.pinger(ctx) // must be running or the server will disconnect after some time
-
 	go func() {
 		<-ctx.Done()
 		conn.Close()
@@ -438,6 +445,7 @@ func (sc *ServerConn) Request(ctx context.Context, method string, args any, resu
 	}
 
 	if resp == nil { // channel closed
+		fmt.Printf("CONNECTION TERMINATED\n")
 		return errors.New("connection terminated")
 	}
 
@@ -455,6 +463,7 @@ func (sc *ServerConn) Request(ctx context.Context, method string, args any, resu
 // demand, although a ServerConn started with ConnectServer will launch a pinger
 // goroutine to keep the connection alive.
 func (sc *ServerConn) Ping(ctx context.Context) error {
+	// fmt.Printf("   ** PING! **  %s:\n", time.Now().GoString())
 	return sc.Request(ctx, "server.ping", nil, nil)
 }
 
@@ -476,10 +485,10 @@ type ServerFeatures struct {
 	Hosts    map[string]map[string]uint32 `json:"hosts"` // e.g. {"host.com": {"tcp_port": 51001, "ssl_port": 51002}}, may be unset!
 	ProtoMax string                       `json:"protocol_max"`
 	ProtoMin string                       `json:"protocol_min"`
-	Pruning  any                          `json:"pruning,omitempty"` // supposedly an integer, but maybe a string or even JSON null
-	Version  string                       `json:"server_version"`    // server software version, not proto
-	HashFunc string                       `json:"hash_function"`     // e.g. sha256
-	// Services []string                     `json:"services,omitempty"` // e.g. ["tcp://host.com:51001", "ssl://host.com:51002"]
+	Pruning  any                          `json:"pruning,omitempty"`  // supposedly an integer, but maybe a string or even JSON null
+	Version  string                       `json:"server_version"`     // server software version, not proto
+	HashFunc string                       `json:"hash_function"`      // e.g. sha256
+	Services []string                     `json:"services,omitempty"` // e.g. ["tcp://host.com:51001", "ssl://host.com:51002"]
 }
 
 // Features requests the features claimed by the server. The caller should check
@@ -720,7 +729,7 @@ type HeadersNotifyResult struct {
 
 // GetHeadersNotify returns this connection owned recv channel for headers
 // tip change notifications. This connection will close the channel.
-func (sc *ServerConn) GetHeadersNotify() <-chan *HeadersNotifyResult {
+func (sc *ServerConn) GetHeadersNotify() chan *HeadersNotifyResult {
 	return sc.headersNotify
 }
 
@@ -752,7 +761,7 @@ type ScripthashStatusResult struct {
 
 // GetScripthashNotify returns this connection owned recv channel for scripthash
 // status change notifications. This connection will close the channel.
-func (sc *ServerConn) GetScripthashNotify() <-chan *ScripthashStatusResult {
+func (sc *ServerConn) GetScripthashNotify() chan *ScripthashStatusResult {
 	return sc.scripthashNotify
 }
 

@@ -63,7 +63,7 @@ type response struct {
 	Error  *RPCError       `json:"error"`
 }
 
-type ntfn = request // weird but true
+// type ntfn = request // weird but true
 type ntfnData struct {
 	Params json.RawMessage `json:"params"`
 }

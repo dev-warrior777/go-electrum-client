@@ -18,17 +18,19 @@ var ErrNoLeader = errors.New("no leader node is assigned")
 var nodeId uint32
 
 type MultiNode struct {
-	id      uint32
-	trusted bool
-	node    *Node
+	id         uint32
+	trusted    bool
+	node       *Node
+	nodeCancel context.CancelFunc
 }
 
-func newMultiNodeWithId(trusted bool, node *Node) *MultiNode {
+func newMultiNodeWithId(trusted bool, node *Node, nodeCancel context.CancelFunc) *MultiNode {
 	newId := atomic.LoadUint32(&nodeId)
 	m := &MultiNode{
-		id:      newId,
-		trusted: trusted,
-		node:    node,
+		id:         newId,
+		trusted:    trusted,
+		node:       node,
+		nodeCancel: nodeCancel,
 	}
 	atomic.AddUint32(&nodeId, 1)
 	return m
@@ -92,15 +94,18 @@ func (net *Network) start(ctx context.Context) error {
 	network := net.config.Chain.String()
 	nettype := net.config.Params.Name
 	genesis := net.config.Params.GenesisHash.String()
-	err = node.start(ctx, network, nettype, genesis)
+	// node runs in a sub context
+	nodeCtx, nodeCancel := context.WithCancel(ctx)
+	err = node.start(nodeCtx, network, nettype, genesis)
 	if err != nil {
+		nodeCancel()
 		return err
 	}
-	m := newMultiNodeWithId(true, node)
+	m := newMultiNodeWithId(true, node, nodeCancel)
 	net.addPeer(m)
 	net.leader = m
 
-	// TODO: ...bootstrap peers loop with leader
+	// TODO: ...bootstrap peers loop with leader's connction
 
 	net.started = true
 	return nil

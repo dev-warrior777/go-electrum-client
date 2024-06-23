@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-func (n *Node) scriptHashNotify(ctx context.Context) error {
+func (n *Node) scriptHashNotify(nodeCtx context.Context) error {
 	scriptHashNotifyChan := n.getScripthashNotify()
 	if scriptHashNotifyChan == nil {
 		return errors.New("server scripthash notify channel is nil")
@@ -16,14 +16,16 @@ func (n *Node) scriptHashNotify(ctx context.Context) error {
 		fmt.Println("leader node waiting for scripthash notifications")
 		for {
 			select {
-			case <-ctx.Done():
+			case <-nodeCtx.Done():
 				n.state = DISCONNECTING
-				fmt.Println("ctx.Done - in leader node scriptHashNotify - exiting thread")
+				fmt.Println("nodeCtx.Done - in scriptHashNotify - exiting thread")
+				n.server.conn.cancel()
+				<-n.server.conn.Done()
 				return
 			case scriptHashStatusResult, ok := <-scriptHashNotifyChan:
 				if !ok {
 					n.state = DISCONNECTING
-					fmt.Println("leader node scripthash notify channel was closed - exiting thread")
+					fmt.Println("scripthash notify channel was closed - exiting thread")
 					return
 				}
 				// forward to client wallet_synchronize.go - can block

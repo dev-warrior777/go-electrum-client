@@ -11,9 +11,7 @@ import (
 )
 
 type Server struct {
-	conn *ServerConn
-	// scripthashNotifyChan <-chan *ScripthashStatusResult
-	// headersNotifyChan    <-chan *HeadersNotifyResult
+	conn      *ServerConn
 	connected bool
 }
 

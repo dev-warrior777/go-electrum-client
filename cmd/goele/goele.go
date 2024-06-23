@@ -97,6 +97,7 @@ func configure() (string, *client.ClientConfig, error) {
 	fmt.Println("coin:", *coin)
 	fmt.Println("net:", *net)
 	cfg, err := makeBasicConfig(*coin, *net)
+	fmt.Printf("electrumX server address: %s\n", cfg.TrustedPeer)
 	return *pass, cfg, err
 }
 

@@ -21,7 +21,7 @@ const (
 )
 
 type ClientConfig struct {
-	// The blockchain, Bitcoin, Dash, etc
+	// The blockchain, btc, dash, etc
 	Chain wallet.CoinType
 
 	// Size of a block header for this chain - defaults to 80 bytes.

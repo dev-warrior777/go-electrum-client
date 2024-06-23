@@ -33,14 +33,13 @@ type Headers struct {
 	// checkpoint height to start the file. For regtest that is genesis.
 	net *chaincfg.Params
 	// decoded headers stored by height
-	hdrsMtx      sync.RWMutex
-	hdrs         map[int64]*wire.BlockHeader
-	blkHdrs      map[chainhash.Hash]int64
-	startPoint   int64
-	tip          int64
-	synced       bool
-	tipChangeMtx sync.Mutex
-	tipChange    chan int64
+	hdrsMtx    sync.RWMutex
+	hdrs       map[int64]*wire.BlockHeader
+	blkHdrs    map[chainhash.Hash]int64
+	startPoint int64
+	tip        int64
+	synced     bool
+	tipChange  chan int64
 }
 
 func NewHeaders(cfg *ElectrumXConfig) *Headers {
@@ -235,13 +234,13 @@ func (h *Headers) getBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader
 	return headers, nil
 }
 
-func (n *Node) getHeaderForBlockHash(blkHash *chainhash.Hash) *wire.BlockHeader {
-	h := n.networkHeaders
-	h.hdrsMtx.RLock()
-	defer h.hdrsMtx.RUnlock()
-	height := h.blkHdrs[*blkHash]
-	return h.hdrs[height]
-}
+// func (n *Node) getHeaderForBlockHash(blkHash *chainhash.Hash) *wire.BlockHeader {
+// 	h := n.networkHeaders
+// 	h.hdrsMtx.RLock()
+// 	defer h.hdrsMtx.RUnlock()
+// 	height := h.blkHdrs[*blkHash]
+// 	return h.hdrs[height]
+// }
 
 func (h *Headers) getTipBlock() *wire.BlockHeader {
 	h.hdrsMtx.RLock()

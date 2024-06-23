@@ -14,7 +14,7 @@ import (
 )
 
 type WalletConfig struct {
-	// The blockchain, Bitcoin, Dash, etc
+	// The blockchain, btc, dash, etc
 	Chain CoinType
 
 	// Network parameters. Set mainnet, testnet using this.
@@ -44,7 +44,6 @@ type WalletConfig struct {
 }
 
 type ElectrumWallet interface {
-
 	// Start the wallet
 	Start()
 
