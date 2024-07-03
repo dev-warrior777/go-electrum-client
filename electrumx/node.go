@@ -25,6 +25,7 @@ type Node struct {
 	stateMtx               sync.RWMutex
 	nodeCtx                context.Context
 	serverAddr             string
+	netProto               string
 	connectOpts            *ConnectOpts
 	server                 *Server
 	leader                 bool
@@ -72,6 +73,7 @@ func newNode(
 		nodeCtx:     nil,
 		connectOpts: connectOpts,
 		serverAddr:  addr,
+		netProto:    netProto,
 		server: &Server{
 			conn:      nil,
 			connected: false,
@@ -96,7 +98,10 @@ func (n *Node) start(nodeCtx context.Context, network, nettype, genesis string) 
 	}
 	n.server.conn = sc
 	n.server.connected = true
-	fmt.Printf("** Connected to %s using protocol version: %s **\n", nettype, sc.Proto())
+
+	fmt.Printf(
+		"** Connected to %s over %s using server protocol version: %s **\n", nettype, n.netProto, sc.Proto())
+
 	// check genesis
 	feats, err := sc.Features(nodeCtx)
 	if err != nil {
