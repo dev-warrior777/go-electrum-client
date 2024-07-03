@@ -59,7 +59,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 	switch net {
 	case "regtest", "simnet":
 		cfg.Params = &chaincfg.RegressionNetParams
-		cfg.TrustedPeer = electrumx.ServerAddr{
+		cfg.TrustedPeer = &electrumx.NodeServerAddr{
 			// Net: "ssl", Addr: "127.0.0.1:57002", // debug server
 			Net: "ssl", Addr: "127.0.0.1:53002",
 		}
@@ -67,20 +67,20 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		cfg.Testing = true
 	case "testnet":
 		cfg.Params = &chaincfg.TestNet3Params
-		cfg.TrustedPeer = electrumx.ServerAddr{
-			// Net: "ssl", Addr: "testnet.aranguren.org:51002", // down?
+		cfg.TrustedPeer = &electrumx.NodeServerAddr{
+			Net: "ssl", Addr: "testnet.aranguren.org:51002", // down?
 			// Net: "ssl", Addr: "testnet.hsmiths.com:53012", // down?
 			// Net: "ssl", Addr: "electrum.blockstream.info:60002", // no verbose gtx
-			// Net: "ssl", Addr: "blackie.c3-soft.com:57006", // down?
+			// Net: "ssl", Addr: "blackie.c3-soft.com:57006", // down
 			// Net: "tcp", Addr: "blackie.c3-soft.com:57005", // down
-			// Net: "ssl", Addr: "testnet.qtornado.com:51002",
-			Net: "tcp", Addr: "testnet.qtornado.com:51001",
+			// Net: "ssl", Addr: "testnet.qtornado.com:51002", // doesn't send peers .. ok for BlockHeaders
+			// Net: "tcp", Addr: "testnet.qtornado.com:51001",
 		}
 		cfg.StoreEncSeed = true
 		cfg.Testing = true
 	case "mainnet":
 		cfg.Params = &chaincfg.MainNetParams
-		cfg.TrustedPeer = electrumx.ServerAddr{
+		cfg.TrustedPeer = &electrumx.NodeServerAddr{
 			Net: "ssl", Addr: "elx.bitske.com:50002",
 		}
 		cfg.StoreEncSeed = false

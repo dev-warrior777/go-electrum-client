@@ -15,20 +15,24 @@ type Server struct {
 	connected bool
 }
 
-type ServerAddr struct {
+type NodeServerAddr struct {
 	Net, Addr string
 }
 
-func (a ServerAddr) Network() string {
-	return a.Net
+func (nsa NodeServerAddr) Network() string {
+	return nsa.Net
 }
 
-func (a ServerAddr) String() string {
-	return a.Addr
+func (nsa NodeServerAddr) String() string {
+	return nsa.Addr
+}
+
+func (nsa *NodeServerAddr) IsEqual(other *NodeServerAddr) bool {
+	return nsa.Addr == other.Addr && nsa.Net == other.Net
 }
 
 // Ensure simpleAddr implements the net.Addr interface.
-var _ net.Addr = ServerAddr{}
+var _ net.Addr = NodeServerAddr{}
 
 type ElectrumXConfig struct {
 	// The blockchain, Bitcoin, Dash, etc
@@ -48,7 +52,7 @@ type ElectrumXConfig struct {
 
 	// If you wish to connect to a single trusted electrumX peer set this.
 	// For now it *must be set* while we move to multi-node electrum interface
-	TrustedPeer net.Addr
+	TrustedPeer *NodeServerAddr
 
 	// A Tor proxy can be set here causing the wallet will use Tor. TODO:
 	Proxy proxy.Dialer

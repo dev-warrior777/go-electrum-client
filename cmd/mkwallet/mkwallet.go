@@ -59,7 +59,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 	switch net {
 	case "regtest", "simnet":
 		cfg.Params = &chaincfg.RegressionNetParams
-		cfg.TrustedPeer = electrumx.ServerAddr{
+		cfg.TrustedPeer = &electrumx.NodeServerAddr{
 			// Net: "ssl", Addr: "127.0.0.1:57002", // debug server
 			Net: "ssl", Addr: "127.0.0.1:53002",
 		}
@@ -67,7 +67,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		cfg.Testing = true
 	case "testnet", "testnet3":
 		cfg.Params = &chaincfg.TestNet3Params
-		cfg.TrustedPeer = electrumx.ServerAddr{
+		cfg.TrustedPeer = &electrumx.NodeServerAddr{
 			// Net: "ssl", Addr: "testnet.aranguren.org:51002",
 			// Net: "tcp", Addr: "testnet.aranguren.org:51001",
 			// Net: "ssl", Addr: "testnet.hsmiths.com:53012",
@@ -79,7 +79,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		cfg.Testing = true
 	case "mainnet":
 		cfg.Params = &chaincfg.MainNetParams
-		cfg.TrustedPeer = electrumx.ServerAddr{
+		cfg.TrustedPeer = &electrumx.NodeServerAddr{
 			Net: "ssl", Addr: "elx.bitske.com:50002",
 		}
 		cfg.StoreEncSeed = false

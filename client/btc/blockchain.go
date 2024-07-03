@@ -16,7 +16,7 @@ func (ec *BtcElectrumClient) Tip() (tip int64) {
 // tipChange receives notifications from network leader nodes. If an api user
 // has registered to receive tip change notifications - forward the notification
 // on the client's registered channel. rcvTipChangeNotify is a single unbuffered
-// channel kept open by network.go.
+// channel kept open by network.go. Run as a goroutine from client startup.
 func (ec *BtcElectrumClient) tipChange(ctx context.Context) {
 	for {
 		select {
@@ -28,7 +28,8 @@ func (ec *BtcElectrumClient) tipChange(ctx context.Context) {
 				fmt.Println("client tipChange - channel closed - exiting thread")
 				return
 			}
-			fmt.Printf("client tip change - new headers tip is %d\n", tip)
+			fmt.Printf("     ..client tip change - new headers tip is %d\n", tip)
+			fmt.Println("--------------------------------------------------------------------------------")
 			// update wallet's notion of the tip for confirmations
 			ec.updateWalletTip(tip)
 			// send tip change to an api user if channel exists - locked during

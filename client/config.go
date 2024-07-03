@@ -1,7 +1,6 @@
 package client
 
 import (
-	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -46,9 +45,8 @@ type ClientConfig struct {
 	DB wallet.Datastore
 
 	// Currently we use this electrumX server to bootstrap others so it should
-	// be set. Later we could use a file of somewhat trusted servers. See Also:
-	// servers_testnet.json from the electrum project and copied here.
-	TrustedPeer net.Addr
+	// be set.
+	TrustedPeer *electrumx.NodeServerAddr
 
 	// A Tor proxy can be set here. TODO:
 	Proxy proxy.Dialer

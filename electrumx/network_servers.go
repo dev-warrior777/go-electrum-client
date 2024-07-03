@@ -1,0 +1,305 @@
+package electrumx
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"path"
+	"strings"
+)
+
+const serverAddrFileName = "network_servers.json"
+
+type serverAddr struct {
+	Net     string `json:"net"`
+	Address string `json:"addr"`
+	Host    string `json:"host"`
+	IsOnion bool   `json:"is_onion"`
+	Version string `json:"version"`
+	Caps    string `json:"caps"`          // comma separated string eg. "cannot_lead,no_blks,..."
+	Rep     int    `json:"rep,omitempty"` // reputation score - not implemented as yet
+}
+
+// Incoming list from server_connection.go - constructed using reflection
+//
+//	  type PeersResult struct {
+//	  	  Addr  string // IP address or .onion name
+//		  Host  string
+//		  Feats []string
+//	  }
+//
+// ..which we build into a list of serverAddr structs which can be used in both
+// memory and persisted to 'network_servers.json' file in the data dir.
+
+// getServers gets server peers (from the peerNode's server) which that server
+// currently knows; which can be different than known persisted servers held by
+// goele.
+func (net *Network) getServers(ctx context.Context) error {
+	if !net.started {
+		return ErrNoNetwork
+	}
+	if net.getLeader() == nil {
+		return ErrNoLeader
+	}
+	peerResults, err := net.getLeader().node.getServerPeers(ctx)
+	if err != nil {
+		return err
+	}
+	if len(peerResults) == 0 {
+		return nil
+	}
+	err = net.addIncomingservers(peerResults)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// addIncomingservers converts incoming peerResults and updates memory & stored
+// server lists
+func (net *Network) addIncomingservers(in []*PeersResult) error {
+	servers := net.makeIncomingServerAddrs(in)
+	if len(servers) == 0 {
+		// probably redundant but at least ine peer I started on testnet returned
+		// an empty list
+		return errors.New("no incoming")
+	}
+	err := net.updateNetworkServers(servers)
+	if err != nil {
+		return err
+	}
+	err = net.updateStoredServers(servers)
+	if err != nil {
+		// if error we still have the old file contents; so just log
+		fmt.Printf("error: %v\n", err)
+	}
+	return nil
+}
+
+func (net *Network) makeIncomingServerAddrs(in []*PeersResult) []*serverAddr {
+	var servers = make([]*serverAddr, 0, 2*len(in))
+
+	for _, pres := range in {
+		var isTcp bool
+		var isSsl bool
+
+		var version string
+		var tcpPort string
+		var sslPort string
+
+		feats := pres.Feats
+		for _, feat := range feats {
+			switch []rune(feat)[0] {
+			case 'v':
+				version = feat[1:]
+			case 't':
+				tcpPort = feat[1:]
+				isTcp = true
+			case 's':
+				sslPort = feat[1:]
+				isSsl = true
+			}
+		}
+		if isTcp {
+			if len(tcpPort) == 0 {
+				tcpPort = "51001" // default if no explicit port after 't'
+			}
+			saddr := &serverAddr{
+				Net:     "tcp",
+				Address: pres.Addr + ":" + tcpPort,
+				Host:    pres.Host,
+				IsOnion: strings.HasSuffix(pres.Host, ".onion"),
+				Version: version,
+				Caps:    "",
+			}
+			servers = append(servers, saddr)
+		}
+		if isSsl {
+			if len(sslPort) == 0 {
+				sslPort = "51002" // default if no explicit port after 's'
+			}
+			saddr := &serverAddr{
+				Net:     "ssl",
+				Address: pres.Addr + ":" + sslPort,
+				Host:    pres.Host,
+				IsOnion: strings.HasSuffix(pres.Host, ".onion"),
+				Version: version,
+				Caps:    "",
+			}
+			servers = append(servers, saddr)
+		}
+	}
+	return servers
+}
+
+func (net *Network) updateNetworkServers(servers []*serverAddr) error {
+	fmt.Printf("updateNetworkServers: len(serverAddr) = %v\n", len(servers))
+	net.knownServersMtx.Lock()
+	defer net.knownServersMtx.Unlock()
+	if len(net.knownServers) == 0 {
+		net.knownServers = servers
+		return nil
+	}
+	// add any new servers that we do not have already
+	var tmpAdd = []*serverAddr{}
+	for _, new := range servers { // for each incoming server
+		matchedKnown := false
+		for _, got := range net.knownServers { // loop through what we have already
+			// already got?
+			if got.Address == new.Address {
+				matchedKnown = true
+			}
+		}
+		if !matchedKnown {
+			tmpAdd = append(tmpAdd, new)
+		}
+	}
+	net.knownServers = append(net.knownServers, tmpAdd...)
+	return nil
+}
+
+func (net *Network) updateStoredServers(servers []*serverAddr) error {
+	fmt.Printf("updateStoredServers: len(serverAddr) = %v\n", len(servers))
+	net.knownServersMtx.Lock()
+	defer net.knownServersMtx.Unlock()
+	stored, numRead, err := net.readServerAddrFile()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("updateStoredServers - num read from file is %d - update done\n", numRead)
+	if numRead == 0 {
+		stored = servers
+		return net.writeServerAddrFile(stored)
+	}
+	// add any new servers that we have not stored already
+	var tmpAdd = []*serverAddr{}
+	for _, new := range servers {
+		matchedKnown := false
+		for _, got := range stored {
+			if got.Address == new.Address {
+				matchedKnown = true
+			}
+		}
+		if !matchedKnown {
+			tmpAdd = append(tmpAdd, new)
+		}
+	}
+	stored = append(stored, tmpAdd...)
+	err = net.writeServerAddrFile(stored)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (net *Network) removeServer(server *serverAddr) error {
+	net.knownServersMtx.Lock()
+	defer net.knownServersMtx.Unlock()
+	// remove from memory first
+	var lessKnown = []*serverAddr{}
+	for _, known := range net.knownServers {
+		if known.Address == server.Address {
+			continue
+		}
+		lessKnown = append(lessKnown, known)
+	}
+	net.knownServers = lessKnown
+	// remove from file
+	stored, numRead, err := net.readServerAddrFile()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("removeServer -- num read from file is %d\n", numRead)
+	// find server in the list and remove
+	var lessStored []*serverAddr = []*serverAddr{}
+	for _, got := range stored {
+		if got.Address == server.Address {
+			continue
+		}
+		lessStored = append(lessStored, got)
+	}
+
+	return net.writeServerAddrFile(lessStored)
+}
+
+func (net *Network) readServerAddrFile() ([]*serverAddr, int, error) {
+	serverAddrFile := path.Join(net.config.DataDir, serverAddrFileName)
+	f, err := os.OpenFile(serverAddrFile, os.O_CREATE|os.O_RDONLY, 0644)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer f.Close()
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(b) == 0 {
+		// 0 read is not an error
+		return nil, 0, nil
+	}
+	var servers []*serverAddr
+	buf := bytes.NewBuffer(b)
+	d := json.NewDecoder(buf)
+	err = d.Decode(&servers)
+	if err != nil {
+		fmt.Printf("json Decode: %v\n", err)
+		return nil, 0, err
+	}
+	return servers, len(servers), nil
+}
+
+func (net *Network) writeServerAddrFile(servers []*serverAddr) error {
+	jsonBytes, err := json.MarshalIndent(servers, "", "  ")
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(servers) == 0 {
+		// json will marshal an empty slice to '[]' ..as it should ;-)
+		// so write nil slice after truncation so we get an empty file
+		// this is checked for just before the write syscall
+		jsonBytes = []byte(nil)
+	}
+	// write all marshalled json after truncating file to 0 bytes
+	serverAddrFile := path.Join(net.config.DataDir, serverAddrFileName)
+	f, err := os.OpenFile(serverAddrFile, os.O_RDWR, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	err = f.Truncate(0)
+	if err != nil {
+		return err
+	}
+	newFileOffset, err := f.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
+	if newFileOffset != 0 {
+		return fmt.Errorf("bad file offset %d after truncate then seek(0,0)", newFileOffset)
+	}
+	n, err := f.Write(jsonBytes)
+	if err != nil {
+		return err
+	}
+	if n != len(jsonBytes) {
+		return fmt.Errorf("written %d bytes, wanted to write %d", n, len(jsonBytes))
+	}
+	return nil
+}
+
+// loadKnownServers loads any stored servers at network startup
+func (net *Network) loadKnownServers() (int, error) {
+	net.knownServersMtx.Lock() // not really needed when called during net.start
+	defer net.knownServersMtx.Unlock()
+	stored, numRead, err := net.readServerAddrFile()
+	if err != nil {
+		return 0, err
+	}
+	net.knownServers = stored
+	return numRead, nil
+}

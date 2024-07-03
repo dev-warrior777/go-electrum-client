@@ -85,8 +85,9 @@ func (s *session) runCostDecayLoop(nodeCtx context.Context) {
 			fmt.Println("nodeCtx.Done in runCostDecayLoop - exiting thread")
 			return
 		case <-t.C:
-			// TuningFactor times slower to give back credits for less and s
-			// smaller requests
+			// TuningFactor times slower to give back credits for less frequent
+			// and smaller request + response sizes. Should be very conservative
+			// to be useful.
 			if tune%TuningFactor == 0 {
 				s.reduceCost()
 			}
@@ -105,7 +106,7 @@ func (s *session) bumpCost(incurred float32) {
 	s.costMtx.Lock()
 	defer s.costMtx.Unlock()
 	s.cost += incurred
-	fmt.Printf("incurred: %f, total-cost: %f\n", incurred, s.cost)
+	fmt.Printf(" - incurred: %f, total-cost: %f\n", incurred, s.cost)
 }
 
 func (s *session) bumpCostBytes(numBytes int) {

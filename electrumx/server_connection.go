@@ -16,8 +16,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -164,7 +162,7 @@ func (sc *ServerConn) pinger(ctx context.Context) {
 		// fmt.Printf("setReadDeadline %s\n", newTime.GoString())
 		err := sc.conn.SetReadDeadline(newTime)
 		if err != nil {
-			// fmt.Printf("SetReadDeadline: %v", err) // just dropped conn, but for debugging...
+			fmt.Printf("SetReadDeadline: %v", err) // just dropped conn, but for debugging...
 			sc.cancel()
 			return
 		}
@@ -479,7 +477,7 @@ func (sc *ServerConn) Banner(ctx context.Context) (string, error) {
 	return resp, nil
 }
 
-// ServerFeatures represents the result of a server features requests.
+// ServerFeatures represents the result of a server features request.
 type ServerFeatures struct {
 	Genesis  string                       `json:"genesis_hash"`
 	Hosts    map[string]map[string]uint32 `json:"hosts"` // e.g. {"host.com": {"tcp_port": 51001, "ssl_port": 51002}}, may be unset!
@@ -502,7 +500,9 @@ func (sc *ServerConn) Features(ctx context.Context) (*ServerFeatures, error) {
 	return &feats, nil
 }
 
-// PeersResult represents the results of a peers server request.
+// PeersResult represents the results of a peers server request. We further break
+// this info down in network_servers.go as this struct is awkward and we want to
+// persist some of it in a json file like electrum.
 type PeersResult struct {
 	Addr  string // IP address or .onion name
 	Host  string
@@ -511,7 +511,7 @@ type PeersResult struct {
 
 // Peers requests the known peers from a server (other servers). See
 // SSLPeerAddrs to assist parsing useable peers.
-func (sc *ServerConn) Peers(ctx context.Context) ([]*PeersResult, error) {
+func (sc *ServerConn) serverPeers(ctx context.Context) ([]*PeersResult, error) {
 	// Note that the Electrum exchange wallet type does not currently use this
 	// method since it follows the Electrum wallet server peer or one of the
 	// wallets other servers. See (*electrumWallet).connect and
@@ -524,6 +524,7 @@ func (sc *ServerConn) Peers(ctx context.Context) ([]*PeersResult, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	peers := make([]*PeersResult, 0, len(resp))
 	for _, peer := range resp {
 		if len(peer) != 3 {
@@ -561,52 +562,6 @@ func (sc *ServerConn) Peers(ctx context.Context) ([]*PeersResult, error) {
 		})
 	}
 	return peers, nil
-}
-
-// SSLPeerAddrs filters the peers slice and returns the addresses in a
-// "host:port" format in separate slices for SSL-enabled servers and optionally
-// TCP-only hidden services (.onion host names). Note that if requesting to
-// include onion hosts, the SSL slice may include onion hosts that also use SSL.
-func SSLPeerAddrs(peers []*PeersResult, includeOnion bool) (ssl, tcpOnlyOnion []string) {
-peerloop:
-	for _, peer := range peers {
-		isOnion := strings.HasSuffix(peer.Addr, ".onion")
-		if isOnion && !includeOnion {
-			continue
-		}
-		var tcpOnion string // host to accept if no ssl
-		for _, feat := range peer.Feats {
-			// We require a port set after the transport letter. The default
-			// port depends on the asset network, so we could consider providing
-			// that as an input in the future, but most servers set a port.
-			if len(feat) < 2 {
-				continue
-			}
-			switch []rune(feat)[0] {
-			case 't':
-				if !isOnion {
-					continue
-				}
-				port := feat[1:]
-				if _, err := strconv.Atoi(port); err != nil {
-					continue
-				}
-				tcpOnion = net.JoinHostPort(peer.Host, port) // hang onto this if there is no ssl
-			case 's':
-				port := feat[1:]
-				if _, err := strconv.Atoi(port); err != nil {
-					continue
-				}
-				addr := net.JoinHostPort(peer.Host, port)
-				ssl = append(ssl, addr) // we know the first rune is one byte
-				continue peerloop
-			}
-		}
-		if tcpOnion != "" {
-			tcpOnlyOnion = append(tcpOnlyOnion, tcpOnion)
-		}
-	}
-	return
 }
 
 // SigScript represents the signature script in a Vin returned by a transaction

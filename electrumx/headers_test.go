@@ -68,27 +68,6 @@ func mkHdrFile() (*os.File, int, error) {
 	return f, n, nil
 }
 
-func makeRegtestConfig() (*ElectrumXConfig, error) {
-	// TODO: make a full dummy electrumx cfg for test
-
-	// cfg := client.NewDefaultConfig()
-	// cfg.Chain = wallet.Bitcoin
-	// cfg.Params = &chaincfg.RegressionNetParams
-	// cfg.StoreEncSeed = true
-	// appDir, err := client.GetConfigPath()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// regtestDir := filepath.Join(appDir, "btc", "regtest")
-	// err = os.MkdirAll(regtestDir, os.ModeDir|0777)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// cfg.DataDir = regtestDir
-	// return cfg, nil
-	return nil, nil
-}
-
 func TestAppendHeaders(t *testing.T) {
 	f, err := os.CreateTemp("/tmp", "cli_tst_")
 	if err != nil {
@@ -191,8 +170,14 @@ func TestReadStoreHeaderFile(t *testing.T) {
 	fmt.Printf("read %d bytes %d headers from headerfile\n", read, numHdrs)
 
 	// store headers
-	cfg, _ := makeRegtestConfig()
-	h := NewHeaders(cfg)
+	h := Headers{
+		hdrFilePath: f.Name(),
+		net:         &chaincfg.RegressionNetParams,
+		hdrs:        make(map[int64]*wire.BlockHeader),
+		blkHdrs:     make(map[chainhash.Hash]int64),
+		tip:         0,
+		synced:      false,
+	}
 	err = h.store(b, 0)
 	if err != nil {
 		log.Fatal(err)
@@ -210,6 +195,68 @@ func TestReadStoreHeaderFile(t *testing.T) {
 			log.Fatal("header chain verify failed")
 		}
 		fmt.Printf("verified header at height %d has blockhash %s\n", height-1, prevHdrBlkHash.String())
+	}
+}
+
+func TestTruncateHeadersFile(t *testing.T) {
+	f, size, err := mkHdrFile()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fname := f.Name()
+
+	defer f.Close() // <-------------------open
+
+	h := Headers{
+		hdrFilePath: fname,
+		net:         &chaincfg.RegressionNetParams,
+		hdrs:        make(map[int64]*wire.BlockHeader),
+		blkHdrs:     make(map[chainhash.Hash]int64),
+		tip:         0,
+		synced:      false,
+	}
+	numHeaders, err := h.bytesToNumHdrs(int64(size))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = h.truncateHeadersFile(1)
+	if err == nil {
+		log.Fatal(err)
+	}
+	h.synced = true
+	_, err = h.truncateHeadersFile(-1)
+	if err == nil {
+		log.Fatal(err)
+	}
+	newNumHeaders, err := h.truncateHeadersFile(1)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if newNumHeaders != numHeaders-1 {
+		log.Fatalf("invaid number of headers returned %d", newNumHeaders)
+	}
+	newNumHeaders, err = h.truncateHeadersFile(5)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if newNumHeaders != numHeaders-1-5 {
+		log.Fatalf("invaid number of headers returned %d", newNumHeaders)
+	}
+	newNumHeaders, err = h.truncateHeadersFile(1)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if newNumHeaders != numHeaders-1-5-1 {
+		log.Fatalf("invaid number of headers returned %d", newNumHeaders)
+	}
+
+	newNumHeaders, err = h.truncateHeadersFile(1)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if newNumHeaders != 0 {
+		log.Fatalf("invaid number of headers returned %d", newNumHeaders)
 	}
 }
 
@@ -257,8 +304,14 @@ var hdr3 = []byte{
 }
 
 func TestStore(t *testing.T) {
-	cfg, _ := makeRegtestConfig()
-	h := NewHeaders(cfg)
+	h := Headers{
+		hdrFilePath: "<empty>",
+		net:         &chaincfg.RegressionNetParams,
+		hdrs:        make(map[int64]*wire.BlockHeader),
+		blkHdrs:     make(map[chainhash.Hash]int64),
+		tip:         0,
+		synced:      false,
+	}
 	err := h.store(hdr, 0)
 	if err != nil {
 		log.Fatal(err)
@@ -298,8 +351,14 @@ func TestStore(t *testing.T) {
 }
 
 func TestMapIter(t *testing.T) {
-	cfg, _ := makeRegtestConfig()
-	h := NewHeaders(cfg)
+	h := Headers{
+		hdrFilePath: "<empty>",
+		net:         &chaincfg.RegressionNetParams,
+		hdrs:        make(map[int64]*wire.BlockHeader),
+		blkHdrs:     make(map[chainhash.Hash]int64),
+		tip:         0,
+		synced:      false,
+	}
 	err := h.store(hdrFileReg, 0)
 	if err != nil {
 		log.Fatal(err)
@@ -314,8 +373,14 @@ func TestMapIter(t *testing.T) {
 }
 
 func TestStoreHashes(t *testing.T) {
-	cfg, _ := makeRegtestConfig()
-	h := NewHeaders(cfg)
+	h := Headers{
+		hdrFilePath: "<empty>",
+		net:         &chaincfg.RegressionNetParams,
+		hdrs:        make(map[int64]*wire.BlockHeader),
+		blkHdrs:     make(map[chainhash.Hash]int64),
+		tip:         0,
+		synced:      false,
+	}
 	err := h.store(hdrFileReg, 0)
 	if err != nil {
 		log.Fatal(err)

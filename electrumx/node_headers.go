@@ -19,7 +19,6 @@ func (n *Node) syncHeaders(nodeCtx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// return n.headersNotify(nodeCtx)
 	return nil
 }
 
@@ -121,8 +120,7 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 		}
 	}
 
-	// 3. Read up to date blockchain_headers file - this can be improved since
-	//    we already read most of it but for now: simplicity
+	// 3. Read up to date blockchain_headers file
 	b2, err := h.readAllBytesFromFile()
 	if err != nil {
 		return err
@@ -157,7 +155,7 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 //     protocol does not guarantee notification of all intermediate block headers.
 func (n *Node) headersNotify(nodeCtx context.Context) error {
 	h := n.networkHeaders
-	// get a channel to receive notifications from this node's server connection
+	// get a channel to receive notifications from this node's <- server connection
 	hdrsNotifyChan := n.getHeadersNotify()
 	if hdrsNotifyChan == nil {
 		return errors.New("server headers notify channel is nil")
@@ -179,7 +177,7 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 		fmt.Println("=== Waiting for headers ===")
 		for {
 			if nodeCtx.Err() != nil {
-				n.state = DISCONNECTING
+				n.setState(DISCONNECTED)
 				fmt.Println("nodeCtx.Done - in headers notify - exiting thread")
 				return
 			}
@@ -193,13 +191,15 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 	return nil
 }
 
-// headerQueue receives incoming headers notify results from hdrsQueueChan - run as a goroutune
+// headerQueue receives incoming headers notify results from qhan
+// - run as a goroutine
 // The client local 'blockhain_headers' file is appended and the headers map updated and verified.
 func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *HeadersNotifyResult) {
 	h := n.networkHeaders
 	fmt.Println("headrs queue started")
 	for {
 		if nodeCtx.Err() != nil {
+			n.setState(DISCONNECTED)
 			fmt.Println("nodeCtx.Done - in headersQueue - exiting thread")
 			return
 		}
@@ -213,7 +213,7 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *HeadersNotifyR
 				return
 			}
 
-			ourTip := h.getTip()
+			ourTip := h.getTip() // locked .. propagate this value to syncHeadersOntoOurTip
 
 			// dbg: TODO: remove --------------------------------------------->
 			fmt.Printf(" --- headerQueue %v\n", time.Now())
@@ -248,7 +248,7 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *HeadersNotifyR
 			if hdrRes.Height == (ourTip + 1) {
 				// simple case one header incoming .. try connect on top of our chain
 				if !n.connectTip(hdrRes.Hex) {
-					fmt.Printf(" - possible reorg at server height %d - skipping for now - TODO:\n", hdrRes.Height)
+					fmt.Printf(" - possible reorg at server height %d - skipping for now - PLACE AAA\n", hdrRes.Height)
 					n.session.bumpCostError()
 					continue
 				}
@@ -256,8 +256,8 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *HeadersNotifyR
 				// connected the block & updated our headers tip
 				fmt.Printf(" - updated 1 header - our new tip is %d\n", h.getTip())
 				// notify client
-				fmt.Println("   ..updating client thru network's static rcvTipChangeNotify channel")
-				n.rcvTipChangeNotify <- h.getTip()
+				fmt.Println("   ..updating client thru network's static clientTipChangeNotify channel")
+				n.clientTipChangeNotify <- h.getTip()
 				continue
 			}
 			// two or more headers that we do not have yet
@@ -268,8 +268,8 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *HeadersNotifyR
 			// updating less hdrs than requested is not an error - we hope to get them next time
 			fmt.Printf(" - updated %d headers - our new tip is %d\n", numHdrs, h.getTip())
 			if numHdrs > 0 {
-				fmt.Println("   ..updating client thru network's static rcvTipChangeNotify channel")
-				n.rcvTipChangeNotify <- h.getTip()
+				fmt.Println("   ..updating client thru network's clientTipChangeNotify channel")
+				n.clientTipChangeNotify <- h.getTip()
 			}
 		}
 	}
@@ -277,7 +277,7 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *HeadersNotifyR
 
 func (n *Node) syncHeadersOntoOurTip(nodeCtx context.Context, serverHeight int64) (int64, error) {
 	h := n.networkHeaders
-	ourTip := h.getTip() // locked
+	ourTip := h.getTip()
 	numMissing := serverHeight - ourTip
 	from := ourTip + 1
 	to := serverHeight
@@ -297,8 +297,24 @@ func (n *Node) updateFromBlocks(nodeCtx context.Context, from, to int64) (int64,
 		if err != nil {
 			break
 		}
-		fmt.Println()
+
+		// dbg
+		fmt.Println("incoming:")
+		hash := dbgHashHexFromHeaderHex(header)
+		prev := dbgStringHeaderPrev(header)
+		fmt.Printf("hdr hash: %s hdr prev: %s\n", hash, prev)
+		// enddbg
+
 		if !n.connectTip(header) {
+
+			// debug------------------>
+			if i == 0 {
+				fmt.Println("dbgTryRecoverHack")
+				n.dbgTryRecoverHack()
+				fmt.Printf("*** removed 10 stored headers from tip -  new tip is %d - PLACE BBB\n", n.networkHeaders.getTip())
+			}
+			// <-----------------------
+
 			break
 		}
 		headersConnected++
@@ -316,10 +332,6 @@ func (n *Node) updateFromChunk(nodeCtx context.Context, from, to int64) (int64, 
 		fmt.Printf("BlockHeaders failed - %v\n", err)
 		return 0, nil
 	}
-
-	// dbg dump the blocks - TODO: remove
-	fmt.Println(hdrsRes.HexConcat)
-
 	// check max send parameter for validity
 	if hdrsRes.Max < 2016 {
 		// corrupted or electrumx server code different from expected
@@ -343,17 +355,27 @@ func (n *Node) updateFromChunk(nodeCtx context.Context, from, to int64) (int64, 
 	}
 
 	// dbg
+	fmt.Println("incoming:")
 	for i := 0; i < hdrsRes.Count; i++ {
 		header := hdrsRes.HexConcat[i*oneHdrLen : (i+1)*oneHdrLen]
 		hash := dbgHashHexFromHeaderHex(header)
 		prev := dbgStringHeaderPrev(header)
-		fmt.Printf("header hash: %s hdr prev: %s\n", hash, prev)
+		fmt.Printf("hdr hash: %s hdr prev: %s\n", hash, prev)
 	}
 	// enddbg
 
 	for i := 0; i < hdrsRes.Count; i++ {
 		header := hdrsRes.HexConcat[i*oneHdrLen : (i+1)*oneHdrLen]
 		if !n.connectTip(header) {
+
+			// debug------------------>
+			if i == 0 {
+				fmt.Println("dbgTryRecoverHack")
+				n.dbgTryRecoverHack()
+				fmt.Printf("*** removed 10 stored headers from tip -  new tip is %d - PLACE CCC\n", n.networkHeaders.getTip())
+			}
+			// <-----------------------
+
 			break
 		}
 		headersConnected++
@@ -373,13 +395,18 @@ func (n *Node) connectTip(serverHeader string) bool {
 		fmt.Printf("connectTip - cannot connect\n -- incoming prev hash: %s\n -- current tip hash:   %s \n",
 			incomingHdr.PrevBlock.String(), h.getTipBlock().BlockHash().String())
 		// fork maybe?
+		h.dbgDumpTipHashes(10)
 		return false
 	}
+	// hard to make writing to file && writing headers map atomic. Consider just using the
+	// 'blockchain_headers' file for storage.
 	_, err = h.appendHeadersFile(incomingHdrBytes)
 	if err != nil {
 		panic(err)
 	}
 	// if here we could write a file: 'last_good_header'
+	// but it is the top of the chain we following only
+	// which could be a fork :(
 	h.storeOneHdr(incomingHdr) // updates tip
 	return true
 }
@@ -402,6 +429,21 @@ func convertStringHdrToBlkHdr(svrHdr string) (*wire.BlockHeader, []byte, error) 
 }
 
 // debug ------------------------------------------------------------------------
+
+// -------- hack -------------------
+
+func (n *Node) dbgTryRecoverHack() {
+	h := n.networkHeaders
+	tip := h.getTip()
+	if tip > 10 {
+		h.truncateHeadersFile(10)
+		for i := 0; i < 10; i++ {
+			h.removeHdrFromTip()
+		}
+	}
+}
+
+// -------- end hack --------------
 
 func dbgStringHeaderPrev(svrHdr string) string {
 	rawBytes, err := hex.DecodeString(svrHdr)
@@ -439,6 +481,5 @@ func dbgHashHexFromHeaderHex(svrHdr string) string {
 // }
 
 func dbgHashHexFromHdr(hdr *wire.BlockHeader) string {
-	hash := hdr.BlockHash()
-	return hash.String()
+	return hdr.BlockHash().String()
 }

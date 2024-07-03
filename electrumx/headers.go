@@ -21,9 +21,9 @@ import (
 )
 
 const (
-	HEADER_SIZE           = 80
+	HEADER_SIZE           = 80 // TODO: move to ElectrumXInterface
 	HEADER_FILE_NAME      = "blockchain_headers"
-	ELECTRUM_MAGIC_NUMHDR = 2016
+	ELECTRUM_MAGIC_NUMHDR = 2016 // chunk size
 )
 
 type Headers struct {
@@ -60,7 +60,7 @@ func NewHeaders(cfg *ElectrumXConfig) *Headers {
 	return &hdrs
 }
 
-// stored Headers start from here
+// stored Headers start from here - TODO: move to ElectrumXInterface
 func getStartPointHeight(cfg *ElectrumXConfig) int64 {
 	var startAtHeight int64 = 0
 	chain := cfg.Chain.String()
@@ -140,6 +140,36 @@ func (h *Headers) appendHeadersFile(rawHdrs []byte) (int64, error) {
 	return numHdrs, nil
 }
 
+func (h *Headers) truncateHeadersFile(numHeaders int64) (int64, error) {
+	if !h.synced {
+		return 0, errors.New("still syncing")
+	}
+	if numHeaders <= 0 {
+		return 0, errors.New("numHeaders <= 0")
+	}
+	size, err := h.statFileSize()
+	if err != nil {
+		return 0, err
+	}
+	if size%HEADER_SIZE != 0 {
+		return 0, errors.New("headers file corrupt - size not a multiple of HEADER_SIZE")
+	}
+	newByteLen := size - (numHeaders * HEADER_SIZE)
+	if newByteLen < 0 {
+		newByteLen = 0
+	}
+	err = os.Truncate(h.hdrFilePath, newByteLen)
+	if err != nil {
+		return 0, err
+	}
+	newSize, err := h.statFileSize()
+	if err != nil {
+		return 0, err
+	}
+	newNumHeaders, _ := h.bytesToNumHdrs(newSize)
+	return newNumHeaders, nil
+}
+
 func (h *Headers) readAllBytesFromFile() ([]byte, error) {
 	hdrFile, err := os.OpenFile(h.hdrFilePath, os.O_CREATE|os.O_RDWR, 0664)
 	if err != nil {
@@ -186,6 +216,13 @@ func (h *Headers) store(b []byte, startHeight int64) error {
 		h.blkHdrs[blkHash] = at
 	}
 	return nil
+}
+
+func (h *Headers) removeHdrFromTip() {
+	h.hdrsMtx.Lock()
+	defer h.hdrsMtx.Unlock()
+	delete(h.hdrs, h.tip)
+	h.tip--
 }
 
 // tip returns the stored block headers tip height.
@@ -330,4 +367,15 @@ func (h *Headers) ClearMaps() {
 	h.blkHdrs = nil
 	h.hdrs = make(map[int64]*wire.BlockHeader, 10)
 	h.blkHdrs = make(map[chainhash.Hash]int64, 10)
+}
+
+// Only debug - dump the top 'depth' hash - prev hashes
+func (h *Headers) dbgDumpTipHashes(depth int64) {
+	tip := h.getTip()
+	fmt.Printf("--- Dump of the top %d stored headers ---\n", depth)
+	for i := tip; i > tip-depth; i-- {
+		hash := h.hdrs[i].BlockHash().String()
+		prev := h.hdrs[i].PrevBlock.String()
+		fmt.Printf("height: %d hash: %s prev: %s\n", i, hash, prev)
+	}
 }

@@ -9,7 +9,6 @@ func TestNode_connectTip(t *testing.T) {
 		connectOpts         *ConnectOpts
 		server              *Server
 		leader              bool
-		syncingHeaders      bool
 		networkHeaders      *Headers
 		rcvTipChangeNotify  chan int64
 		rcvScriptHashNotify chan *ScripthashStatusResult
@@ -28,15 +27,14 @@ func TestNode_connectTip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			n := &Node{
-				state:               tt.fields.state,
-				serverAddr:          tt.fields.serverAddr,
-				connectOpts:         tt.fields.connectOpts,
-				server:              tt.fields.server,
-				leader:              tt.fields.leader,
-				syncingHeaders:      tt.fields.syncingHeaders,
-				networkHeaders:      tt.fields.networkHeaders,
-				rcvTipChangeNotify:  tt.fields.rcvTipChangeNotify,
-				rcvScriptHashNotify: tt.fields.rcvScriptHashNotify,
+				state:                  tt.fields.state,
+				serverAddr:             tt.fields.serverAddr,
+				connectOpts:            tt.fields.connectOpts,
+				server:                 tt.fields.server,
+				leader:                 tt.fields.leader,
+				networkHeaders:         tt.fields.networkHeaders,
+				clientTipChangeNotify:  tt.fields.rcvTipChangeNotify,
+				clientScriptHashNotify: tt.fields.rcvScriptHashNotify,
 			}
 			if got := n.connectTip(tt.args.serverHeader); got != tt.want {
 				t.Errorf("Node.connectTip() = %v, want %v", got, tt.want)
