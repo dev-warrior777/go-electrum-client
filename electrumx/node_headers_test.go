@@ -6,7 +6,7 @@ func TestNode_connectTip(t *testing.T) {
 	type fields struct {
 		state               nodeState
 		serverAddr          string
-		connectOpts         *ConnectOpts
+		connectOpts         *connectOpts
 		server              *Server
 		leader              bool
 		networkHeaders      *Headers

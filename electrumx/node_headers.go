@@ -89,7 +89,10 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 		select {
 
 		case <-nodeCtx.Done():
-			fmt.Println("shutdown - gathering")
+			n.setState(DISCONNECTED)
+			<-n.server.conn.Done()
+			fmt.Printf("nodeCtx.Done - gathering - %s\n", n.serverAddr)
+			<-n.server.conn.Done()
 			return nil
 
 		case <-time.After(time.Second):
@@ -161,7 +164,7 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 		return errors.New("server headers notify channel is nil")
 	}
 	// start headers queue with depth 3
-	qchan := make(chan *HeadersNotifyResult, 3)
+	qchan := make(chan *headersNotifyResult, 3)
 	go n.headerQueue(nodeCtx, qchan)
 	// subscribe headers also returns latest header the server knows
 	hdrRes, err := n.subscribeHeaders(nodeCtx)
@@ -178,7 +181,8 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 		for {
 			if nodeCtx.Err() != nil {
 				n.setState(DISCONNECTED)
-				fmt.Println("nodeCtx.Done - in headers notify - exiting thread")
+				<-n.server.conn.done
+				fmt.Printf("nodeCtx.Done - in headers notify %s - exiting thread\n", n.serverAddr)
 				return
 			}
 
@@ -194,13 +198,14 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 // headerQueue receives incoming headers notify results from qhan
 // - run as a goroutine
 // The client local 'blockhain_headers' file is appended and the headers map updated and verified.
-func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *HeadersNotifyResult) {
+func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyResult) {
 	h := n.networkHeaders
 	fmt.Println("headrs queue started")
 	for {
 		if nodeCtx.Err() != nil {
 			n.setState(DISCONNECTED)
-			fmt.Println("nodeCtx.Done - in headersQueue - exiting thread")
+			<-n.server.conn.Done()
+			fmt.Printf("nodeCtx.Done - in headersQueue %s - exiting thread\n", n.serverAddr)
 			return
 		}
 
@@ -209,7 +214,7 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *HeadersNotifyR
 		for hdrRes := range qchan {
 
 			if hdrRes == nil {
-				fmt.Println("qchan returned nil - exiting thread")
+				fmt.Printf("qchan closed %s - exiting thread\n", n.serverAddr)
 				return
 			}
 

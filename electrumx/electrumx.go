@@ -11,7 +11,7 @@ import (
 )
 
 type Server struct {
-	conn      *ServerConn
+	conn      *serverConn
 	connected bool
 }
 

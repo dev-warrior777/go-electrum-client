@@ -12,20 +12,19 @@ func (n *Node) scriptHashNotify(nodeCtx context.Context) error {
 		return errors.New("server scripthash notify channel is nil")
 	}
 
-	// TODO: make a queue & range over incoming channel pattern
+	// TODO: make a queue & use 'range over incoming channel' pattern
 
 	go func() {
 		for {
 			select {
 			case <-nodeCtx.Done():
 				n.setState(DISCONNECTED)
-				fmt.Println("nodeCtx.Done - in scriptHashNotify - exiting thread")
-				n.server.conn.cancel()
 				<-n.server.conn.Done()
+				fmt.Printf("nodeCtx.Done - in scriptHashNotify %s - exiting thread\n", n.serverAddr)
 				return
 			case scriptHashStatusResult, ok := <-scriptHashNotifyChan:
 				if !ok {
-					fmt.Println("scripthash notify channel was closed - exiting thread")
+					fmt.Printf("scripthash notify channel was closed %s - exiting thread\n", n.serverAddr)
 					return
 				}
 				// forward to client wallet_synchronize.go - can block

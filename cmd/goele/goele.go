@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/dev-warrior777/go-electrum-client/client"
@@ -201,4 +202,5 @@ func main() {
 	}
 
 	// SIGINT kills the node server(s) & test rpc server
+	time.Sleep(time.Second)
 }

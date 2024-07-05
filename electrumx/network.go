@@ -112,10 +112,12 @@ func (net *Network) start(ctx context.Context, startServer *NodeServerAddr) erro
 	if err != nil {
 		return err
 	}
-	// bootstrap peers loop with leader's connection
-	go net.peersMonitor(ctx)
 	// leader up and headers synced
 	net.started = true
+	// ask leader for it's known peers
+	net.getPeerServers(ctx)
+	// bootstrap peers loop with leader's connection
+	go net.peersMonitor(ctx)
 	return nil
 }
 
@@ -135,7 +137,7 @@ func (net *Network) startNewPeer(ctx context.Context, netAddr *NodeServerAddr, i
 	genesis := net.config.Params.GenesisHash.String()
 	// node runs in a new child context
 	nodeCtx, nodeCancel := context.WithCancel(ctx)
-	err = node.start(nodeCtx, network, nettype, genesis)
+	err = node.start(nodeCtx, nodeCancel, network, nettype, genesis)
 	if err != nil {
 		nodeCancel()
 		return err
@@ -169,6 +171,7 @@ func (net *Network) removePeer(oldPeer *peerNode) error {
 	newPeers := make([]*peerNode, 0, nodesLen-1)
 	for _, peer := range currPeers {
 		if oldPeer.id == peer.id {
+			fmt.Printf("cancelling peer %d\n", oldPeer.id)
 			oldPeer.nodeCancel()
 		} else {
 			newPeers = append(newPeers, peer)
@@ -199,19 +202,22 @@ func (net *Network) getLeader() *peerNode {
 
 // bootstrap peers and monitor leader - run as goroutine
 func (net *Network) peersMonitor(ctx context.Context) {
-	t := time.NewTicker(time.Second)
+	// The ticker will adjust the time interval or drop ticks to make up for
+	// slow receivers.
+	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("ctx.Done in nodesMonitor - exiting thread")
+			fmt.Println("ctx.Done in peersMonitor - exiting thread")
 			for _, peer := range net.peers {
 				peer.nodeCancel()
 			}
 			return
 		case <-t.C:
 			net.checkLeader(ctx)
-			net.startNewPeersIfRequired(ctx)
+			net.reapDeadPeers()
+			net.startNewPeerMaybe(ctx)
 		}
 	}
 }
@@ -233,7 +239,6 @@ func (net *Network) checkLeader(ctx context.Context) {
 	if leader != nil {
 		net.removePeer(leader)
 	}
-
 	// any running nodes we can promote?
 	numPeers := net.getNumPeers()
 	if numPeers >= 1 {
@@ -242,7 +247,6 @@ func (net *Network) checkLeader(ctx context.Context) {
 		newLleader.node.promoteToLeader()
 		return
 	}
-
 	// no running nodes so make new leader
 	net.startNewLeader(ctx)
 }
@@ -255,17 +259,26 @@ func (net *Network) promoteOnePeerAsNewLeader(ctx context.Context) {
 	// TODO: promote one currently running peer as new leader
 }
 
-func (net *Network) startNewPeersIfRequired(ctx context.Context) {
+func (net *Network) reapDeadPeers() {
+	net.peersMtx.Lock()
+	defer net.peersMtx.Unlock()
+	currPeers := net.peers
+	for _, peer := range currPeers {
+		if peer.node.getState() == DISCONNECTED {
+			net.removePeer(peer)
+			fmt.Printf("reapDeadPeers - online peers: %d\n\n", net.getNumPeers())
+		}
+	}
+}
+
+func (net *Network) startNewPeerMaybe(ctx context.Context) {
 	net.peersMtx.Lock()
 	defer net.peersMtx.Unlock()
 	numPeers := net.getNumPeers()
 	if numPeers >= MAX_ONLINE_PEERS {
 		return
 	}
-	net.startNewPeers(ctx)
-}
 
-func (net *Network) startNewPeers(ctx context.Context) {
 	toNetAddr := func(sa *serverAddr) *NodeServerAddr {
 		return &NodeServerAddr{
 			Net:  sa.Net,
@@ -279,9 +292,8 @@ func (net *Network) startNewPeers(ctx context.Context) {
 		return
 	}
 	peers := net.peers
-	numPeers := len(peers)
-	// build a map of known servers that can be started
-	var possible = make(map[*serverAddr]bool) // [server]started
+	// build a list of known servers that have not yet been started
+	var possible = make([]*serverAddr, 0)
 	for _, server := range servers {
 		if server.IsOnion {
 			continue
@@ -295,38 +307,23 @@ func (net *Network) startNewPeers(ctx context.Context) {
 			}
 		}
 		if !matchedAnyNetAddr {
-			possible[server] = false
+			possible = append(possible, server)
 		}
 	}
 	if len(possible) == 0 {
 		fmt.Println("startNewPeers: no known servers that are not already connected")
 		return
 	}
-
-	numTostart := MAX_ONLINE_PEERS - numPeers
-
-	var peersStarted int = 0
-	for i := 0; i < numTostart; i++ {
-		for server, hasStarted := range possible {
-			if hasStarted {
-				continue
-			}
-			possible[server] = true
-			addr := toNetAddr(server)
-			err := net.startNewPeer(ctx, addr, false, false)
-			if err != nil {
-				fmt.Printf(" ..cannot start %s %v\n", addr.String(), err)
-				continue
-			}
-			peersStarted++
-		}
+	// start a new peer
+	addr := toNetAddr(possible[0])
+	err := net.startNewPeer(ctx, addr, false, false) // dialerCtx limited
+	if err != nil {
+		fmt.Printf(" ..cannot start %s %v\n", addr.String(), err)
+		net.removeServer(possible[0])
 	}
-	fmt.Printf("started %d new peers\n", peersStarted)
+	fmt.Printf("online peers: %d\n\n", net.getNumPeers())
 }
 
-// -----------------------------------------------------------------------------
-// Local peers
-// -----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 // API Local headers
 //-----------------------------------------------------------------------------
@@ -353,7 +350,7 @@ func (net *Network) BlockHeaders(startHeight int64, blockCount int64) ([]*wire.B
 }
 
 // -----------------------------------------------------------------------------
-// API Pass thru
+// API Pass thru from Client
 // -----------------------------------------------------------------------------
 
 func (net *Network) SubscribeScripthashNotify(ctx context.Context, scripthash string) (*ScripthashStatusResult, error) {

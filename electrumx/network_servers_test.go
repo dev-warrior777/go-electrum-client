@@ -8,9 +8,9 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-var peerNoResults = []*PeersResult{}
+var peerNoResults = []*peersResult{}
 
-var peerResults = []*PeersResult{
+var peerResults = []*peersResult{
 	{
 		Addr:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd:onion",
 		Host:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion",
@@ -33,7 +33,7 @@ var peerResults = []*PeersResult{
 	},
 }
 
-var peerResults2 = []*PeersResult{ // identical to peersResult above
+var peerResults2 = []*peersResult{ // identical to peersResult above
 	{
 		Addr:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd:onion",
 		Host:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion",
@@ -56,7 +56,7 @@ var peerResults2 = []*PeersResult{ // identical to peersResult above
 	},
 }
 
-var peerResults3 = []*PeersResult{ // mixed: some in the above some new
+var peerResults3 = []*peersResult{ // mixed: some in the above some new
 	{
 		Addr:  "new ONION:PORT",
 		Host:  "new6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion",

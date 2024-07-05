@@ -23,35 +23,32 @@ import (
 	"github.com/decred/go-socks/socks"
 )
 
-// Printer is a function with the signature of a logger method.
-type Printer func(format string, params ...any)
+// printer is a function with the signature of a logger method.
+type printer func(format string, params ...any)
 
 var (
-	// StdoutPrinter is a DebugLogger that uses fmt.Printf.
-	StdoutPrinter = Printer(func(format string, params ...any) {
-		fmt.Printf(format+"\n", params...) // discard the returns
-	})
-	// StderrPrinter is a DebugLogger that uses fmt.Fprintf(os.Stderr, ...).
-	StderrPrinter = Printer(func(format string, params ...any) {
+	// stderrPrinter is a debugLogger that uses fmt.Fprintf(os.Stderr, ...).
+	stderrPrinter = printer(func(format string, params ...any) {
 		fmt.Fprintf(os.Stderr, format+"\n", params...)
 	})
 
-	disabledPrinter = Printer(func(string, ...any) {})
+	disabledPrinter = printer(func(string, ...any) {})
 )
 
 // from electrum code - about 50% default server timeout for ping which is ~10m
 // const pingInterval = 300 * time.Second
 const pingInterval = 10 * time.Second
 
-// ServerConn represents a connection to an Electrum server e.g. ElectrumX. It
+// serverConn represents a connection to an Electrum server e.g. ElectrumX. It
 // is a single use type that must be replaced if the connection is lost. Use
-// ConnectServer to construct a ServerConn and connect to the server.
-type ServerConn struct {
-	conn   net.Conn
-	cancel context.CancelFunc
-	done   chan struct{}
-	proto  string
-	debug  Printer
+// connectServer to construct a serverConn and connect to the server.
+type serverConn struct {
+	conn       net.Conn
+	nodeCancel context.CancelFunc
+	done       chan struct{}
+	proto      string
+	addr       string // kept from connectServer for debug
+	debug      printer
 
 	reqID uint64
 
@@ -60,7 +57,7 @@ type ServerConn struct {
 
 	// The single scripthash notification channel. The channel will be made on
 	// the ConnectServer call and lasts until connection is terminated. It is
-	// closed in the 'listen' below.
+	// closed in the 'listen' func below.
 	scripthashNotifyMtx sync.Mutex
 	scripthashNotify    chan *ScripthashStatusResult
 
@@ -68,22 +65,22 @@ type ServerConn struct {
 	// the ConnectServer call and lasts until connection is terminated. It is
 	// closed in the 'listen' below.
 	headersNotifyMtx sync.Mutex
-	headersNotify    chan *HeadersNotifyResult
+	headersNotify    chan *headersNotifyResult
 }
 
-func (sc *ServerConn) nextID() uint64 {
+func (sc *serverConn) nextID() uint64 {
 	return atomic.AddUint64(&sc.reqID, 1)
 }
 
 const newline = byte('\n')
 
-func (sc *ServerConn) listen(ctx context.Context) {
+func (sc *serverConn) listen(nodeCtx context.Context) {
 	// listen is charged with sending on the response and notification channels.
-	// As such, only listen should close these channels, and only after the read
+	// As such only listen should close these channels, and only after the read
 	// loop has finished.
 	defer sc.cancelRequests()        // close the response chans
-	defer sc.closeHeadersNotify()    // close the single headers notify channel
-	defer sc.closeScripthashNotify() // close the single scripthash notify channel
+	defer sc.closeHeadersNotify()    // close the headers notify channel
+	defer sc.closeScripthashNotify() // close the scripthash notify channel
 
 	// make a reader with a buffer big enough to handle initial sync download
 	// of block headers from ElectrumX -> client in chunks of 2016 headers for
@@ -91,17 +88,18 @@ func (sc *ServerConn) listen(ctx context.Context) {
 	reader := bufio.NewReaderSize(sc.conn, 2016*80*16)
 
 	for {
-		if ctx.Err() != nil {
+		if nodeCtx.Err() != nil {
 			return
 		}
 
 		// read msg chunk from stream
 		msg, err := reader.ReadBytes(newline)
 		if err != nil {
-			if ctx.Err() == nil { // unexpected
-				fmt.Printf("ReadBytes: %v - conn closed", err)
+			if nodeCtx.Err() == nil { // unexpected
+				fmt.Printf("ReadBytes: %v - conn closed\n", err)
 			}
-			sc.cancel()
+			// sc.cancel()
+			sc.nodeCancel()
 			return
 		}
 
@@ -151,7 +149,7 @@ func (sc *ServerConn) listen(ctx context.Context) {
 	}
 }
 
-func (sc *ServerConn) pinger(ctx context.Context) {
+func (sc *serverConn) pinger(nodeCtx context.Context) {
 	t := time.NewTicker(pingInterval)
 	defer t.Stop()
 
@@ -159,21 +157,19 @@ func (sc *ServerConn) pinger(ctx context.Context) {
 		// listen => ReadBytes cannot wait forever. Reset the read deadline for
 		// the next ping's response, as the ping loop is running.
 		newTime := time.Now().Add(pingInterval * 5 / 4)
-		// fmt.Printf("setReadDeadline %s\n", newTime.GoString())
 		err := sc.conn.SetReadDeadline(newTime)
 		if err != nil {
-			fmt.Printf("SetReadDeadline: %v", err) // just dropped conn, but for debugging...
-			sc.cancel()
+			fmt.Printf("SetReadDeadline: %v\n", err) // just dropped conn, but for debugging...
 			return
 		}
-		if err = sc.Ping(ctx); err != nil {
-			fmt.Printf("Ping: %v", err)
-			sc.cancel()
+		if err = sc.ping(nodeCtx); err != nil {
+			fmt.Printf("Ping: %v\n", err)
 			return
 		}
 
 		select {
-		case <-ctx.Done():
+		case <-nodeCtx.Done():
+			fmt.Printf("nodeCtx.Done in pinger\n")
 			return
 		case <-t.C:
 		}
@@ -181,8 +177,8 @@ func (sc *ServerConn) pinger(ctx context.Context) {
 }
 
 // negotiateVersion should only be called once, and before starting the listen
-// read loop. As such, this does not use the Request method.
-func (sc *ServerConn) negotiateVersion() (string, error) {
+// read loop so this does not use the request method.
+func (sc *serverConn) negotiateVersion() (string, error) {
 	reqMsg, err := prepareRequest(sc.nextID(), "server.version", positional{"Electrum", "1.4"})
 	if err != nil {
 		return "", err
@@ -221,20 +217,25 @@ func (sc *ServerConn) negotiateVersion() (string, error) {
 	return vers[1], nil
 }
 
-type ConnectOpts struct {
+type connectOpts struct {
 	TLSConfig   *tls.Config // nil means plain
 	TorProxy    string
-	DebugLogger Printer
+	DebugLogger printer
 }
 
-// ConnectServer connects to the electrum server at the given address. To close
-// the connection and shutdown ServerConn, either cancel the context or use the
-// Shutdown method, then wait on the channel from Done() to ensure a clean
-// shutdown (connection closed and all requests handled). There is no automatic
-// reconnection functionality, as the caller should handle dropped connections
-// by potentially cycling to a different server.
-func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*ServerConn, error) {
-	var dial func(ctx context.Context, network, addr string) (net.Conn, error)
+// connectServer connects to the electrumx server at the given address. To close
+// the connection and shutdown ServerConn cancel the context or use the then wait
+// on the channel from Done() to ensure a clean shutdown (connection closed and
+// all requests handled).
+// There is no automatic reconnection functionality, as the caller should handle
+// dropped connections by cycling to a different server.
+func connectServer(
+	nodeCtx context.Context,
+	nodeCancel context.CancelFunc,
+	addr string,
+	opts *connectOpts) (*serverConn, error) {
+
+	var dial func(nodeCtx context.Context, network, addr string) (net.Conn, error)
 	if opts.TorProxy != "" {
 		proxy := &socks.Proxy{
 			Addr: opts.TorProxy,
@@ -244,7 +245,7 @@ func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*Server
 		dial = new(net.Dialer).DialContext
 	}
 
-	dialCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	dialCtx, cancel := context.WithTimeout(nodeCtx, 10*time.Second)
 	defer cancel()
 	conn, err := dial(dialCtx, "tcp", addr)
 	if err != nil {
@@ -253,7 +254,7 @@ func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*Server
 
 	if opts.TLSConfig != nil {
 		conn = tls.Client(conn, opts.TLSConfig)
-		err = conn.(*tls.Conn).HandshakeContext(ctx)
+		err = conn.(*tls.Conn).HandshakeContext(nodeCtx)
 		if err != nil {
 			conn.Close()
 			return nil, err
@@ -265,19 +266,17 @@ func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*Server
 		logger = disabledPrinter
 	}
 
-	sc := &ServerConn{
+	sc := &serverConn{
 		conn:             conn,
+		nodeCancel:       nodeCancel,
 		done:             make(chan struct{}),
+		addr:             addr,
 		debug:            logger,
 		respHandlers:     make(map[uint64]chan *response),
 		scripthashNotify: make(chan *ScripthashStatusResult, 1), // 128 bytes/slot
-		headersNotify:    make(chan *HeadersNotifyResult),       // 168 bytes/slot
-		// headersNotify:    make(chan *HeadersNotifyResult, 1),    // 168 bytes/slot
+		headersNotify:    make(chan *headersNotifyResult),       // 168 bytes
+		// unbuffered because we have a queue downstream
 	}
-
-	// Wrap the context with a cancel function for internal shutdown, and so the
-	// user can use Shutdown, instead of cancelling the parent context.
-	ctx, sc.cancel = context.WithCancel(ctx)
 
 	// Negotiate protocol version.
 	sc.proto, err = sc.negotiateVersion()
@@ -289,34 +288,31 @@ func ConnectServer(ctx context.Context, addr string, opts *ConnectOpts) (*Server
 	sc.debug("network: connected to server %s using negotiated protocol version %s",
 		addr, sc.proto)
 
-	go sc.listen(ctx) // must be running to receive response & notifications
-	go sc.pinger(ctx) // must be running or the server will disconnect after some time
+	go sc.listen(nodeCtx) // must be running to receive response & notifications
+	go sc.pinger(nodeCtx) // must be running or the server will disconnect after some time
 	go func() {
-		<-ctx.Done()
+		<-nodeCtx.Done()
+		fmt.Printf("nodeCtx.Done in connectServer for %s - waiting for connection to finish\n", sc.addr)
 		conn.Close()
+		fmt.Printf("serverConn -- conn Closed - closing sc.Done channel\n")
 		close(sc.done)
+		fmt.Printf("serverConn -- sc.Done channel closed - exiting thread\n")
 	}()
 
 	return sc, nil
 }
 
-// Proto returns the electrum protocol of the connected server. e.g. "1.4.2".
-func (sc *ServerConn) Proto() string {
-	return sc.proto
-}
-
-// Shutdown begins shutting down the connection and request handling goroutines.
-// Receive on the channel from Done() to wait for shutdown to complete.
-func (sc *ServerConn) Shutdown() {
-	sc.cancel()
-}
-
-// Done returns a channel that is closed when the ServerConn is fully shutdown.
-func (sc *ServerConn) Done() <-chan struct{} {
+// Done returns a channel that is closed when serverConn is *fully* shut down.
+func (sc *serverConn) Done() <-chan struct{} {
 	return sc.done
 }
 
-func (sc *ServerConn) send(msg []byte) error {
+// electrumxProto returns the electrum protocol of the connected server. e.g. "1.4.2".
+func (sc *serverConn) electrumxProto() string {
+	return sc.proto
+}
+
+func (sc *serverConn) send(msg []byte) error {
 	err := sc.conn.SetWriteDeadline(time.Now().Add(7 * time.Second))
 	if err != nil {
 		return err
@@ -325,7 +321,7 @@ func (sc *ServerConn) send(msg []byte) error {
 	return err
 }
 
-func (sc *ServerConn) registerRequest(id uint64) chan *response {
+func (sc *serverConn) registerRequest(id uint64) chan *response {
 	c := make(chan *response, 1)
 	sc.respHandlersMtx.Lock()
 	sc.respHandlers[id] = c
@@ -333,7 +329,7 @@ func (sc *ServerConn) registerRequest(id uint64) chan *response {
 	return c
 }
 
-func (sc *ServerConn) responseChan(id uint64) chan *response {
+func (sc *serverConn) responseChan(id uint64) chan *response {
 	sc.respHandlersMtx.Lock()
 	defer sc.respHandlersMtx.Unlock()
 	c := sc.respHandlers[id]
@@ -342,9 +338,10 @@ func (sc *ServerConn) responseChan(id uint64) chan *response {
 }
 
 // cancelRequests deletes all response handlers from the respHandlers map and
-// closes all of the channels. As such, this method MUST be called from the same
-// goroutine that sends on the channel.
-func (sc *ServerConn) cancelRequests() {
+// closes all of the channels. This method MUST be called from the same goroutine
+// that sends on the channel.
+func (sc *serverConn) cancelRequests() {
+	fmt.Println("cancelRequests")
 	sc.respHandlersMtx.Lock()
 	defer sc.respHandlersMtx.Unlock()
 	for id, c := range sc.respHandlers {
@@ -362,7 +359,7 @@ func (sc *ServerConn) cancelRequests() {
 //
 // Which we decode into:
 // statusResult [ScriptHash, Status]
-func (sc *ServerConn) scripthashStatusNotify(raw json.RawMessage) {
+func (sc *serverConn) scripthashStatusNotify(raw json.RawMessage) {
 	var strs [2]string
 	if err := json.Unmarshal(raw, &strs); err == nil && len(strs) == 2 {
 		statusResult := ScripthashStatusResult{
@@ -378,8 +375,9 @@ func (sc *ServerConn) scripthashStatusNotify(raw json.RawMessage) {
 }
 
 // closeScripthashNotify closes the scripthash subscription notify channel
-// once and once only. Called once from the listen thread when it exits.
-func (sc *ServerConn) closeScripthashNotify() {
+// once and once only. Called from the listen thread when it exits.
+func (sc *serverConn) closeScripthashNotify() {
+	fmt.Println("closeScripthashNotify")
 	sc.scripthashNotifyMtx.Lock()
 	defer sc.scripthashNotifyMtx.Unlock()
 	close(sc.scripthashNotify)
@@ -393,8 +391,8 @@ func (sc *ServerConn) closeScripthashNotify() {
 //
 // Which we decode into:
 // headersResults [{Height,Hex}{Height,Hex}...{Height,Hex}]
-func (sc *ServerConn) headersTipChangeNotify(raw json.RawMessage) {
-	var headersResults []*HeadersNotifyResult
+func (sc *serverConn) headersTipChangeNotify(raw json.RawMessage) {
+	var headersResults []*headersNotifyResult
 	if err := json.Unmarshal(raw, &headersResults); err == nil {
 		sc.headersNotifyMtx.Lock()
 		defer sc.headersNotifyMtx.Unlock()
@@ -407,20 +405,21 @@ func (sc *ServerConn) headersTipChangeNotify(raw json.RawMessage) {
 }
 
 // closeScripthashNotify closes the scripthash subscription notify channel
-// once and once only. Called from the listen thread.
-func (sc *ServerConn) closeHeadersNotify() {
+// once and once only. Called from the listen thread when it exits.
+func (sc *serverConn) closeHeadersNotify() {
+	fmt.Println("closeHeadersNotify")
 	sc.headersNotifyMtx.Lock()
 	defer sc.headersNotifyMtx.Unlock()
 	close(sc.headersNotify)
 }
 
-// Request performs a request to the remote server for the given method using
+// request performs a request to the remote server for the given method using
 // the provided arguments, which may either be positional (e.g.
 // []interface{arg1, arg2}), named (any struct), or nil if there are no
 // arguments. args may not be any other basic type. The the response does not
 // include an error, the result will be unmarshalled into result, unless the
 // provided result is nil in which case the response payload will be ignored.
-func (sc *ServerConn) Request(ctx context.Context, method string, args any, result any) error {
+func (sc *serverConn) request(nodeCtx context.Context, method string, args any, result any) error {
 	id := sc.nextID()
 	reqMsg, err := prepareRequest(id, method, args)
 	if err != nil {
@@ -431,20 +430,22 @@ func (sc *ServerConn) Request(ctx context.Context, method string, args any, resu
 	c := sc.registerRequest(id)
 
 	if err = sc.send(reqMsg); err != nil {
-		sc.cancel()
+		// sc.cancel()
+		sc.nodeCancel()
 		return err
 	}
 
 	var resp *response
 	select {
-	case <-ctx.Done():
-		return ctx.Err() // either timeout or canceled
+	case <-nodeCtx.Done():
+		fmt.Printf("nodeCtx.Done in request\n")
+		return nodeCtx.Err() // either timeout or canceled
 	case resp = <-c:
 	}
 
 	if resp == nil { // channel closed
-		fmt.Printf("CONNECTION TERMINATED\n")
-		return errors.New("connection terminated")
+		fmt.Printf("server conn request: response channel closed\n")
+		return errors.New("response channel closed")
 	}
 
 	if resp.Error != nil {
@@ -457,28 +458,15 @@ func (sc *ServerConn) Request(ctx context.Context, method string, args any, resu
 	return nil
 }
 
-// Ping pings the remote server. This can be used as a connectivity test on
-// demand, although a ServerConn started with ConnectServer will launch a pinger
+// ping pings the remote server. This can be used as a connectivity test on
+// demand, although a serverConn started with ConnectServer will launch a pinger
 // goroutine to keep the connection alive.
-func (sc *ServerConn) Ping(ctx context.Context) error {
-	// fmt.Printf("   ** PING! **  %s:\n", time.Now().GoString())
-	return sc.Request(ctx, "server.ping", nil, nil)
+func (sc *serverConn) ping(nodeCtx context.Context) error {
+	return sc.request(nodeCtx, "server.ping", nil, nil)
 }
 
-// Banner retrieves the server's banner, which is any announcement set by the
-// server operator. It should be interpreted with caution as the content is
-// untrusted.
-func (sc *ServerConn) Banner(ctx context.Context) (string, error) {
-	var resp string
-	err := sc.Request(ctx, "server.banner", nil, &resp)
-	if err != nil {
-		return "", err
-	}
-	return resp, nil
-}
-
-// ServerFeatures represents the result of a server features request.
-type ServerFeatures struct {
+// serverFeatures represents the result of a server features request.
+type serverFeatures struct {
 	Genesis  string                       `json:"genesis_hash"`
 	Hosts    map[string]map[string]uint32 `json:"hosts"` // e.g. {"host.com": {"tcp_port": 51001, "ssl_port": 51002}}, may be unset!
 	ProtoMax string                       `json:"protocol_max"`
@@ -489,30 +477,32 @@ type ServerFeatures struct {
 	Services []string                     `json:"services,omitempty"` // e.g. ["tcp://host.com:51001", "ssl://host.com:51002"]
 }
 
-// Features requests the features claimed by the server. The caller should check
+// features requests the features claimed by the server. The caller should check
 // the Genesis hash field to ensure it is the intended network.
-func (sc *ServerConn) Features(ctx context.Context) (*ServerFeatures, error) {
-	var feats ServerFeatures
-	err := sc.Request(ctx, "server.features", nil, &feats)
+func (sc *serverConn) features(nodeCtx context.Context) (*serverFeatures, error) {
+	var feats serverFeatures
+	err := sc.request(nodeCtx, "server.features", nil, &feats)
 	if err != nil {
 		return nil, err
 	}
 	return &feats, nil
 }
 
-// PeersResult represents the results of a peers server request. We further break
+// peersResult represents the results of a peers server request. We further break
 // this info down in network_servers.go as this struct is awkward and we want to
-// persist some of it in a json file like electrum.
-type PeersResult struct {
+// persist some of it in a json file like electrum does.
+type peersResult struct {
 	Addr  string // IP address or .onion name
 	Host  string
 	Feats []string
 }
 
-// Peers requests the known peers from a server (other servers). See
-// SSLPeerAddrs to assist parsing useable peers.
-func (sc *ServerConn) serverPeers(ctx context.Context) ([]*PeersResult, error) {
-	// Note that the Electrum exchange wallet type does not currently use this
+// Peers requests the known peers from a server (other servers). Occasionaly a
+// testnet server such as  "testnet.qtornado.com:51002" doesn't send peers. But
+// is still useful as a non-leader for blockHeader(s) calls when testing latest
+// incoming headers to see if we have a reorg
+func (sc *serverConn) serverPeers(nodeCtx context.Context) ([]*peersResult, error) {
+	// Note that the Electrum exchange wallet type does not  use this
 	// method since it follows the Electrum wallet server peer or one of the
 	// wallets other servers. See (*electrumWallet).connect and
 	// (*WalletClient).GetServers. We might wish to in the future though.
@@ -520,12 +510,12 @@ func (sc *ServerConn) serverPeers(ctx context.Context) ([]*PeersResult, error) {
 	// [["ip", "host", ["featA", "featB", ...]], ...]
 	// [][]any{string, string, []any{string, ...}}
 	var resp [][]any
-	err := sc.Request(ctx, "server.peers.subscribe", nil, &resp) // not really a subscription!
+	err := sc.request(nodeCtx, "server.peers.subscribe", nil, &resp) // not really a subscription!
 	if err != nil {
 		return nil, err
 	}
 
-	peers := make([]*PeersResult, 0, len(resp))
+	peers := make([]*peersResult, 0, len(resp))
 	for _, peer := range resp {
 		if len(peer) != 3 {
 			sc.debug("bad peer data: %v (%T)", peer, peer)
@@ -555,7 +545,7 @@ func (sc *ServerConn) serverPeers(ctx context.Context) ([]*PeersResult, error) {
 			}
 			feats[i] = feat
 		}
-		peers = append(peers, &PeersResult{
+		peers = append(peers, &peersResult{
 			Addr:  addr,
 			Host:  host,
 			Feats: feats,
@@ -564,26 +554,26 @@ func (sc *ServerConn) serverPeers(ctx context.Context) ([]*PeersResult, error) {
 	return peers, nil
 }
 
-// SigScript represents the signature script in a Vin returned by a transaction
+// sigScript represents the signature script in a Vin returned by a transaction
 // request.
-type SigScript struct {
-	Asm string `json:"asm"` // this is not the sigScript you're looking for
+type sigScript struct {
+	Asm string `json:"asm"` // this is not the sigScript you're looking for ;-)
 	Hex string `json:"hex"`
 }
 
-// Vin represents a transaction input in a requested transaction.
-type Vin struct {
+// vin represents a transaction input in a requested transaction.
+type vin struct {
 	TxID      string     `json:"txid"`
 	Vout      uint32     `json:"vout"`
-	SigScript *SigScript `json:"scriptsig"`
+	SigScript *sigScript `json:"scriptsig"`
 	Witness   []string   `json:"txinwitness,omitempty"`
 	Sequence  uint32     `json:"sequence"`
 	Coinbase  string     `json:"coinbase,omitempty"`
 }
 
-// PkScript represents the pkScript/scriptPubKey of a transaction output
+// pkScript represents the pkScript/scriptPubKey of a transaction output
 // returned by a transaction requests.
-type PkScript struct {
+type pkScript struct {
 	Asm       string   `json:"asm"`
 	Hex       string   `json:"hex"`
 	ReqSigs   uint32   `json:"reqsigs"`
@@ -591,14 +581,15 @@ type PkScript struct {
 	Addresses []string `json:"addresses,omitempty"`
 }
 
-// Vout represents a transaction output in a requested transaction.
-type Vout struct {
+// vout represents a transaction output in a requested transaction.
+type vout struct {
 	Value    float64  `json:"value"`
 	N        uint32   `json:"n"`
-	PkScript PkScript `json:"scriptpubkey"`
+	PkScript pkScript `json:"scriptpubkey"`
 }
 
-// GetTransactionResult is the data returned by a transaction request.
+// GetTransactionResult is the data returned by a transaction request. It is
+// exported to Client.
 type GetTransactionResult struct {
 	TxID string `json:"txid"`
 	// Hash          string `json:"hash"` // ??? don't use, not always the txid! witness not stripped?
@@ -608,32 +599,33 @@ type GetTransactionResult struct {
 	Weight        uint32 `json:"weight"`
 	LockTime      uint32 `json:"locktime"`
 	Hex           string `json:"hex"`
-	Vin           []Vin  `json:"vin"`
-	Vout          []Vout `json:"vout"`
+	Vin           []vin  `json:"vin"`
+	Vout          []vout `json:"vout"`
 	BlockHash     string `json:"blockhash,omitempty"`
 	Confirmations int32  `json:"confirmations,omitempty"` // probably uint32 ok because it seems to be omitted, but could be -1?
 	Time          int64  `json:"time,omitempty"`
 	BlockTime     int64  `json:"blocktime,omitempty"` // same as Time?
-	// Merkel // proto 1.5+
+	// Merkel // proto 1.5+ // consider upgrading proto
 }
 
-// GetTransaction requests a transaction.
-func (sc *ServerConn) GetTransaction(ctx context.Context, txid string) (*GetTransactionResult, error) {
+// getTransaction requests a transaction with verbose output. Some servers such
+// as Blockstream do not support this to save on the resources used.
+func (sc *serverConn) getTransaction(nodeCtx context.Context, txid string) (*GetTransactionResult, error) {
 	verbose := true
 	// verbose result
 	var resp GetTransactionResult
-	err := sc.Request(ctx, "blockchain.transaction.get", positional{txid, verbose}, &resp)
+	err := sc.request(nodeCtx, "blockchain.transaction.get", positional{txid, verbose}, &resp)
 	if err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-// GetTransaction requests a transaction as raw byte.
-func (sc *ServerConn) GetRawTransaction(ctx context.Context, txid string) (string, error) {
+// getRawTransaction requests a transaction as raw bytes.
+func (sc *serverConn) getRawTransaction(nodeCtx context.Context, txid string) (string, error) {
 	// non verbose result as a hex string of the raw transaction
 	var resp string
-	err := sc.Request(ctx, "blockchain.transaction.get", positional{txid, false}, &resp)
+	err := sc.request(nodeCtx, "blockchain.transaction.get", positional{txid, false}, &resp)
 	if err != nil {
 		return "", err
 	}
@@ -644,58 +636,58 @@ func (sc *ServerConn) GetRawTransaction(ctx context.Context, txid string) (strin
 // block headers methods
 // /////////////////////
 
-// BlockHeader requests the block header at the given height, returning
+// blockHeader requests the block header at the given height, returning
 // hexadecimal encoded serialized header.
-func (sc *ServerConn) BlockHeader(ctx context.Context, height uint32) (string, error) {
+func (sc *serverConn) blockHeader(nodeCtx context.Context, height uint32) (string, error) {
 	var resp string
-	err := sc.Request(ctx, "blockchain.block.header", positional{height}, &resp)
+	err := sc.request(nodeCtx, "blockchain.block.header", positional{height}, &resp)
 	if err != nil {
 		return "", err
 	}
 	return resp, nil
 }
 
-// GetBlockHeadersResult represent the result of a batch request for block
+// getBlockHeadersResult represent the result of a batch request for block
 // headers via the BlockHeaders method. The serialized block headers are
 // concatenated in the HexConcat field, which contains Count headers.
-type GetBlockHeadersResult struct {
+type getBlockHeadersResult struct {
 	Count     int    `json:"count"`
 	HexConcat string `json:"hex"`
 	Max       int64  `json:"max"`
 }
 
-// BlockHeaders requests a batch of block headers beginning at the given height.
+// blockHeaders requests a batch of block headers beginning at the given height.
 // The sever may respond with a different number of headers, so the caller
 // should check the Count field of the result.
-func (sc *ServerConn) BlockHeaders(ctx context.Context, startHeight int64, count int) (*GetBlockHeadersResult, error) {
-	var resp GetBlockHeadersResult
-	err := sc.Request(ctx, "blockchain.block.headers", positional{startHeight, count}, &resp)
+func (sc *serverConn) blockHeaders(nodeCtx context.Context, startHeight int64, count int) (*getBlockHeadersResult, error) {
+	var resp getBlockHeadersResult
+	err := sc.request(nodeCtx, "blockchain.block.headers", positional{startHeight, count}, &resp)
 	if err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-// HeadersNotifyResult is the contents of a block header notification.
-type HeadersNotifyResult struct {
+// headersNotifyResult is the contents of a block header notification.
+type headersNotifyResult struct {
 	Height int64  `json:"height"`
 	Hex    string `json:"hex"`
 }
 
-// GetHeadersNotify returns this connection owned recv channel for headers
+// getHeadersNotify returns this connection owned recv channel for headers
 // tip change notifications. This connection will close the channel.
-func (sc *ServerConn) GetHeadersNotify() chan *HeadersNotifyResult {
+func (sc *serverConn) getHeadersNotify() chan *headersNotifyResult {
 	return sc.headersNotify
 }
 
-// SubscribeHeaders subscribes for block header notifications. There seems to be
+// subscribeHeaders subscribes for block header notifications. There seems to be
 // no guarantee that we will be notified of all new blocks, such as when there
 // are blocks in rapid succession.
-func (sc *ServerConn) SubscribeHeaders(ctx context.Context) (*HeadersNotifyResult, error) {
+func (sc *serverConn) subscribeHeaders(nodeCtx context.Context) (*headersNotifyResult, error) {
 	const method = "blockchain.headers.subscribe"
 
-	var resp HeadersNotifyResult
-	err := sc.Request(ctx, method, nil, &resp)
+	var resp headersNotifyResult
+	err := sc.request(nodeCtx, method, nil, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -704,8 +696,8 @@ func (sc *ServerConn) SubscribeHeaders(ctx context.Context) (*HeadersNotifyResul
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-// scripthash methods
-// //////////////////
+// scripthash methods (exported) to Client
+// ///////////////////////////////////////
 
 // ScripthashStatusResult is the contents of a scripthash notification.
 // Raw bytes with no json key names or json [] {} delimiters
@@ -716,18 +708,18 @@ type ScripthashStatusResult struct {
 
 // GetScripthashNotify returns this connection owned recv channel for scripthash
 // status change notifications. This connection will close the channel.
-func (sc *ServerConn) GetScripthashNotify() chan *ScripthashStatusResult {
+func (sc *serverConn) GetScripthashNotify() chan *ScripthashStatusResult {
 	return sc.scripthashNotify
 }
 
 // SubscribeScripthash subscribes for notifications of changes for an address
-// in our wallet. We send the electrum 'scripthash' of the address rather than
-// the base58 encoded string. See also client_wallet.go.
-func (sc *ServerConn) SubscribeScripthash(ctx context.Context, scripthash string) (*ScripthashStatusResult, error) {
+// (scripthash) in wallet. We send the electrum 'scripthash' of the address
+// rather than the base58 encoded string. See also client_wallet.go.
+func (sc *serverConn) SubscribeScripthash(nodeCtx context.Context, scripthash string) (*ScripthashStatusResult, error) {
 	const method = "blockchain.scripthash.subscribe"
 
 	var status string // no json - sha256 of address history expected, as hex string
-	err := sc.Request(ctx, method, positional{scripthash}, &status)
+	err := sc.request(nodeCtx, method, positional{scripthash}, &status)
 	if err != nil {
 		return nil, err
 	}
@@ -740,12 +732,13 @@ func (sc *ServerConn) SubscribeScripthash(ctx context.Context, scripthash string
 	return &statusResult, nil
 }
 
-// Unsubscribe from a script hash, preventing future status change notifications.
-func (sc *ServerConn) UnsubscribeScripthash(ctx context.Context, scripthash string) {
+// UnsubscribeScripthash unsubscribes from a script hash, preventing future
+// status change notifications.
+func (sc *serverConn) UnsubscribeScripthash(nodeCtx context.Context, scripthash string) {
 	const method = "blockchain.scripthash.unsubscribe"
 
 	var resp string
-	err := sc.Request(ctx, method, positional{scripthash}, &resp)
+	err := sc.request(nodeCtx, method, positional{scripthash}, &resp)
 	if err != nil {
 		fmt.Println("dbg: ", err)
 	}
@@ -761,11 +754,11 @@ type History struct {
 
 type HistoryResult []History
 
-// GetHistory gets a list of [{height, txid and fee},...] for
-// the scripthash of an address of interest to the client
-func (sc *ServerConn) GetHistory(ctx context.Context, scripthash string) (HistoryResult, error) {
+// GetHistory gets a list of [{height, txid and fee (only mempool)},...] for the
+// scripthash of an address of interest to the client wallet.
+func (sc *serverConn) GetHistory(nodeCtx context.Context, scripthash string) (HistoryResult, error) {
 	var resp HistoryResult
-	err := sc.Request(ctx, "blockchain.scripthash.get_history", positional{scripthash}, &resp)
+	err := sc.request(nodeCtx, "blockchain.scripthash.get_history", positional{scripthash}, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -781,11 +774,11 @@ type ListUnspent struct {
 
 type ListUnspentResult []ListUnspent
 
-// GetListUnspent gets a list of [{height, txid tx_pos and value},...] for
-// the scripthash of an address of interest to the client
-func (sc *ServerConn) GetListUnspent(ctx context.Context, scripthash string) (ListUnspentResult, error) {
+// GetListUnspent gets a list of [{height, txid tx_pos and value},...] for the
+// scripthash of an address of interest to the client wallet.
+func (sc *serverConn) GetListUnspent(nodeCtx context.Context, scripthash string) (ListUnspentResult, error) {
 	var resp ListUnspentResult
-	err := sc.Request(ctx, "blockchain.scripthash.listunspent", positional{scripthash}, &resp)
+	err := sc.request(nodeCtx, "blockchain.scripthash.listunspent", positional{scripthash}, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -793,26 +786,26 @@ func (sc *ServerConn) GetListUnspent(ctx context.Context, scripthash string) (Li
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-// other wallet methods
-// ////////////////////
+// Other wallet methods (exported to Client)
+// /////////////////////////////////////////
 
 // Broadcast broadcasts a raw tx as a hexadecimal string to the network. The tx
 // hash is returned as a hexadecimal string.
-func (sc *ServerConn) Broadcast(ctx context.Context, rawTx string) (string, error) {
+func (sc *serverConn) Broadcast(nodeCtx context.Context, rawTx string) (string, error) {
 	var resp string
-	err := sc.Request(ctx, "blockchain.transaction.broadcast", positional{rawTx}, &resp)
+	err := sc.request(nodeCtx, "blockchain.transaction.broadcast", positional{rawTx}, &resp)
 	if err != nil {
 		return "", err
 	}
 	return resp, nil
 }
 
-// estimated transaction fee in coin units per kilobyte, as a floating point number string.
+// Estimated transaction fee in coin units per kilobyte, as a floating point number string.
 // If the daemon does not have enough information to make an estimate, the integer -1
 // is returned.
-func (sc *ServerConn) EstimateFee(ctx context.Context, confTarget int64) (int64, error) {
+func (sc *serverConn) EstimateFee(nodeCtx context.Context, confTarget int64) (int64, error) {
 	var resp float64
-	err := sc.Request(ctx, "blockchain.estimatefee", positional{confTarget}, &resp)
+	err := sc.request(nodeCtx, "blockchain.estimatefee", positional{confTarget}, &resp)
 	if err != nil {
 		return 0, err
 	}

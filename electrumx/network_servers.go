@@ -21,8 +21,8 @@ type serverAddr struct {
 	Host    string `json:"host"`
 	IsOnion bool   `json:"is_onion"`
 	Version string `json:"version"`
-	Caps    string `json:"caps"`          // comma separated string eg. "cannot_lead,no_blks,..."
-	Rep     int    `json:"rep,omitempty"` // reputation score - not implemented as yet
+	Caps    string `json:"caps"` // comma separated string eg. "cannot_lead,no_blks,..."
+	Rep     int    `json:"rep"`  // reputation score - not fully implemented as yet
 }
 
 // Incoming list from server_connection.go - constructed using reflection
@@ -62,7 +62,7 @@ func (net *Network) getServers(ctx context.Context) error {
 
 // addIncomingservers converts incoming peerResults and updates memory & stored
 // server lists
-func (net *Network) addIncomingservers(in []*PeersResult) error {
+func (net *Network) addIncomingservers(in []*peersResult) error {
 	servers := net.makeIncomingServerAddrs(in)
 	if len(servers) == 0 {
 		// probably redundant but at least ine peer I started on testnet returned
@@ -81,7 +81,7 @@ func (net *Network) addIncomingservers(in []*PeersResult) error {
 	return nil
 }
 
-func (net *Network) makeIncomingServerAddrs(in []*PeersResult) []*serverAddr {
+func (net *Network) makeIncomingServerAddrs(in []*peersResult) []*serverAddr {
 	var servers = make([]*serverAddr, 0, 2*len(in))
 
 	for _, pres := range in {
