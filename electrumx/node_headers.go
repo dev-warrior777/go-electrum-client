@@ -305,8 +305,8 @@ func (n *Node) updateFromBlocks(nodeCtx context.Context, from, to int64) (int64,
 
 		// dbg
 		fmt.Println("incoming:")
-		hash := dbgHashHexFromHeaderHex(header)
-		prev := dbgStringHeaderPrev(header)
+		hash := n.dbgHashHexFromHeaderHex(header)
+		prev := n.dbgStringHeaderPrev(header)
 		fmt.Printf("hdr hash: %s hdr prev: %s\n", hash, prev)
 		// enddbg
 
@@ -329,6 +329,7 @@ func (n *Node) updateFromBlocks(nodeCtx context.Context, from, to int64) (int64,
 }
 
 func (n *Node) updateFromChunk(nodeCtx context.Context, from, to int64) (int64, error) {
+	h := n.networkHeaders
 	var headersConnected int64
 	fmt.Printf("updateFromChunk: from %d to %d inclusive\n", from, to)
 	reqCount := int(to - from + 1)
@@ -343,7 +344,7 @@ func (n *Node) updateFromChunk(nodeCtx context.Context, from, to int64) (int64, 
 		fmt.Printf("server uses too low 'max' count %d for block.headers\n", hdrsRes.Max)
 		return 0, nil
 	}
-	oneHdrLen := HEADER_SIZE * 2
+	oneHdrLen := int(h.headerSize) * 2
 	allHdrs := hdrsRes.HexConcat
 	strLenAll := len(allHdrs)
 	// check size of returned concatenated blocks
@@ -363,8 +364,8 @@ func (n *Node) updateFromChunk(nodeCtx context.Context, from, to int64) (int64, 
 	fmt.Println("incoming:")
 	for i := 0; i < hdrsRes.Count; i++ {
 		header := hdrsRes.HexConcat[i*oneHdrLen : (i+1)*oneHdrLen]
-		hash := dbgHashHexFromHeaderHex(header)
-		prev := dbgStringHeaderPrev(header)
+		hash := n.dbgHashHexFromHeaderHex(header)
+		prev := n.dbgStringHeaderPrev(header)
 		fmt.Printf("hdr hash: %s hdr prev: %s\n", hash, prev)
 	}
 	// enddbg
@@ -390,7 +391,7 @@ func (n *Node) updateFromChunk(nodeCtx context.Context, from, to int64) (int64, 
 
 func (n *Node) connectTip(serverHeader string) bool {
 	h := n.networkHeaders
-	incomingHdr, incomingHdrBytes, err := convertStringHdrToBlkHdr(serverHeader)
+	incomingHdr, incomingHdrBytes, err := n.convertStringHdrToBlkHdr(serverHeader)
 	if err != nil {
 		// this assertion should maybe just trigger a server change for MultiNode
 		panic(err)
@@ -416,12 +417,13 @@ func (n *Node) connectTip(serverHeader string) bool {
 	return true
 }
 
-func convertStringHdrToBlkHdr(svrHdr string) (*wire.BlockHeader, []byte, error) {
+func (n *Node) convertStringHdrToBlkHdr(svrHdr string) (*wire.BlockHeader, []byte, error) {
+	h := n.networkHeaders
 	rawBytes, err := hex.DecodeString(svrHdr)
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(rawBytes) != HEADER_SIZE {
+	if len(rawBytes) != h.headerSize {
 		return nil, nil, fmt.Errorf("corrupted header - length %d", len(svrHdr))
 	}
 	r := bytes.NewBuffer(rawBytes)
@@ -450,12 +452,13 @@ func (n *Node) dbgTryRecoverHack() {
 
 // -------- end hack --------------
 
-func dbgStringHeaderPrev(svrHdr string) string {
+func (n *Node) dbgStringHeaderPrev(svrHdr string) string {
+	h := n.networkHeaders
 	rawBytes, err := hex.DecodeString(svrHdr)
 	if err != nil {
 		return "<hex decode error>"
 	}
-	if len(rawBytes) != HEADER_SIZE {
+	if len(rawBytes) != int(h.headerSize) {
 		return "<corrupted header>"
 	}
 	r := bytes.NewBuffer(rawBytes)
@@ -467,8 +470,8 @@ func dbgStringHeaderPrev(svrHdr string) string {
 	return hdr.PrevBlock.String()
 }
 
-func dbgHashHexFromHeaderHex(svrHdr string) string {
-	hdr, _, err := convertStringHdrToBlkHdr(svrHdr)
+func (n *Node) dbgHashHexFromHeaderHex(svrHdr string) string {
+	hdr, _, err := n.convertStringHdrToBlkHdr(svrHdr)
 	if err != nil {
 		return "*conversion error*"
 	}

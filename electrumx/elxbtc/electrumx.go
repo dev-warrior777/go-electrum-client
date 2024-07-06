@@ -8,12 +8,24 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
+const (
+	BTC_HEADER_SIZE        = 80
+	BTC_STARTPOINT_REGTEST = 0
+	BTC_STARTPOINT_TESTNET = 2560000
+	BTC_STARTPOINT_MAINNET = 823000
+)
+
 type ElectrumXInterface struct {
 	config  *electrumx.ElectrumXConfig
 	network *electrumx.Network
 }
 
 func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterface, error) {
+	config.BlockHeaderSize = BTC_HEADER_SIZE
+	config.StartPoints = make(map[string]int64)
+	config.StartPoints[electrumx.REGTEST] = int64(BTC_STARTPOINT_REGTEST)
+	config.StartPoints[electrumx.TESTNET] = int64(BTC_STARTPOINT_TESTNET)
+	config.StartPoints[electrumx.MAINNET] = int64(BTC_STARTPOINT_MAINNET)
 	x := ElectrumXInterface{
 		config:  config,
 		network: nil,
@@ -31,7 +43,7 @@ func (x *ElectrumXInterface) Start(ctx context.Context) error {
 	return nil
 }
 
-var ErrNoNetwork error = errors.New("network not running")
+var ErrNoNetwork error = errors.New("btc: network not running")
 
 func (x *ElectrumXInterface) GetTip() int64 {
 	if x.network == nil {

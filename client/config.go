@@ -23,10 +23,13 @@ type ClientConfig struct {
 	// The blockchain, btc, dash, etc
 	Chain wallet.CoinType
 
-	// Size of a block header for this chain - defaults to 80 bytes.
-	BlockHeaderSize int
+	// Coin ticker to id the coin
+	Coin string
 
-	// Network parameters.
+	// Net type - mainnet, testnet or regtest
+	NetType string
+
+	// Network parameters - make more general if it cannot adapt to other coins.
 	Params *chaincfg.Params
 
 	// Store the seed in encrypted storage
@@ -77,8 +80,9 @@ type ClientConfig struct {
 func NewDefaultConfig() *ClientConfig {
 	return &ClientConfig{
 		Chain:                wallet.Bitcoin,
+		Coin:                 "btc",
+		NetType:              "mainnet",
 		Params:               &chaincfg.MainNetParams,
-		BlockHeaderSize:      80,
 		UserAgent:            appName,
 		DataDir:              btcutil.AppDataDir(appName, false),
 		DbType:               DbTypeBolt,
@@ -90,6 +94,8 @@ func NewDefaultConfig() *ClientConfig {
 func (cc *ClientConfig) MakeWalletConfig() *wallet.WalletConfig {
 	wc := wallet.WalletConfig{
 		Chain:        cc.Chain,
+		Coin:         cc.Coin,
+		NetType:      cc.NetType,
 		Params:       cc.Params,
 		StoreEncSeed: cc.StoreEncSeed,
 		DataDir:      cc.DataDir,
@@ -106,14 +112,14 @@ func (cc *ClientConfig) MakeWalletConfig() *wallet.WalletConfig {
 
 func (cc *ClientConfig) MakeElectrumXConfig() *electrumx.ElectrumXConfig {
 	nc := electrumx.ElectrumXConfig{
-		Chain:           cc.Chain,
-		Params:          cc.Params,
-		BlockHeaderSize: cc.BlockHeaderSize,
-		UserAgent:       cc.UserAgent,
-		DataDir:         cc.DataDir,
-		TrustedPeer:     cc.TrustedPeer,
-		Proxy:           cc.Proxy,
-		Testing:         cc.Testing,
+		Chain:       cc.Chain,
+		NetType:     cc.NetType,
+		Params:      cc.Params,
+		UserAgent:   cc.UserAgent,
+		DataDir:     cc.DataDir,
+		TrustedPeer: cc.TrustedPeer,
+		Proxy:       cc.Proxy,
+		Testing:     cc.Testing,
 	}
 	return &nc
 }

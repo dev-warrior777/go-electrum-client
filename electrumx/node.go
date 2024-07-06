@@ -29,7 +29,7 @@ type Node struct {
 	connectOpts            *connectOpts
 	server                 *Server
 	leader                 bool
-	networkHeaders         *Headers
+	networkHeaders         *headers
 	clientTipChangeNotify  chan int64
 	clientScriptHashNotify chan *ScripthashStatusResult
 	session                *session
@@ -38,7 +38,7 @@ type Node struct {
 func newNode(
 	netAddr *NodeServerAddr,
 	isLeader bool,
-	networkHeaders *Headers,
+	networkHeaders *headers,
 	clientTipChangeNotify chan int64,
 	clientScriptHashNotify chan *ScripthashStatusResult) (*Node, error) {
 

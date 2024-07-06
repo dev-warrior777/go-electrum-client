@@ -34,14 +34,37 @@ func (nsa *NodeServerAddr) IsEqual(other *NodeServerAddr) bool {
 // Ensure simpleAddr implements the net.Addr interface.
 var _ net.Addr = NodeServerAddr{}
 
+const (
+	MAINNET = "mainnet"
+	TESTNET = "testnet"
+	REGTEST = "regtest"
+)
+
+const (
+	COIN_BTC = "btc"
+	//...
+)
+
 type ElectrumXConfig struct {
 	// The blockchain, Bitcoin, Dash, etc
 	Chain wallet.CoinType
 
+	// Coin ticker to id the coin
+	// Filled in by each coin in ElectrumXInterface
+	Coin string
+
 	// Size of a block header for this chain, normally 80 bytes.
+	// Filled in by each coin in ElectrumXInterface
 	BlockHeaderSize int
 
-	// NetType parameters..
+	// Checkpoints for each network: mainnet, testnet, regtest
+	// Filled in by each coin in ElectrumXInterface
+	StartPoints map[string]int64
+
+	// mainnet, testnet, regtest
+	NetType string
+
+	// NetType parameters.. can chaincfg adapt for all coins? for now we use the NetType
 	Params *chaincfg.Params
 
 	// The user-agent visible to the network
@@ -61,11 +84,9 @@ type ElectrumXConfig struct {
 	Testing bool
 }
 
-type Nettype string
-
-var Regtest Nettype = "regtest"
-var Testnet Nettype = "testnet"
-var Mainnet Nettype = "mainnet"
+var Regtest string = "regtest"
+var Testnet string = "testnet"
+var Mainnet string = "mainnet"
 
 var DebugMode bool
 

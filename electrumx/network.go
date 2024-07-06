@@ -54,14 +54,14 @@ type Network struct {
 	peersMtx        sync.RWMutex
 	knownServers    []*serverAddr
 	knownServersMtx sync.Mutex
-	headers         *Headers
+	headers         *headers
 	// static channels to client for the lifetime of the main context
 	clientTipChangeNotify  chan int64
 	clientScripthashNotify chan *ScripthashStatusResult
 }
 
 func NewNetwork(config *ElectrumXConfig) *Network {
-	h := NewHeaders(config)
+	h := newHeaders(config)
 	n := &Network{
 		config:                 config,
 		started:                false,

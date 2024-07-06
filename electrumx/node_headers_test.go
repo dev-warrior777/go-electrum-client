@@ -9,7 +9,7 @@ func TestNode_connectTip(t *testing.T) {
 		connectOpts         *connectOpts
 		server              *Server
 		leader              bool
-		networkHeaders      *Headers
+		networkHeaders      *headers
 		rcvTipChangeNotify  chan int64
 		rcvScriptHashNotify chan *ScripthashStatusResult
 	}

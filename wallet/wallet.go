@@ -17,7 +17,13 @@ type WalletConfig struct {
 	// The blockchain, btc, dash, etc
 	Chain CoinType
 
-	// Network parameters. Set mainnet, testnet using this.
+	// Coin ticker to id the coin
+	Coin string
+
+	// mainnet, testnet or regtest
+	NetType string
+
+	// Network parameters - can this be generalized for all coins?
 	Params *chaincfg.Params
 
 	// Store the seed in encrypted storage

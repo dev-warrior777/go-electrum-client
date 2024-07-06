@@ -14,6 +14,8 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
+// Data taken from btc regtest which has a block size 0f 80
+
 var hdrFileReg = []byte{
 	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -81,7 +83,8 @@ func TestAppendHeaders(t *testing.T) {
 	fname := fi.Name()
 	f.Close()
 
-	h := Headers{
+	h := headers{
+		headerSize:  80,
 		hdrFilePath: path.Join("/tmp", fname),
 		net:         &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
@@ -117,7 +120,7 @@ func TestAppendHeaders(t *testing.T) {
 	}
 	fmt.Println(fsize, " total bytes stored ", totalHdrs, ", total headers stored")
 
-	if totalHdrs != fsize/HEADER_SIZE {
+	if totalHdrs != fsize/int64(h.headerSize) {
 		log.Fatal("total headers wrong")
 	}
 
@@ -163,14 +166,9 @@ func TestReadStoreHeaderFile(t *testing.T) {
 	if read != n {
 		log.Fatal("read truncated")
 	}
-	if read%HEADER_SIZE != 0 {
-		log.Fatal("invalid file size")
-	}
-	numHdrs := int64(read / HEADER_SIZE)
-	fmt.Printf("read %d bytes %d headers from headerfile\n", read, numHdrs)
-
 	// store headers
-	h := Headers{
+	h := headers{
+		headerSize:  80,
 		hdrFilePath: f.Name(),
 		net:         &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
@@ -178,14 +176,24 @@ func TestReadStoreHeaderFile(t *testing.T) {
 		tip:         0,
 		synced:      false,
 	}
+	if read%h.headerSize != 0 {
+		log.Fatal("invalid file size")
+	}
+	numHdrs := read / h.headerSize
+	fmt.Printf("read %d bytes %d headers from headerfile\n", read, numHdrs)
+
 	err = h.store(b, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
-	h.tip = numHdrs - 1
+	h.tip = int64(numHdrs - 1)
 	fmt.Printf("stored %d headers into hdrs map at height %d\n", numHdrs, 0)
-
 	// verify chain
+	err = h.verifyAll()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// just visual confirmation
 	var height int64
 	for height = h.tip; height > 0; height-- {
 		thisHdr := h.hdrs[height]
@@ -204,10 +212,9 @@ func TestTruncateHeadersFile(t *testing.T) {
 		log.Fatal(err)
 	}
 	fname := f.Name()
-
-	defer f.Close() // <-------------------open
-
-	h := Headers{
+	defer f.Close()
+	h := headers{
+		headerSize:  80,
 		hdrFilePath: fname,
 		net:         &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
@@ -273,7 +280,7 @@ var hdrBadLenLess = []byte{
 	0x43, 0xeb, 0x5b, 0xbf, 0x28, 0xc3, 0x4f, 0x3a, 0x5e, 0x33, 0x2a, 0x1f, 0xc7, 0xb2, 0xb7, 0x3c,
 	0xf1, 0x88, 0x91, 0x0f, 0x95, 0x2d, 0xaa, 0x4d, 0x5d, 0x1c, 0x84, 0x66, 0x7f, 0xb4, 0x86, 0x30,
 	0x0a, 0x63, 0x20, 0x8a, 0x05, 0xe5, 0x0e, 0xbf, 0x41, 0xd8, 0xc3, 0x4a, 0x9f, 0x3b, 0xd3, 0x7b,
-	0xd0, 0x45, 0x26, 0x4c, 0x42, 0x78, 0x33, 0x65, 0xff, 0xff, 0x7f, 0x20,
+	0xd0, 0x45, 0x26, 0x4c, 0x42, 0x78, 0x33, 0x65, 0xff, 0xff, 0x7f, 0x20, // less
 }
 
 var hdrBadLenMore = []byte{
@@ -282,6 +289,7 @@ var hdrBadLenMore = []byte{
 	0xf1, 0x88, 0x91, 0x0f, 0x95, 0x2d, 0xaa, 0x4d, 0x5d, 0x1c, 0x84, 0x66, 0x7f, 0xb4, 0x86, 0x30,
 	0x0a, 0x63, 0x20, 0x8a, 0x05, 0xe5, 0x0e, 0xbf, 0x41, 0xd8, 0xc3, 0x4a, 0x9f, 0x3b, 0xd3, 0x7b,
 	0xd0, 0x45, 0x26, 0x4c, 0x42, 0x78, 0x33, 0x65, 0xff, 0xff, 0x7f, 0x20, 0x00, 0x00, 0x00, 0x00,
+	/* more */
 	0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
 }
 
@@ -304,7 +312,8 @@ var hdr3 = []byte{
 }
 
 func TestStore(t *testing.T) {
-	h := Headers{
+	h := headers{
+		headerSize:  80,
 		hdrFilePath: "<empty>",
 		net:         &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
@@ -351,7 +360,8 @@ func TestStore(t *testing.T) {
 }
 
 func TestMapIter(t *testing.T) {
-	h := Headers{
+	h := headers{
+		headerSize:  80,
 		hdrFilePath: "<empty>",
 		net:         &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
@@ -373,7 +383,8 @@ func TestMapIter(t *testing.T) {
 }
 
 func TestStoreHashes(t *testing.T) {
-	h := Headers{
+	h := headers{
+		headerSize:  80,
 		hdrFilePath: "<empty>",
 		net:         &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
