@@ -18,7 +18,6 @@ func (n *Node) scriptHashNotify(nodeCtx context.Context) error {
 		for {
 			select {
 			case <-nodeCtx.Done():
-				n.setState(DISCONNECTED)
 				<-n.server.conn.Done()
 				fmt.Printf("nodeCtx.Done - in scriptHashNotify %s - exiting thread\n", n.serverAddr)
 				return

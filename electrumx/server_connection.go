@@ -35,6 +35,8 @@ var (
 	disabledPrinter = printer(func(string, ...any) {})
 )
 
+var errServerCanceled = errors.New("Server Cancelled")
+
 // from electrum code - about 50% default server timeout for ping which is ~10m
 // const pingInterval = 300 * time.Second
 const pingInterval = 10 * time.Second
@@ -44,7 +46,7 @@ const pingInterval = 10 * time.Second
 // connectServer to construct a serverConn and connect to the server.
 type serverConn struct {
 	conn       net.Conn
-	nodeCancel context.CancelFunc
+	nodeCancel context.CancelCauseFunc
 	done       chan struct{}
 	proto      string
 	addr       string // kept from connectServer for debug
@@ -98,8 +100,7 @@ func (sc *serverConn) listen(nodeCtx context.Context) {
 			if nodeCtx.Err() == nil { // unexpected
 				fmt.Printf("ReadBytes: %v - conn closed\n", err)
 			}
-			// sc.cancel()
-			sc.nodeCancel()
+			sc.nodeCancel(errServerCanceled)
 			return
 		}
 
@@ -224,14 +225,14 @@ type connectOpts struct {
 }
 
 // connectServer connects to the electrumx server at the given address. To close
-// the connection and shutdown ServerConn cancel the context or use the then wait
+// the connection and shutdown serverConn cancel the context or use the then wait
 // on the channel from Done() to ensure a clean shutdown (connection closed and
 // all requests handled).
 // There is no automatic reconnection functionality, as the caller should handle
 // dropped connections by cycling to a different server.
 func connectServer(
 	nodeCtx context.Context,
-	nodeCancel context.CancelFunc,
+	nodeCancel context.CancelCauseFunc,
 	addr string,
 	opts *connectOpts) (*serverConn, error) {
 
@@ -292,7 +293,9 @@ func connectServer(
 	go sc.pinger(nodeCtx) // must be running or the server will disconnect after some time
 	go func() {
 		<-nodeCtx.Done()
-		fmt.Printf("nodeCtx.Done in connectServer for %s - waiting for connection to finish\n", sc.addr)
+		cause := context.Cause(nodeCtx)
+		fmt.Printf("nodeCtx.Done in connectServer for %s - cause %v - waiting for connection to finish\n",
+			cause, sc.addr)
 		conn.Close()
 		fmt.Printf("serverConn -- conn Closed - closing sc.Done channel\n")
 		close(sc.done)
@@ -430,8 +433,7 @@ func (sc *serverConn) request(nodeCtx context.Context, method string, args any, 
 	c := sc.registerRequest(id)
 
 	if err = sc.send(reqMsg); err != nil {
-		// sc.cancel()
-		sc.nodeCancel()
+		sc.nodeCancel(errServerCanceled)
 		return err
 	}
 

@@ -13,13 +13,24 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-const (
-	MAX_ONLINE_PEERS = 3 // TODO: this should be based on coin/net
-	MIN_ONLINE_PEERS = 2
-)
+// network
+//    |
+//    leader
+//    |
+//    peers
+//      |
+//       -- peer id 1
+//      |
+//       -- peer id 2
+//      |
+//       -- peer id 3
+//      |
+//       ...
 
-var ErrNoNetwork = errors.New("network not started")
-var ErrNoLeader = errors.New("no leader node is assigned")
+var errNoNetwork = errors.New("network not started")
+var errNoLeader = errors.New("no leader node is assigned - try again in 10 seconds")
+
+var errNetworkCanceled = errors.New("Network Cancelled")
 
 var peerId uint32 // stomic
 
@@ -29,10 +40,18 @@ type peerNode struct {
 	isTrusted  bool
 	netAddr    *NodeServerAddr
 	node       *Node
-	nodeCancel context.CancelFunc
+	nodeCtx    context.Context
+	nodeCancel context.CancelCauseFunc
 }
 
-func newPeerNodeWithId(isLeader, isTrusted bool, netAddr *NodeServerAddr, node *Node, nodeCancel context.CancelFunc) *peerNode {
+func newPeerNodeWithId(
+	isLeader,
+	isTrusted bool,
+	netAddr *NodeServerAddr,
+	node *Node,
+	nodeCtx context.Context,
+	nodeCancel context.CancelCauseFunc) *peerNode {
+
 	newId := atomic.LoadUint32(&peerId)
 	pn := &peerNode{
 		id:         newId,
@@ -40,6 +59,7 @@ func newPeerNodeWithId(isLeader, isTrusted bool, netAddr *NodeServerAddr, node *
 		isTrusted:  isTrusted,
 		netAddr:    netAddr,
 		node:       node,
+		nodeCtx:    nodeCtx,
 		nodeCancel: nodeCancel,
 	}
 	atomic.AddUint32(&peerId, 1)
@@ -50,6 +70,7 @@ type Network struct {
 	config          *ElectrumXConfig
 	started         bool
 	startMtx        sync.Mutex
+	leader          *peerNode
 	peers           []*peerNode
 	peersMtx        sync.RWMutex
 	knownServers    []*serverAddr
@@ -65,6 +86,7 @@ func NewNetwork(config *ElectrumXConfig) *Network {
 	n := &Network{
 		config:                 config,
 		started:                false,
+		leader:                 nil,
 		peers:                  make([]*peerNode, 0, 10),
 		knownServers:           make([]*serverAddr, 0, 30),
 		headers:                h,
@@ -115,7 +137,7 @@ func (net *Network) start(ctx context.Context, startServer *NodeServerAddr) erro
 	// leader up and headers synced
 	net.started = true
 	// ask leader for it's known peers
-	net.getPeerServers(ctx)
+	net.getServerPeers(ctx)
 	// bootstrap peers loop with leader's connection
 	go net.peersMonitor(ctx)
 	return nil
@@ -136,22 +158,26 @@ func (net *Network) startNewPeer(ctx context.Context, netAddr *NodeServerAddr, i
 	nettype := net.config.Params.Name
 	genesis := net.config.Params.GenesisHash.String()
 	// node runs in a new child context
-	nodeCtx, nodeCancel := context.WithCancel(ctx)
+	nodeCtx, nodeCancel := context.WithCancelCause(ctx)
 	err = node.start(nodeCtx, nodeCancel, network, nettype, genesis)
 	if err != nil {
-		nodeCancel()
+		nodeCancel(errNetworkCanceled)
 		return err
 	}
-	// node is up, add to peerNodes
-	peer := newPeerNodeWithId(isLeader, isTrusted, netAddr, node, nodeCancel)
-	net.addPeer(peer)
-	// ask peer for it's electrumx server's Peers & load server list from file
-	net.getPeerServers(ctx)
+	// node is up, add to peerNodes if not leader
+	peer := newPeerNodeWithId(isLeader, isTrusted, netAddr, node, nodeCtx, nodeCancel)
+	if isLeader {
+		net.leader = peer
+	} else {
+		net.addPeer(peer)
+	}
+	// ask our peer for it's electrumx server's Peers & load server list from file
+	net.getServerPeers(ctx)
 	return nil
 }
 
 // get and update a list of a known servers - not locked
-func (net *Network) getPeerServers(ctx context.Context) {
+func (net *Network) getServerPeers(ctx context.Context) {
 	err := net.getServers(ctx)
 	if err != nil {
 		fmt.Println(err)
@@ -164,21 +190,18 @@ func (net *Network) addPeer(newPeer *peerNode) {
 	net.peers = append(net.peers, newPeer)
 }
 
-// remove and cancel a running peer - not locked
-func (net *Network) removePeer(oldPeer *peerNode) error {
+// remove a running peer - not locked
+func (net *Network) removePeer(oldPeer *peerNode) {
 	nodesLen := len(net.peers)
-	currPeers := net.peers
 	newPeers := make([]*peerNode, 0, nodesLen-1)
-	for _, peer := range currPeers {
+	for _, peer := range net.peers {
 		if oldPeer.id == peer.id {
-			fmt.Printf("cancelling peer %d\n", oldPeer.id)
-			oldPeer.nodeCancel()
+			fmt.Printf("removing peer %d\n", oldPeer.id)
 		} else {
 			newPeers = append(newPeers, peer)
 		}
 	}
 	net.peers = newPeers
-	return nil
 }
 
 // getNumPeers gets the number of current peer nodes - not locked
@@ -188,12 +211,7 @@ func (net *Network) getNumPeers() int {
 
 // getLeader gets leader node if any - not locked
 func (net *Network) getLeader() *peerNode {
-	for _, peer := range net.peers {
-		if peer.isLeader {
-			return peer
-		}
-	}
-	return nil
+	return net.leader
 }
 
 // -----------------------------------------------------------------------------
@@ -211,7 +229,7 @@ func (net *Network) peersMonitor(ctx context.Context) {
 		case <-ctx.Done():
 			fmt.Println("ctx.Done in peersMonitor - exiting thread")
 			for _, peer := range net.peers {
-				peer.nodeCancel()
+				peer.nodeCancel(errNetworkCanceled)
 			}
 			return
 		case <-t.C:
@@ -225,81 +243,106 @@ func (net *Network) peersMonitor(ctx context.Context) {
 func (net *Network) checkLeader(ctx context.Context) {
 	net.peersMtx.Lock()
 	defer net.peersMtx.Unlock()
+
 	leader := net.getLeader()
 	if leader != nil {
-		state := leader.node.getState()
-		if state == CONNECTED || state == CONNECTING {
+		if leader.nodeCtx.Err() == nil {
+			// fast path
 			return
 		}
+		fmt.Printf("checkLeader: need a new leader for: %s nodeCtx.Err(): %v\n",
+			leader.netAddr, context.Cause(leader.nodeCtx))
+	} else {
+		fmt.Printf("checkLeader: need a new leader - current leader is <nil>\n")
 	}
 
 	// we need a new leader
 
-	// if leader still exists remove from peers list
-	if leader != nil {
-		net.removePeer(leader)
-	}
-	// any running nodes we can promote?
+	// any running peers we can promote?
 	numPeers := net.getNumPeers()
-	if numPeers >= 1 {
-		// promote first in the list TODO: reputation score in network_servers
-		newLleader := net.peers[0]
-		newLleader.node.promoteToLeader()
-		return
+	if numPeers > 0 {
+		// promote one from the list.
+		for _, peer := range net.peers {
+			if peer.nodeCtx.Err() != nil {
+				continue
+			}
+			err := peer.node.promoteToLeader(peer.nodeCtx)
+			if err != nil {
+				fmt.Printf("checkLeader: cannot start %s %v\n", peer.netAddr, err)
+				peer.nodeCancel(errNetworkCanceled)
+				continue
+			}
+			net.leader = peer
+			return
+		}
 	}
-	// no running nodes so make new leader
+	// no running peers so make new leader
 	net.startNewLeader(ctx)
-}
-
-func (net *Network) startNewLeader(ctx context.Context) {
-	// TODO: get a free known server and start it up as new leader
-}
-
-func (net *Network) promoteOnePeerAsNewLeader(ctx context.Context) {
-	// TODO: promote one currently running peer as new leader
 }
 
 func (net *Network) reapDeadPeers() {
 	net.peersMtx.Lock()
 	defer net.peersMtx.Unlock()
-	currPeers := net.peers
-	for _, peer := range currPeers {
-		if peer.node.getState() == DISCONNECTED {
-			net.removePeer(peer)
-			fmt.Printf("reapDeadPeers - online peers: %d\n\n", net.getNumPeers())
+
+	var peersToRemove = make([]*peerNode, 0)
+	for _, peer := range net.peers {
+		if peer.nodeCtx.Err() != nil {
+			peersToRemove = append(peersToRemove, peer)
 		}
+	}
+	for i, peer := range peersToRemove {
+		net.removePeer(peer)
+		fmt.Printf("reapDeadPeers - online peers after reap (#%d) is: %d\n\n", i+1, net.getNumPeers())
 	}
 }
 
 func (net *Network) startNewPeerMaybe(ctx context.Context) {
 	net.peersMtx.Lock()
 	defer net.peersMtx.Unlock()
+
 	numPeers := net.getNumPeers()
-	if numPeers >= MAX_ONLINE_PEERS {
+	if numPeers >= net.config.MaxOnlinePeers {
 		return
 	}
-
-	toNetAddr := func(sa *serverAddr) *NodeServerAddr {
-		return &NodeServerAddr{
-			Net:  sa.Net,
-			Addr: sa.Address,
-		}
+	if len(net.knownServers) == 0 {
+		fmt.Println("startNewPeerMaybe: no known servers")
+		return
 	}
+	available := net.availableServers()
+	if len(available) == 0 {
+		fmt.Println("startNewPeerMaybe: no known servers that are not already connected")
+		return
+	}
+	// start a new peer
+	addr := toNetAddr(available[0])
+	err := net.startNewPeer(ctx, addr, false, false) // dialerCtx time limited to 10s
+	if err != nil {
+		fmt.Printf(" ..cannot start %s %v\n", addr.String(), err)
+		net.removeServer(available[0])
+	}
+	fmt.Printf("startNewPeerMaybe: online peers: %d\n\n", net.getNumPeers())
+}
 
+func toNetAddr(saddr *serverAddr) *NodeServerAddr {
+	return &NodeServerAddr{
+		Net:  saddr.Net,
+		Addr: saddr.Address,
+	}
+}
+
+// build a list of known servers that have not yet been started
+func (net *Network) availableServers() []*serverAddr {
+	var available = make([]*serverAddr, 0)
 	servers := net.knownServers
-	if len(servers) == 0 {
-		fmt.Println("startNewPeers: no known servers")
-		return
-	}
-	peers := net.peers
-	// build a list of known servers that have not yet been started
-	var possible = make([]*serverAddr, 0)
 	for _, server := range servers {
 		if server.IsOnion {
 			continue
 		}
 		matchedAnyNetAddr := false
-		for _, peer := range peers {
+		for _, peer := range net.peers {
+			if peer.nodeCtx.Err() != nil {
+				continue
+			}
 			svrNodeAddr := toNetAddr(server)
 			if svrNodeAddr.IsEqual(peer.netAddr) {
 				matchedAnyNetAddr = true
@@ -307,21 +350,34 @@ func (net *Network) startNewPeerMaybe(ctx context.Context) {
 			}
 		}
 		if !matchedAnyNetAddr {
-			possible = append(possible, server)
+			available = append(available, server)
 		}
 	}
-	if len(possible) == 0 {
-		fmt.Println("startNewPeers: no known servers that are not already connected")
+	return available
+}
+
+func (net *Network) startNewLeader(ctx context.Context) {
+	fmt.Printf("startNewLeader .. not impl\n")
+	// get a free known server
+	if len(net.knownServers) == 0 {
+		fmt.Println("startNewLeader: no known servers")
 		return
 	}
-	// start a new peer
-	addr := toNetAddr(possible[0])
-	err := net.startNewPeer(ctx, addr, false, false) // dialerCtx limited
+	available := net.availableServers()
+	if len(available) == 0 {
+		fmt.Println("startNewLeader: no known servers that are not already connected")
+		return
+	}
+	// TODO: filter servers again by reputation, capabilities and banlist
+
+	// start one node up as new leader
+	addr := toNetAddr(available[0])
+	err := net.startNewPeer(ctx, addr, true, false) // dialerCtx time limited to 10s
 	if err != nil {
 		fmt.Printf(" ..cannot start %s %v\n", addr.String(), err)
-		net.removeServer(possible[0])
+		net.removeServer(available[0])
 	}
-	fmt.Printf("online peers: %d\n\n", net.getNumPeers())
+	fmt.Printf("startNewLeader: leader (untrusted) online: %s\n\n", addr.String())
 }
 
 //-----------------------------------------------------------------------------
@@ -330,21 +386,21 @@ func (net *Network) startNewPeerMaybe(ctx context.Context) {
 
 func (net *Network) Tip() (int64, error) {
 	if !net.started {
-		return 0, ErrNoNetwork
+		return 0, errNoNetwork
 	}
 	return net.headers.getTip(), nil
 }
 
 func (net *Network) BlockHeader(height int64) (*wire.BlockHeader, error) {
 	if !net.started {
-		return nil, ErrNoNetwork
+		return nil, errNoNetwork
 	}
 	return net.headers.getBlockHeader(height)
 }
 
 func (net *Network) BlockHeaders(startHeight int64, blockCount int64) ([]*wire.BlockHeader, error) {
 	if !net.started {
-		return nil, ErrNoNetwork
+		return nil, errNoNetwork
 	}
 	return net.headers.getBlockHeaders(startHeight, blockCount)
 }
@@ -355,14 +411,15 @@ func (net *Network) BlockHeaders(startHeight int64, blockCount int64) ([]*wire.B
 
 func (net *Network) SubscribeScripthashNotify(ctx context.Context, scripthash string) (*ScripthashStatusResult, error) {
 	if !net.started {
-		return nil, ErrNoNetwork
+		return nil, errNoNetwork
 	}
 	net.peersMtx.Lock()
 	defer net.peersMtx.Unlock()
-	if net.getLeader() == nil {
-		return nil, ErrNoLeader
+	leader := net.getLeader()
+	if leader == nil {
+		return nil, errNoLeader
 	}
-	return net.getLeader().node.subscribeScripthashNotify(ctx, scripthash)
+	return leader.node.subscribeScripthashNotify(ctx, scripthash)
 }
 
 func (net *Network) UnsubscribeScripthashNotify(ctx context.Context, scripthash string) {
@@ -371,80 +428,87 @@ func (net *Network) UnsubscribeScripthashNotify(ctx context.Context, scripthash 
 	}
 	net.peersMtx.Lock()
 	defer net.peersMtx.Unlock()
-	if net.getLeader() == nil {
+	leader := net.getLeader()
+	if leader == nil {
 		return
 	}
-	net.getLeader().node.unsubscribeScripthashNotify(ctx, scripthash)
+	leader.node.unsubscribeScripthashNotify(ctx, scripthash)
 }
 
 func (net *Network) GetHistory(ctx context.Context, scripthash string) (HistoryResult, error) {
 	if !net.started {
-		return nil, ErrNoNetwork
+		return nil, errNoNetwork
 	}
 	net.peersMtx.Lock()
 	defer net.peersMtx.Unlock()
-	if net.getLeader() == nil {
-		return nil, ErrNoLeader
+	leader := net.getLeader()
+	if leader == nil {
+		return nil, errNoLeader
 	}
-	return net.getLeader().node.getHistory(ctx, scripthash)
+	return leader.node.getHistory(ctx, scripthash)
 }
 
 func (net *Network) GetListUnspent(ctx context.Context, scripthash string) (ListUnspentResult, error) {
 	if !net.started {
-		return nil, ErrNoNetwork
+		return nil, errNoNetwork
 	}
 	net.peersMtx.Lock()
 	defer net.peersMtx.Unlock()
-	if net.getLeader() == nil {
-		return nil, ErrNoLeader
+	leader := net.getLeader()
+	if leader == nil {
+		return nil, errNoLeader
 	}
-	return net.getLeader().node.getListUnspent(ctx, scripthash)
+	return leader.node.getListUnspent(ctx, scripthash)
 }
 
 func (net *Network) GetTransaction(ctx context.Context, txid string) (*GetTransactionResult, error) {
 	if !net.started {
-		return nil, ErrNoNetwork
+		return nil, errNoNetwork
 	}
 	net.peersMtx.Lock()
 	defer net.peersMtx.Unlock()
-	if net.getLeader() == nil {
-		return nil, ErrNoLeader
+	leader := net.getLeader()
+	if leader == nil {
+		return nil, errNoLeader
 	}
-	return net.getLeader().node.getTransaction(ctx, txid)
+	return leader.node.getTransaction(ctx, txid)
 }
 
 func (net *Network) GetRawTransaction(ctx context.Context, txid string) (string, error) {
 	if !net.started {
-		return "", ErrNoNetwork
+		return "", errNoNetwork
 	}
 	net.peersMtx.Lock()
 	defer net.peersMtx.Unlock()
-	if net.getLeader() == nil {
-		return "", ErrNoLeader
+	leader := net.getLeader()
+	if leader == nil {
+		return "", errNoLeader
 	}
-	return net.getLeader().node.getRawTransaction(ctx, txid)
+	return leader.node.getRawTransaction(ctx, txid)
 }
 
 func (net *Network) Broadcast(ctx context.Context, rawTx string) (string, error) {
 	if !net.started {
-		return "", ErrNoNetwork
+		return "", errNoNetwork
 	}
 	net.peersMtx.Lock()
 	defer net.peersMtx.Unlock()
-	if net.getLeader() == nil {
-		return "", ErrNoLeader
+	leader := net.getLeader()
+	if leader == nil {
+		return "", errNoLeader
 	}
-	return net.getLeader().node.broadcast(ctx, rawTx)
+	return leader.node.broadcast(ctx, rawTx)
 }
 
 func (net *Network) EstimateFeeRate(ctx context.Context, confTarget int64) (int64, error) {
 	if !net.started {
-		return 0, ErrNoNetwork
+		return 0, errNoNetwork
 	}
 	net.peersMtx.Lock()
 	defer net.peersMtx.Unlock()
-	if net.getLeader() == nil {
-		return 0, ErrNoLeader
+	leader := net.getLeader()
+	if leader == nil {
+		return 0, errNoLeader
 	}
-	return net.getLeader().node.estimateFeeRate(ctx, confTarget)
+	return leader.node.estimateFeeRate(ctx, confTarget)
 }

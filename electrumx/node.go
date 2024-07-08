@@ -7,23 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"sync"
 )
 
 var ErrNotConnected = errors.New("node not connected")
 
-type nodeState int
-
-const (
-	DISCONNECTED nodeState = 0
-	CONNECTING   nodeState = 1
-	CONNECTED    nodeState = 2
-)
-
 type Node struct {
-	state                  nodeState
-	stateMtx               sync.RWMutex
-	nodeCtx                context.Context
 	serverAddr             string
 	netProto               string
 	connectOpts            *connectOpts
@@ -69,15 +57,10 @@ func newNode(
 	}
 
 	n := &Node{
-		state:       DISCONNECTED,
-		nodeCtx:     nil,
-		connectOpts: connectOpts,
-		serverAddr:  addr,
-		netProto:    netProto,
-		server: &Server{
-			conn:      nil,
-			connected: false,
-		},
+		connectOpts:            connectOpts,
+		serverAddr:             addr,
+		netProto:               netProto,
+		server:                 &Server{},
 		leader:                 isLeader,
 		networkHeaders:         networkHeaders,
 		clientTipChangeNotify:  clientTipChangeNotify,
@@ -87,13 +70,11 @@ func newNode(
 	return n, nil
 }
 
-func (n *Node) start(nodeCtx context.Context, nodeCancel context.CancelFunc, network, nettype, genesis string) error {
+func (n *Node) start(nodeCtx context.Context, nodeCancel context.CancelCauseFunc, network, nettype, genesis string) error {
 	fmt.Printf("starting a new node on %s %s\n", network, nettype)
 	// connect to electrumX
-	n.setState(CONNECTING)
 	sc, err := connectServer(nodeCtx, nodeCancel, n.serverAddr, n.connectOpts)
 	if err != nil {
-		n.setState(DISCONNECTED)
 		return err
 	}
 	n.server.conn = sc
@@ -106,26 +87,20 @@ func (n *Node) start(nodeCtx context.Context, nodeCancel context.CancelFunc, net
 	// check genesis
 	feats, err := sc.features(nodeCtx)
 	if err != nil {
-		n.setState(DISCONNECTED)
 		return err
 	}
 	// check genesis
 	if feats.Genesis != genesis {
-		n.setState(DISCONNECTED)
 		return fmt.Errorf("wrong genesis hash for %s %s", network, nettype)
 	}
 	// now server is connected check if we have required functions like
 	// GetTransaction which is not supported on some servers.
 	// if !testNeededServerFns(nodeCtx, sc, network, nettype) {
-	// 	n.setState(DISCONNECTED)
 	// 	return errors.New("server does not implement needed function")
 	// }
 	// start a new session for this node to monitor resource use
 	n.session = newSession()
 	n.session.start(nodeCtx)
-	n.setState(CONNECTED)
-	// store node's context - needed for promotion
-	n.nodeCtx = nodeCtx
 
 	// Node is up and ready - if not leader then we exit here
 	if !n.leader {
@@ -135,46 +110,44 @@ func (n *Node) start(nodeCtx context.Context, nodeCancel context.CancelFunc, net
 	// leader sync headers
 	err = n.syncHeaders(nodeCtx)
 	if err != nil {
-		n.setState(DISCONNECTED)
-		<-sc.Done()
 		return err
 	}
 	// start header notifications
 	err = n.headersNotify(nodeCtx)
 	if err != nil {
-		n.setState(DISCONNECTED)
 		return err
 	}
 	// start scripthash notifications
 	err = n.scriptHashNotify(nodeCtx)
 	if err != nil {
-		n.setState(DISCONNECTED)
 		return err
 	}
 	return nil
 }
 
-func (n *Node) setState(state nodeState) {
-	n.stateMtx.Lock()
-	defer n.stateMtx.Unlock()
-	n.state = state
-}
-
-func (n *Node) getState() nodeState {
-	n.stateMtx.RLock()
-	defer n.stateMtx.RUnlock()
-	return n.state
-}
-
 // promoteToLeader makes a non-leader responsible for incoming notifications
-func (n *Node) promoteToLeader() error {
+func (n *Node) promoteToLeader(nodeCtx context.Context) error {
 	h := n.networkHeaders
+	fmt.Printf("promoteToLeader: %s synced %v\n", n.server.conn.addr, h.synced)
 	// start sync if not synced
 	if !h.synced {
-
+		err := n.syncHeaders(nodeCtx)
+		if err != nil {
+			return err
+		}
 	}
-	// start notifications
-
+	// start header notifications
+	err := n.headersNotify(nodeCtx)
+	if err != nil {
+		fmt.Printf("promoteToLeader start headersNotify: %s err: %v\n", n.server.conn.addr, err)
+		return err
+	}
+	// start scripthash notifications
+	err = n.scriptHashNotify(nodeCtx)
+	if err != nil {
+		fmt.Printf("promoteToLeader start scriptHashNotify: %s err: %v\n", n.server.conn.addr, err)
+		return err
+	}
 	n.leader = true
 	return nil
 }
@@ -185,49 +158,49 @@ func (n *Node) promoteToLeader() error {
 
 // getServerPeers gets this node's electrumx server's peers - not public!
 func (n *Node) getServerPeers(nodeCtx context.Context) ([]*peersResult, error) {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return nil, ErrNotConnected
 	}
 	return n.server.conn.serverPeers(nodeCtx)
 }
 
 func (n *Node) getHeadersNotify() chan *headersNotifyResult {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return nil
 	}
 	return n.server.conn.getHeadersNotify()
 }
 
 func (n *Node) subscribeHeaders(nodeCtx context.Context) (*headersNotifyResult, error) {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return nil, ErrNotConnected
 	}
 	return n.server.conn.subscribeHeaders(nodeCtx)
 }
 
 func (n *Node) getScripthashNotify() chan *ScripthashStatusResult {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return nil
 	}
 	return n.server.conn.GetScripthashNotify()
 }
 
 func (n *Node) subscribeScripthashNotify(nodeCtx context.Context, scripthash string) (*ScripthashStatusResult, error) {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return nil, ErrNotConnected
 	}
 	return n.server.conn.SubscribeScripthash(nodeCtx, scripthash)
 }
 
 func (n *Node) unsubscribeScripthashNotify(nodeCtx context.Context, scripthash string) {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return
 	}
 	n.server.conn.UnsubscribeScripthash(nodeCtx, scripthash)
 }
 
 func (n *Node) blockHeader(nodeCtx context.Context, height int64) (string, error) {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return "", ErrNotConnected
 	}
 	blkHdr, err := n.server.conn.blockHeader(nodeCtx, uint32(height))
@@ -240,7 +213,7 @@ func (n *Node) blockHeader(nodeCtx context.Context, height int64) (string, error
 }
 
 func (n *Node) blockHeaders(nodeCtx context.Context, startHeight int64, blockCount int) (*getBlockHeadersResult, error) {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return nil, ErrNotConnected
 	}
 	gbh_res, err := n.server.conn.blockHeaders(nodeCtx, startHeight, blockCount)
@@ -253,7 +226,7 @@ func (n *Node) blockHeaders(nodeCtx context.Context, startHeight int64, blockCou
 }
 
 func (n *Node) getHistory(nodeCtx context.Context, scripthash string) (HistoryResult, error) {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return nil, ErrNotConnected
 	}
 	gh_res, err := n.server.conn.GetHistory(nodeCtx, scripthash)
@@ -266,7 +239,7 @@ func (n *Node) getHistory(nodeCtx context.Context, scripthash string) (HistoryRe
 }
 
 func (n *Node) getListUnspent(nodeCtx context.Context, scripthash string) (ListUnspentResult, error) {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return nil, ErrNotConnected
 	}
 	lu_res, err := n.server.conn.GetListUnspent(nodeCtx, scripthash)
@@ -280,7 +253,7 @@ func (n *Node) getListUnspent(nodeCtx context.Context, scripthash string) (ListU
 }
 
 func (n *Node) getTransaction(nodeCtx context.Context, txid string) (*GetTransactionResult, error) {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return nil, ErrNotConnected
 	}
 	gtx_res, err := n.server.conn.getTransaction(nodeCtx, txid)
@@ -294,7 +267,7 @@ func (n *Node) getTransaction(nodeCtx context.Context, txid string) (*GetTransac
 }
 
 func (n *Node) getRawTransaction(nodeCtx context.Context, txid string) (string, error) {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return "", ErrNotConnected
 	}
 	grt_res, err := n.server.conn.getRawTransaction(nodeCtx, txid)
@@ -308,7 +281,7 @@ func (n *Node) getRawTransaction(nodeCtx context.Context, txid string) (string, 
 }
 
 func (n *Node) broadcast(nodeCtx context.Context, rawTx string) (string, error) {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return "", ErrNotConnected
 	}
 	txid, err := n.server.conn.Broadcast(nodeCtx, rawTx)
@@ -322,7 +295,7 @@ func (n *Node) broadcast(nodeCtx context.Context, rawTx string) (string, error) 
 }
 
 func (n *Node) estimateFeeRate(nodeCtx context.Context, confTarget int64) (int64, error) {
-	if n.getState() != CONNECTED {
+	if !n.server.connected {
 		return 0, ErrNotConnected
 	}
 	ef_res, err := n.server.conn.EstimateFee(nodeCtx, confTarget)

@@ -89,7 +89,6 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 		select {
 
 		case <-nodeCtx.Done():
-			n.setState(DISCONNECTED)
 			<-n.server.conn.Done()
 			fmt.Printf("nodeCtx.Done - gathering - %s\n", n.serverAddr)
 			<-n.server.conn.Done()
@@ -180,7 +179,6 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 		fmt.Println("=== Waiting for headers ===")
 		for {
 			if nodeCtx.Err() != nil {
-				n.setState(DISCONNECTED)
 				<-n.server.conn.done
 				fmt.Printf("nodeCtx.Done - in headers notify %s - exiting thread\n", n.serverAddr)
 				return
@@ -203,7 +201,6 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyR
 	fmt.Println("headrs queue started")
 	for {
 		if nodeCtx.Err() != nil {
-			n.setState(DISCONNECTED)
 			<-n.server.conn.Done()
 			fmt.Printf("nodeCtx.Done - in headersQueue %s - exiting thread\n", n.serverAddr)
 			return
@@ -218,7 +215,7 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyR
 				return
 			}
 
-			ourTip := h.getTip() // locked .. propagate this value to syncHeadersOntoOurTip
+			ourTip := h.getTip() // locked
 
 			// dbg: TODO: remove --------------------------------------------->
 			fmt.Printf(" --- headerQueue %v\n", time.Now())
@@ -244,8 +241,6 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyR
 			}
 			if hdrRes.Height <= ourTip {
 				// we already have it
-				//
-				// Note: maybe some verification here that it is the same as our stored one TODO:
 				fmt.Printf(" - we already have a header for height %d\n", hdrRes.Height)
 				continue
 			}
@@ -253,7 +248,7 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyR
 			if hdrRes.Height == (ourTip + 1) {
 				// simple case one header incoming .. try connect on top of our chain
 				if !n.connectTip(hdrRes.Hex) {
-					fmt.Printf(" - possible reorg at server height %d - skipping for now - PLACE AAA\n", hdrRes.Height)
+					fmt.Printf(" - possible reorg at server height %d - PLACE AAA\n", hdrRes.Height)
 					n.session.bumpCostError()
 					continue
 				}
@@ -283,12 +278,12 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyR
 func (n *Node) syncHeadersOntoOurTip(nodeCtx context.Context, serverHeight int64) (int64, error) {
 	h := n.networkHeaders
 	ourTip := h.getTip()
-	numMissing := serverHeight - ourTip
+	missing := serverHeight - ourTip
 	from := ourTip + 1
 	to := serverHeight
-	fmt.Printf("syncHeadersFromTip: ourTip %d server height %d num missing %d\n", ourTip, serverHeight, numMissing)
-	// per electrum, but I don't think it matters and we could use BlockHeaders once
-	if numMissing > 10 {
+	fmt.Printf("syncHeadersFromTip: ourTip %d server height %d num missing %d\n", ourTip, serverHeight, missing)
+	// per electrum, but I don't think it matters and we could always use BlockHeaders once
+	if missing > REWIND {
 		return n.updateFromChunk(nodeCtx, from, to)
 	}
 	return n.updateFromBlocks(nodeCtx, from, to)
@@ -311,15 +306,6 @@ func (n *Node) updateFromBlocks(nodeCtx context.Context, from, to int64) (int64,
 		// enddbg
 
 		if !n.connectTip(header) {
-
-			// debug------------------>
-			if i == 0 {
-				fmt.Println("dbgTryRecoverHack")
-				n.dbgTryRecoverHack()
-				fmt.Printf("*** removed 10 stored headers from tip -  new tip is %d - PLACE BBB\n", n.networkHeaders.getTip())
-			}
-			// <-----------------------
-
 			break
 		}
 		headersConnected++
@@ -373,15 +359,6 @@ func (n *Node) updateFromChunk(nodeCtx context.Context, from, to int64) (int64, 
 	for i := 0; i < hdrsRes.Count; i++ {
 		header := hdrsRes.HexConcat[i*oneHdrLen : (i+1)*oneHdrLen]
 		if !n.connectTip(header) {
-
-			// debug------------------>
-			if i == 0 {
-				fmt.Println("dbgTryRecoverHack")
-				n.dbgTryRecoverHack()
-				fmt.Printf("*** removed 10 stored headers from tip -  new tip is %d - PLACE CCC\n", n.networkHeaders.getTip())
-			}
-			// <-----------------------
-
 			break
 		}
 		headersConnected++
@@ -401,19 +378,18 @@ func (n *Node) connectTip(serverHeader string) bool {
 		fmt.Printf("connectTip - cannot connect\n -- incoming prev hash: %s\n -- current tip hash:   %s \n",
 			incomingHdr.PrevBlock.String(), h.getTipBlock().BlockHash().String())
 		// fork maybe?
-		h.dbgDumpTipHashes(10)
+		h.dbgDumpTipHashes(3)
+		n.reorgRecovery()
+		fmt.Printf("*** removed 8 stored headers from tip -  new tip is %d\n", n.networkHeaders.getTip())
 		return false
 	}
-	// hard to make writing to file && writing headers map atomic. Consider just using the
-	// 'blockchain_headers' file for storage.
+
 	_, err = h.appendHeadersFile(incomingHdrBytes)
 	if err != nil {
-		panic(err)
+		return false
 	}
-	// if here we could write a file: 'last_good_header'
-	// but it is the top of the chain we following only
-	// which could be a fork :(
-	h.storeOneHdr(incomingHdr) // updates tip
+	h.storeOneHdr(incomingHdr) // (sets tip++)
+	h.recovery = false
 	return true
 }
 
@@ -433,61 +409,4 @@ func (n *Node) convertStringHdrToBlkHdr(svrHdr string) (*wire.BlockHeader, []byt
 		return nil, nil, err
 	}
 	return hdr, rawBytes, nil
-}
-
-// debug ------------------------------------------------------------------------
-
-// -------- hack -------------------
-
-func (n *Node) dbgTryRecoverHack() {
-	h := n.networkHeaders
-	tip := h.getTip()
-	if tip > 10 {
-		h.truncateHeadersFile(10)
-		for i := 0; i < 10; i++ {
-			h.removeHdrFromTip()
-		}
-	}
-}
-
-// -------- end hack --------------
-
-func (n *Node) dbgStringHeaderPrev(svrHdr string) string {
-	h := n.networkHeaders
-	rawBytes, err := hex.DecodeString(svrHdr)
-	if err != nil {
-		return "<hex decode error>"
-	}
-	if len(rawBytes) != int(h.headerSize) {
-		return "<corrupted header>"
-	}
-	r := bytes.NewBuffer(rawBytes)
-	hdr := &wire.BlockHeader{}
-	err = hdr.BtcDecode(r, 0, wire.BaseEncoding)
-	if err != nil {
-		return "<deserilaize error>"
-	}
-	return hdr.PrevBlock.String()
-}
-
-func (n *Node) dbgHashHexFromHeaderHex(svrHdr string) string {
-	hdr, _, err := n.convertStringHdrToBlkHdr(svrHdr)
-	if err != nil {
-		return "*conversion error*"
-	}
-	hash := hdr.BlockHash()
-	return hash.String()
-}
-
-// func dbgPrevHexFromHeaderHex(svrHdr string) string {
-// 	hdr, _, err := convertStringHdrToBlkHdr(svrHdr)
-// 	if err != nil {
-// 		return "*conversion error*"
-// 	}
-// 	hash := hdr.BlockHash()
-// 	return hash.String()
-// }
-
-func dbgHashHexFromHdr(hdr *wire.BlockHeader) string {
-	return hdr.BlockHash().String()
 }

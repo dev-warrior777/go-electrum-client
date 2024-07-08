@@ -41,10 +41,10 @@ type serverAddr struct {
 // goele.
 func (net *Network) getServers(ctx context.Context) error {
 	if !net.started {
-		return ErrNoNetwork
+		return errNoNetwork
 	}
 	if net.getLeader() == nil {
-		return ErrNoLeader
+		return errNoLeader
 	}
 	peerResults, err := net.getLeader().node.getServerPeers(ctx)
 	if err != nil {

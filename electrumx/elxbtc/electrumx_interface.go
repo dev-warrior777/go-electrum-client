@@ -9,10 +9,13 @@ import (
 )
 
 const (
-	BTC_HEADER_SIZE        = 80
-	BTC_STARTPOINT_REGTEST = 0
-	BTC_STARTPOINT_TESTNET = 2560000
-	BTC_STARTPOINT_MAINNET = 823000
+	BTC_HEADER_SIZE              = 80
+	BTC_STARTPOINT_REGTEST       = 0
+	BTC_STARTPOINT_TESTNET       = 2560000
+	BTC_STARTPOINT_MAINNET       = 823000
+	BTC_MAX_ONLINE_PEERS_REGTEST = 0
+	BTC_MAX_ONLINE_PEERS_TESTNET = 5
+	BTC_MAX_ONLINE_PEERS_MAINNET = 5
 )
 
 type ElectrumXInterface struct {
@@ -26,6 +29,16 @@ func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterfa
 	config.StartPoints[electrumx.REGTEST] = int64(BTC_STARTPOINT_REGTEST)
 	config.StartPoints[electrumx.TESTNET] = int64(BTC_STARTPOINT_TESTNET)
 	config.StartPoints[electrumx.MAINNET] = int64(BTC_STARTPOINT_MAINNET)
+	switch config.NetType {
+	case electrumx.Regtest:
+		config.MaxOnlinePeers = BTC_MAX_ONLINE_PEERS_REGTEST
+	case electrumx.Testnet:
+		config.MaxOnlinePeers = BTC_MAX_ONLINE_PEERS_TESTNET
+	case electrumx.Mainnet:
+		config.MaxOnlinePeers = BTC_MAX_ONLINE_PEERS_MAINNET
+	default:
+		config.MaxOnlinePeers = 2
+	}
 	x := ElectrumXInterface{
 		config:  config,
 		network: nil,
@@ -34,12 +47,12 @@ func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterfa
 }
 
 func (x *ElectrumXInterface) Start(ctx context.Context) error {
-	n := electrumx.NewNetwork(x.config)
-	err := n.Start(ctx)
+	network := electrumx.NewNetwork(x.config)
+	err := network.Start(ctx)
 	if err != nil {
 		return err
 	}
-	x.network = n
+	x.network = network
 	return nil
 }
 

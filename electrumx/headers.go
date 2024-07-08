@@ -27,25 +27,27 @@ const (
 	ELECTRUM_MAGIC_NUMHDR = 2016
 )
 
+var ErrSyncing = errors.New("syncing in progress")
+
 type headers struct {
 	// blockchain header size - per coin.
 	headerSize int
 	// blockchain_headers file to persist headers we know in datadir
 	hdrFilePath string
 	// chain parameters for genesis.
-	net *chaincfg.Params
+	p *chaincfg.Params
 	// for each coin/nettype we use the most recent checkpoint (or a specific
 	// but arbitrary one) for the start of the block_headers file. For regtest
 	// that is block 0.
 	startPoint int64
 	// decoded headers stored by height
-	hdrs    map[int64]*wire.BlockHeader
-	blkHdrs map[chainhash.Hash]int64
-	hdrsMtx sync.RWMutex
-	tip     int64
-	synced  bool
-	// recovery    bool
-	// recoveryTip int64
+	hdrs        map[int64]*wire.BlockHeader
+	blkHdrs     map[chainhash.Hash]int64
+	hdrsMtx     sync.RWMutex
+	tip         int64
+	synced      bool
+	recovery    bool
+	recoveryTip int64
 }
 
 func newHeaders(cfg *ElectrumXConfig) *headers {
@@ -57,12 +59,14 @@ func newHeaders(cfg *ElectrumXConfig) *headers {
 	hdrs := headers{
 		headerSize:  cfg.BlockHeaderSize,
 		hdrFilePath: filePath,
-		net:         cfg.Params,
+		p:           cfg.Params,
 		startPoint:  startPoint,
 		hdrs:        hdrsMap,
 		blkHdrs:     bhdrsMap,
 		tip:         0,
 		synced:      false,
+		recovery:    false,
+		recoveryTip: 0,
 	}
 	return &hdrs
 }

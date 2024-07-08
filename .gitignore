@@ -32,6 +32,10 @@ cmd/rmwallet/rmwallet
 wallet/cmd/boltdmp/bd
 client/btc/rpc_test/client
 
+#profiling
+cmd/goele/goele.prof
+cmd/goele/tmp/
+
 #vscode
 .vscode/
 __debug_bin*

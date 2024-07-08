@@ -61,6 +61,10 @@ type ElectrumXConfig struct {
 	// Filled in by each coin in ElectrumXInterface
 	StartPoints map[string]int64
 
+	// Maximum online peers for each network
+	// Filled in by each coin in ElectrumXInterface
+	MaxOnlinePeers int
+
 	// mainnet, testnet, regtest
 	NetType string
 

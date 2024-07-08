@@ -4,7 +4,6 @@ import "testing"
 
 func TestNode_connectTip(t *testing.T) {
 	type fields struct {
-		state               nodeState
 		serverAddr          string
 		connectOpts         *connectOpts
 		server              *Server
@@ -27,7 +26,6 @@ func TestNode_connectTip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			n := &Node{
-				state:                  tt.fields.state,
 				serverAddr:             tt.fields.serverAddr,
 				connectOpts:            tt.fields.connectOpts,
 				server:                 tt.fields.server,

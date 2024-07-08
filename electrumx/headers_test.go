@@ -86,7 +86,7 @@ func TestAppendHeaders(t *testing.T) {
 	h := headers{
 		headerSize:  80,
 		hdrFilePath: path.Join("/tmp", fname),
-		net:         &chaincfg.RegressionNetParams,
+		p:           &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
 		blkHdrs:     make(map[chainhash.Hash]int64),
 		tip:         0,
@@ -170,7 +170,7 @@ func TestReadStoreHeaderFile(t *testing.T) {
 	h := headers{
 		headerSize:  80,
 		hdrFilePath: f.Name(),
-		net:         &chaincfg.RegressionNetParams,
+		p:           &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
 		blkHdrs:     make(map[chainhash.Hash]int64),
 		tip:         0,
@@ -216,7 +216,7 @@ func TestTruncateHeadersFile(t *testing.T) {
 	h := headers{
 		headerSize:  80,
 		hdrFilePath: fname,
-		net:         &chaincfg.RegressionNetParams,
+		p:           &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
 		blkHdrs:     make(map[chainhash.Hash]int64),
 		tip:         0,
@@ -315,7 +315,7 @@ func TestStore(t *testing.T) {
 	h := headers{
 		headerSize:  80,
 		hdrFilePath: "<empty>",
-		net:         &chaincfg.RegressionNetParams,
+		p:           &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
 		blkHdrs:     make(map[chainhash.Hash]int64),
 		tip:         0,
@@ -363,7 +363,7 @@ func TestMapIter(t *testing.T) {
 	h := headers{
 		headerSize:  80,
 		hdrFilePath: "<empty>",
-		net:         &chaincfg.RegressionNetParams,
+		p:           &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
 		blkHdrs:     make(map[chainhash.Hash]int64),
 		tip:         0,
@@ -386,7 +386,7 @@ func TestStoreHashes(t *testing.T) {
 	h := headers{
 		headerSize:  80,
 		hdrFilePath: "<empty>",
-		net:         &chaincfg.RegressionNetParams,
+		p:           &chaincfg.RegressionNetParams,
 		hdrs:        make(map[int64]*wire.BlockHeader),
 		blkHdrs:     make(map[chainhash.Hash]int64),
 		tip:         0,
