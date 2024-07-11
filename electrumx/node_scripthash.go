@@ -3,7 +3,6 @@ package electrumx
 import (
 	"context"
 	"errors"
-	"fmt"
 )
 
 func (n *Node) scriptHashNotify(nodeCtx context.Context) error {
@@ -19,11 +18,9 @@ func (n *Node) scriptHashNotify(nodeCtx context.Context) error {
 			select {
 			case <-nodeCtx.Done():
 				<-n.server.conn.Done()
-				fmt.Printf("nodeCtx.Done - in scriptHashNotify %s - exiting thread\n", n.serverAddr)
 				return
 			case scriptHashStatusResult, ok := <-scriptHashNotifyChan:
 				if !ok {
-					fmt.Printf("scripthash notify channel was closed %s - exiting thread\n", n.serverAddr)
 					return
 				}
 				// forward to client wallet_synchronize.go - can block

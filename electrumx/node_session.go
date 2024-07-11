@@ -82,7 +82,7 @@ func (s *session) runCostDecayLoop(nodeCtx context.Context) {
 	for {
 		select {
 		case <-nodeCtx.Done():
-			fmt.Printf("nodeCtx.Done in runCostDecayLoop - final cost %f - exiting thread\n", s.cost)
+			fmt.Printf("final session cost %f\n", s.cost)
 			return
 		case <-t.C:
 			// TuningFactor times slower to give back credits for less frequent

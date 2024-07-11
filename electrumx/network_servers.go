@@ -65,7 +65,7 @@ func (net *Network) getServers(ctx context.Context) error {
 func (net *Network) addIncomingservers(in []*peersResult) error {
 	servers := net.makeIncomingServerAddrs(in)
 	if len(servers) == 0 {
-		// probably redundant but at least ine peer I started on testnet returned
+		// probably redundant but at least one peer on testnet returned
 		// an empty list
 		return errors.New("no incoming")
 	}
@@ -138,7 +138,6 @@ func (net *Network) makeIncomingServerAddrs(in []*peersResult) []*serverAddr {
 }
 
 func (net *Network) updateNetworkServers(servers []*serverAddr) error {
-	fmt.Printf("updateNetworkServers: len(serverAddr) = %v\n", len(servers))
 	net.knownServersMtx.Lock()
 	defer net.knownServersMtx.Unlock()
 	if len(net.knownServers) == 0 {
@@ -164,14 +163,13 @@ func (net *Network) updateNetworkServers(servers []*serverAddr) error {
 }
 
 func (net *Network) updateStoredServers(servers []*serverAddr) error {
-	fmt.Printf("updateStoredServers: len(serverAddr) = %v\n", len(servers))
 	net.knownServersMtx.Lock()
 	defer net.knownServersMtx.Unlock()
 	stored, numRead, err := net.readServerAddrFile()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("updateStoredServers - num read from file is %d - update done\n", numRead)
+	// fmt.Printf("updateStoredServers - num read from file is %d - update done\n", numRead)
 	if numRead == 0 {
 		stored = servers
 		return net.writeServerAddrFile(stored)
@@ -266,7 +264,7 @@ func (net *Network) writeServerAddrFile(servers []*serverAddr) error {
 	}
 	// write all marshalled json after truncating file to 0 bytes
 	serverAddrFile := path.Join(net.config.DataDir, serverAddrFileName)
-	f, err := os.OpenFile(serverAddrFile, os.O_RDWR, 0644)
+	f, err := os.OpenFile(serverAddrFile, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return err
 	}

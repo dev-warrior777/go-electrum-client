@@ -11,8 +11,11 @@ import (
 )
 
 type Server struct {
-	conn      *serverConn
-	connected bool
+	conn            *serverConn
+	connected       bool
+	softwareVersion string
+	protocolVersion string
+	nodeCancel      context.CancelCauseFunc
 }
 
 type NodeServerAddr struct {

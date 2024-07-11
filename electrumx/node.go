@@ -52,8 +52,7 @@ func newNode(
 		return nil, fmt.Errorf("unknown protocol: %s", netProto)
 	}
 	connectOpts := &connectOpts{
-		TLSConfig:   tlsConfig,
-		DebugLogger: stderrPrinter,
+		TLSConfig: tlsConfig,
 	}
 
 	n := &Node{
@@ -77,27 +76,30 @@ func (n *Node) start(nodeCtx context.Context, nodeCancel context.CancelCauseFunc
 	if err != nil {
 		return err
 	}
-	n.server.conn = sc
-	n.server.connected = true
 
-	fmt.Printf(
-		"** Connected to %s over %s using server protocol version: %s **\n",
-		nettype, n.netProto, sc.electrumxProto())
+	version, err := sc.serverVersion(nodeCtx, "Electrum", "1.4")
+	if err != nil {
+		return err
+	}
 
-	// check genesis
 	feats, err := sc.features(nodeCtx)
 	if err != nil {
 		return err
 	}
-	// check genesis
 	if feats.Genesis != genesis {
 		return fmt.Errorf("wrong genesis hash for %s %s", network, nettype)
 	}
-	// now server is connected check if we have required functions like
-	// GetTransaction which is not supported on some servers.
-	// if !testNeededServerFns(nodeCtx, sc, network, nettype) {
-	// 	return errors.New("server does not implement needed function")
-	// }
+
+	fmt.Printf(
+		"** Connected to %s over %s on %s ***\n   Using server software version %s protocol version %s\n   Genesis %s\n",
+		n.serverAddr, n.netProto, nettype, version[0], version[1], genesis)
+
+	n.server.conn = sc
+	n.server.connected = true
+	n.server.nodeCancel = nodeCancel
+	n.server.softwareVersion = version[0]
+	n.server.protocolVersion = version[1]
+
 	// start a new session for this node to monitor resource use
 	n.session = newSession()
 	n.session.start(nodeCtx)

@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime/pprof"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -120,15 +119,15 @@ func checkSimnetHelp(cfg *client.ClientConfig) string {
 }
 
 func main() {
-	// Start profiling
-	f, e := os.Create("goele.prof")
-	if e != nil {
-		fmt.Println(e)
-		return
-	}
-	pprof.StartCPUProfile(f)
-	defer pprof.StopCPUProfile()
-	//--------------------------
+	// // Start profiling
+	// f, e := os.Create("goele.prof")
+	// if e != nil {
+	// 	fmt.Println(e)
+	// 	return
+	// }
+	// pprof.StartCPUProfile(f)
+	// defer pprof.StopCPUProfile()
+	// //--------------------------
 
 	// Run your program here
 	fmt.Println("Goele", client.GoeleVersion)

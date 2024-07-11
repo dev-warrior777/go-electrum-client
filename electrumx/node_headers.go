@@ -12,8 +12,8 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-// syncHeaders uodates the network's headers and then subscribes for new update
-// tip notifications and listens for them
+const REWIND = 8 // reorg
+
 func (n *Node) syncHeaders(nodeCtx context.Context) error {
 	err := n.syncNetworkHeaders(nodeCtx)
 	if err != nil {
@@ -38,9 +38,9 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 	if err != nil {
 		return err
 	}
-	lb := int64(len(b))
-	fmt.Println("read:", lb, " bytes from header file")
-	numHeaders, err := h.bytesToNumHdrs(lb)
+	lenb := int64(len(b))
+	fmt.Println("read:", lenb, " bytes from header file")
+	numHeaders, err := h.bytesToNumHdrs(lenb)
 	if err != nil {
 		return err
 	}
@@ -49,9 +49,9 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 
 	// 2. Gather new block headers we did not have in file up to current tip
 
-	// Do not make block count too big or electrumX may throttle response
+	// Do not make requested block count too big or electrumX may throttle response
 	// as an anti ddos measure. ElectrumX Doc.: "Recommended to be at least one
-	// bitcoin difficulty retarget period, i.e. 2016."
+	// Bitcoin difficulty retarget period, i.e. 2016."
 	var blockCount = 2016
 	var doneGathering = false
 	var startHeight = startPointHeight + numHeaders
@@ -90,8 +90,6 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 
 		case <-nodeCtx.Done():
 			<-n.server.conn.Done()
-			fmt.Printf("nodeCtx.Done - gathering - %s\n", n.serverAddr)
-			<-n.server.conn.Done()
 			return nil
 
 		case <-time.After(time.Second):
@@ -116,7 +114,6 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 			}
 
 			if count < blockCount {
-				// fmt.Println("\nDone gathering")
 				doneGathering = true
 			}
 		}
@@ -162,10 +159,10 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 	if hdrsNotifyChan == nil {
 		return errors.New("server headers notify channel is nil")
 	}
-	// start headers queue with depth 3
-	qchan := make(chan *headersNotifyResult, 3)
+	// start headers queue with depth 8
+	qchan := make(chan *headersNotifyResult, 8)
 	go n.headerQueue(nodeCtx, qchan)
-	// subscribe headers also returns latest header the server knows
+	// subscribe headers call also returns latest header the server knows
 	hdrRes, err := n.subscribeHeaders(nodeCtx)
 	if err != nil {
 		return err
@@ -180,7 +177,6 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 		for {
 			if nodeCtx.Err() != nil {
 				<-n.server.conn.done
-				fmt.Printf("nodeCtx.Done - in headers notify %s - exiting thread\n", n.serverAddr)
 				return
 			}
 
@@ -193,8 +189,8 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 	return nil
 }
 
-// headerQueue receives incoming headers notify results from qhan
-// - run as a goroutine
+// headerQueue receives incoming headers notify results from qchan
+// - run as a goroutine.
 // The client local 'blockhain_headers' file is appended and the headers map updated and verified.
 func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyResult) {
 	h := n.networkHeaders
@@ -202,7 +198,6 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyR
 	for {
 		if nodeCtx.Err() != nil {
 			<-n.server.conn.Done()
-			fmt.Printf("nodeCtx.Done - in headersQueue %s - exiting thread\n", n.serverAddr)
 			return
 		}
 
@@ -211,14 +206,12 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyR
 		for hdrRes := range qchan {
 
 			if hdrRes == nil {
-				fmt.Printf("qchan closed %s - exiting thread\n", n.serverAddr)
 				return
 			}
 
-			ourTip := h.getTip() // locked
+			ourTip := h.getTip()
 
 			// dbg: TODO: remove --------------------------------------------->
-			fmt.Printf(" --- headerQueue %v\n", time.Now())
 			fmt.Printf("qlen %d\n", len(qchan))
 			fmt.Printf("our tip is %d\n", ourTip)
 			tipHdr := n.networkHeaders.hdrs[ourTip]
@@ -227,55 +220,55 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyR
 				fmt.Println("our header at tip is nil")
 				ourTipHash = "<nil>"
 			} else {
-				ourTipHash = dbgHashHexFromHdr(tipHdr)
+				ourTipHash = tipHdr.BlockHash().String()
 				fmt.Printf("our tip hash: %s\n", ourTipHash)
 			}
-			fmt.Printf("incoming header notification height: %d hex: %s\n", hdrRes.Height, hdrRes.Hex)
 			// enddbg: TODO: remove <------------------------------------------
+
+			fmt.Printf("incoming header notification height: %d\n", hdrRes.Height)
 
 			if hdrRes.Height < h.startPoint {
 				// earlier than our starting checkpoint
-				// TODO: this condition should just trigger node/server change for MultiNode
-				fmt.Printf(" - server height %d is below our starting check point %d\n", hdrRes.Height, h.startPoint)
-				continue
+				// This condition triggers node/server change
+				fmt.Printf(" - server height %d is below our starting check point %d - mis-behaving\n", hdrRes.Height, h.startPoint)
+				n.server.nodeCancel(errNodeMisbehavingCanceled)
+				return
 			}
+
 			if hdrRes.Height <= ourTip {
 				// we already have it
 				fmt.Printf(" - we already have a header for height %d\n", hdrRes.Height)
 				continue
 			}
+
 			fmt.Printf(" - we do not yet have header for height %d, our tip is %d\n", hdrRes.Height, ourTip)
+
 			if hdrRes.Height == (ourTip + 1) {
 				// simple case one header incoming .. try connect on top of our chain
 				if !n.connectTip(hdrRes.Hex) {
-					fmt.Printf(" - possible reorg at server height %d - PLACE AAA\n", hdrRes.Height)
-					n.session.bumpCostError()
+					fmt.Printf(" - possible reorg at server height %d - 1 HEADER\n", hdrRes.Height)
 					continue
 				}
 				n.session.bumpCostString(hdrRes.Hex)
 				// connected the block & updated our headers tip
 				fmt.Printf(" - updated 1 header - our new tip is %d\n", h.getTip())
 				// notify client
-				fmt.Println("   ..updating client thru network's static clientTipChangeNotify channel")
+				fmt.Println("   ..updating client thru network's clientTipChangeNotify channel")
 				n.clientTipChangeNotify <- h.getTip()
 				continue
 			}
 			// two or more headers that we do not have yet
-			numHdrs, err := n.syncHeadersOntoOurTip(nodeCtx, hdrRes.Height)
-			if err != nil {
-				panic(err)
-			}
+			numHdrs := n.syncHeadersOntoOurTip(nodeCtx, hdrRes.Height)
 			// updating less hdrs than requested is not an error - we hope to get them next time
 			fmt.Printf(" - updated %d headers - our new tip is %d\n", numHdrs, h.getTip())
 			if numHdrs > 0 {
-				fmt.Println("   ..updating client thru network's clientTipChangeNotify channel")
 				n.clientTipChangeNotify <- h.getTip()
 			}
 		}
 	}
 }
 
-func (n *Node) syncHeadersOntoOurTip(nodeCtx context.Context, serverHeight int64) (int64, error) {
+func (n *Node) syncHeadersOntoOurTip(nodeCtx context.Context, serverHeight int64) int64 {
 	h := n.networkHeaders
 	ourTip := h.getTip()
 	missing := serverHeight - ourTip
@@ -289,46 +282,40 @@ func (n *Node) syncHeadersOntoOurTip(nodeCtx context.Context, serverHeight int64
 	return n.updateFromBlocks(nodeCtx, from, to)
 }
 
-func (n *Node) updateFromBlocks(nodeCtx context.Context, from, to int64) (int64, error) {
-	var headersConnected int64
+func (n *Node) updateFromBlocks(nodeCtx context.Context, from, to int64) int64 {
+	var headersConnected int64 = 0
 	fmt.Printf("updateFromBlocks: from %d to %d inclusive\n", from, to)
 	for i := from; i <= to; i++ {
 		header, err := n.blockHeader(nodeCtx, i)
 		if err != nil {
 			break
 		}
-
-		// dbg
-		fmt.Println("incoming:")
-		hash := n.dbgHashHexFromHeaderHex(header)
-		prev := n.dbgStringHeaderPrev(header)
-		fmt.Printf("hdr hash: %s hdr prev: %s\n", hash, prev)
-		// enddbg
-
 		if !n.connectTip(header) {
 			break
 		}
 		headersConnected++
-		time.Sleep(100 * time.Millisecond) // for reducing session cost at electrumX server
+		// reduce electrumx server session cost .. per electrum
+		time.Sleep(100 * time.Millisecond)
 	}
-	return headersConnected, nil
+	return headersConnected
 }
 
-func (n *Node) updateFromChunk(nodeCtx context.Context, from, to int64) (int64, error) {
+func (n *Node) updateFromChunk(nodeCtx context.Context, from, to int64) int64 {
 	h := n.networkHeaders
-	var headersConnected int64
+	var headersConnected int64 = 0
 	fmt.Printf("updateFromChunk: from %d to %d inclusive\n", from, to)
 	reqCount := int(to - from + 1)
 	hdrsRes, err := n.blockHeaders(nodeCtx, from, reqCount)
 	if err != nil {
 		fmt.Printf("BlockHeaders failed - %v\n", err)
-		return 0, nil
+		return 0
 	}
-	// check max send parameter for validity
+	// check max send parameter for validity per electrum
 	if hdrsRes.Max < 2016 {
-		// corrupted or electrumx server code different from expected
+		// corrupted or electrumx server code different from that expected
+		// - did not see this yet! if we do we will disconnect server.
 		fmt.Printf("server uses too low 'max' count %d for block.headers\n", hdrsRes.Max)
-		return 0, nil
+		return 0
 	}
 	oneHdrLen := int(h.headerSize) * 2
 	allHdrs := hdrsRes.HexConcat
@@ -337,25 +324,15 @@ func (n *Node) updateFromChunk(nodeCtx context.Context, from, to int64) (int64, 
 	if strLenAll != oneHdrLen*hdrsRes.Count {
 		// corrupted
 		fmt.Printf("inconsistent chunk hex and count")
-		return 0, nil
+		return 0
 	}
-	// check the number we asked for has been returned
+	// check the number of headers we asked for has been returned
 	if reqCount != hdrsRes.Count {
-		// maybe corrupt - maybe deliberate - maybe connect here anyway .. see how often it happens!
+		// maybe corrupt - maybe deliberate - I never saw this happen!
 		fmt.Printf("expected %d headers but got %d\n", reqCount, hdrsRes.Count)
-		return 0, nil
+		return 0
 	}
-
-	// dbg
-	fmt.Println("incoming:")
-	for i := 0; i < hdrsRes.Count; i++ {
-		header := hdrsRes.HexConcat[i*oneHdrLen : (i+1)*oneHdrLen]
-		hash := n.dbgHashHexFromHeaderHex(header)
-		prev := n.dbgStringHeaderPrev(header)
-		fmt.Printf("hdr hash: %s hdr prev: %s\n", hash, prev)
-	}
-	// enddbg
-
+	// connect headers
 	for i := 0; i < hdrsRes.Count; i++ {
 		header := hdrsRes.HexConcat[i*oneHdrLen : (i+1)*oneHdrLen]
 		if !n.connectTip(header) {
@@ -363,27 +340,28 @@ func (n *Node) updateFromChunk(nodeCtx context.Context, from, to int64) (int64, 
 		}
 		headersConnected++
 	}
-	return headersConnected, nil
+	return headersConnected
 }
 
 func (n *Node) connectTip(serverHeader string) bool {
 	h := n.networkHeaders
 	incomingHdr, incomingHdrBytes, err := n.convertStringHdrToBlkHdr(serverHeader)
 	if err != nil {
-		// this assertion should maybe just trigger a server change for MultiNode
-		panic(err)
+		return false
 	}
 	// check connect block
 	if !h.checkCanConnect(incomingHdr) {
-		fmt.Printf("connectTip - cannot connect\n -- incoming prev hash: %s\n -- current tip hash:   %s \n",
-			incomingHdr.PrevBlock.String(), h.getTipBlock().BlockHash().String())
-		// fork maybe?
 		h.dbgDumpTipHashes(3)
+		fmt.Printf("connectTip - cannot connect\n -- incoming prev hash: %s\n -- current tip hash:   %s \n",
+			incomingHdr.PrevBlock.String(), h.getTipHash().String())
+		// fork maybe?
 		n.reorgRecovery()
-		fmt.Printf("*** removed 8 stored headers from tip -  new tip is %d\n", n.networkHeaders.getTip())
+		fmt.Printf("*** removed %d stored headers from tip -  new tip is %d ***\n",
+			REWIND, n.networkHeaders.getTip())
+		n.session.bumpCostError()
 		return false
 	}
-
+	// connect
 	_, err = h.appendHeadersFile(incomingHdrBytes)
 	if err != nil {
 		return false
@@ -393,6 +371,48 @@ func (n *Node) connectTip(serverHeader string) bool {
 	return true
 }
 
+// ElectrumX *does* fixup reorgs when it sees them but like us it cannot know
+// until the next block so may send us an unconnectable block in the notification
+// or block headers we ask for on that notification.
+//
+// So this is not a question of looking on other peers' chains for chains with more
+// proof of work .. ElectrumX does that!
+//
+// When we cannot connect a block header we wind back our tip, hdrs map + truncate
+// blockchain_headers file by REWIND block headers so that next time a notification
+// comes in we ask for the last REWIND blocks. If still unconnectable on the next
+// headers notification we wind back again until startPoint where we panic.
+func (n *Node) reorgRecovery() {
+	h := n.networkHeaders
+	tip := h.getTip()
+
+	fmt.Printf("reorgRecovery: tip: %d startPoint: %d\n", tip, h.startPoint)
+
+	if tip < h.startPoint+REWIND {
+		panic("reorgRecovery: tip <= startPoint+REWIND - cannot recover further")
+	}
+
+	// truncate and remove from map atomically
+	newNumHeaders, err := h.truncateHeadersFile(REWIND)
+	if err != nil {
+		errMsg := fmt.Sprintf("reorgRecovery: truncateHeadersFile returned: %v", err)
+		panic(errMsg)
+	}
+
+	fmt.Printf("truncateHeadersFile: new num headers is %d\n", newNumHeaders)
+
+	for i := 0; i < REWIND; i++ {
+		h.removeOneHdrFromTip() // (sets tip--)
+	}
+
+	h.recovery = true
+	h.recoveryTip = tip // what we  send back to users in getTip() during recovery
+}
+
+// ----------------------------------------------------------------------------
+// Utils
+// ----------------------------------------------------------------------------
+
 func (n *Node) convertStringHdrToBlkHdr(svrHdr string) (*wire.BlockHeader, []byte, error) {
 	h := n.networkHeaders
 	rawBytes, err := hex.DecodeString(svrHdr)
@@ -400,7 +420,7 @@ func (n *Node) convertStringHdrToBlkHdr(svrHdr string) (*wire.BlockHeader, []byt
 		return nil, nil, err
 	}
 	if len(rawBytes) != h.headerSize {
-		return nil, nil, fmt.Errorf("corrupted header - length %d", len(svrHdr))
+		return nil, nil, fmt.Errorf("corrupted header - length %d", len(rawBytes))
 	}
 	r := bytes.NewBuffer(rawBytes)
 	hdr := &wire.BlockHeader{}

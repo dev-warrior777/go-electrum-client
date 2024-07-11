@@ -90,7 +90,6 @@ func getStartPointHeight(cfg *ElectrumXConfig) int64 {
 func (h *headers) statFileSize() (int64, error) {
 	fi, err := os.Stat(h.hdrFilePath)
 	if err != nil {
-		fmt.Println(err.Error())
 		return 0, err
 	}
 	return fi.Size(), nil
@@ -170,12 +169,7 @@ func (h *headers) readAllBytesFromFile() ([]byte, error) {
 	return b, nil
 }
 
-// Store 'numHdrs' headers starting at height 'height' in 'hdrs' map
-// 'b' should have exactly 'numHdrs' x 'h.headerSize' bytes.
-//
-// Note: Now headerSize is a variable bytesToNumHdrs will panic if h.headerSize
-//
-//	is not set.
+// Store headers starting at startHeight in the 'hdrs' map
 func (h *headers) store(b []byte, startHeight int64) error {
 	numHdrs, err := h.bytesToNumHdrs(int64(len(b)))
 	if err != nil {
@@ -199,17 +193,27 @@ func (h *headers) store(b []byte, startHeight int64) error {
 	return nil
 }
 
-func (h *headers) removeHdrFromTip() {
+func (h *headers) removeOneHdrFromTip() {
 	h.hdrsMtx.Lock()
 	defer h.hdrsMtx.Unlock()
 	delete(h.hdrs, h.tip)
 	h.tip--
 }
 
-// tip returns the stored block headers tip height.
+// getClientTip returns the stored block headers last tip height or .
+//
+// If we are in a reorg recovery our tip has been re-wound back to a previous
+// known good (probably) header so send the client back the recoveryTip which
+// is the last one sent back before reorg was noticed.
+func (h *headers) getClientTip() int64 {
+	if h.recovery {
+		return h.recoveryTip
+	}
+	return h.tip
+}
+
+// getTip returns the stored block headers tip height. Not locked
 func (h *headers) getTip() int64 {
-	h.hdrsMtx.RLock()
-	defer h.hdrsMtx.RUnlock()
 	return h.tip
 }
 
@@ -218,11 +222,9 @@ func (h *headers) getTip() int64 {
 func (h *headers) getBlockHeader(height int64) (*wire.BlockHeader, error) {
 	h.hdrsMtx.RLock()
 	defer h.hdrsMtx.RUnlock()
-	// If there is a need for blocks before the last checkpoint consider making
-	// a server call
 	hdr := h.hdrs[height]
 	if hdr == nil {
-		return nil, fmt.Errorf("no block stored for height %d", height)
+		return nil, fmt.Errorf("no block header stored for height %d", height)
 	}
 	return hdr, nil
 }
@@ -236,7 +238,7 @@ func (h *headers) getBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader
 	if h.startPoint > startHeight {
 		// error for now. If there is a need for blocks before the last checkpoint
 		// consider making a server call if api users need that.
-		return nil, errors.New("requested start height < start of stored blocks")
+		return nil, errors.New("requested start height < start of stored block headers")
 	}
 	if startHeight > h.tip {
 		return nil, errors.New("requested start height > local tip")
@@ -260,16 +262,16 @@ func (h *headers) getBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader
 // 	return h.hdrs[height]
 // }
 
-func (h *headers) getTipBlock() *wire.BlockHeader {
-	h.hdrsMtx.RLock()
-	defer h.hdrsMtx.RUnlock()
-	return h.hdrs[h.tip]
+func (h *headers) getTipHash() chainhash.Hash {
+	// h.hdrsMtx.RLock()
+	// defer h.hdrsMtx.RUnlock()
+	hdr := h.hdrs[h.tip]
+	return hdr.BlockHash()
 }
 
 func (h *headers) checkCanConnect(incomingHdr *wire.BlockHeader) bool {
-	ourTipHeader := h.getTipBlock()
-	ourHash := ourTipHeader.BlockHash()
-	return ourHash == incomingHdr.PrevBlock
+	ourTipHash := h.getTipHash()
+	return ourTipHash == incomingHdr.PrevBlock
 }
 
 // storeOneHdr stores one wire block header at h.tip+1 and updates h.tip

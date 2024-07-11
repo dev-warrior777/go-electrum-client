@@ -11,26 +11,40 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/crypto/rand"
 )
 
 // network
 //    |
-//    leader
+//    leader id 0	nodeCtx0
 //    |
 //    peers
 //      |
-//       -- peer id 1
+//       -- peer id 1	nodeCtx1
 //      |
-//       -- peer id 2
+//       -- peer id 2	nodeCtx2
 //      |
-//       -- peer id 3
+//       -- peer id 3	nodeCtx3
 //      |
 //       ...
+//
+// Network is the controller of all the nodes we start. Each node is started
+// within it's own child context of the goele ctx. The nodeCtx of each can
+// be cancelled by either the Network or the server connection on disconnect.
+// Mis-behaving nodes can also cancel in rare cases such as obviously wrong
+// information sent.
+
+// Network was the cancel cause
+var errNetworkCanceled = errors.New("Network Canceled")
+
+// server-connection was the cancel cause
+var errServerCanceled = errors.New("Server Canceled")
+
+// misbehaving node server was the cancel cause
+var errNodeMisbehavingCanceled = errors.New("Server Misbehaving Canceled")
 
 var errNoNetwork = errors.New("network not started")
 var errNoLeader = errors.New("no leader node is assigned - try again in 10 seconds")
-
-var errNetworkCanceled = errors.New("Network Cancelled")
 
 var peerId uint32 // stomic
 
@@ -180,7 +194,6 @@ func (net *Network) startNewPeer(ctx context.Context, netAddr *NodeServerAddr, i
 func (net *Network) getServerPeers(ctx context.Context) {
 	err := net.getServers(ctx)
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
 }
@@ -220,14 +233,15 @@ func (net *Network) getLeader() *peerNode {
 
 // bootstrap peers and monitor leader - run as goroutine
 func (net *Network) peersMonitor(ctx context.Context) {
-	// The ticker will adjust the time interval or drop ticks to make up for
-	// slow receivers.
+	// for shuffling []net.peer - shuffle on same thread
+	rand.NewPRNG()
+	// "The ticker will adjust the time interval or drop ticks to make up for
+	// slow receivers." go doc
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("ctx.Done in peersMonitor - exiting thread")
 			for _, peer := range net.peers {
 				peer.nodeCancel(errNetworkCanceled)
 			}
@@ -313,13 +327,14 @@ func (net *Network) startNewPeerMaybe(ctx context.Context) {
 		fmt.Println("startNewPeerMaybe: no known servers that are not already connected")
 		return
 	}
-	// start a new peer
+	// start one new peer .. from the pseudo randomized list
 	addr := toNetAddr(available[0])
 	err := net.startNewPeer(ctx, addr, false, false) // dialerCtx time limited to 10s
 	if err != nil {
 		fmt.Printf(" ..cannot start %s %v\n", addr.String(), err)
 		net.removeServer(available[0])
 	}
+	net.shufflePeers()
 	fmt.Printf("startNewPeerMaybe: online peers: %d\n\n", net.getNumPeers())
 }
 
@@ -330,7 +345,7 @@ func toNetAddr(saddr *serverAddr) *NodeServerAddr {
 	}
 }
 
-// build a list of known servers that have not yet been started
+// build a pseudo randomized list of known servers that have not yet been started
 func (net *Network) availableServers() []*serverAddr {
 	var available = make([]*serverAddr, 0)
 	servers := net.knownServers
@@ -353,11 +368,14 @@ func (net *Network) availableServers() []*serverAddr {
 			available = append(available, server)
 		}
 	}
+	// pseudo randomize the list order
+	shuffleAvailableKnownServers(available)
+
 	return available
 }
 
 func (net *Network) startNewLeader(ctx context.Context) {
-	fmt.Printf("startNewLeader .. not impl\n")
+	fmt.Printf("startNewLeader\n")
 	// get a free known server
 	if len(net.knownServers) == 0 {
 		fmt.Println("startNewLeader: no known servers")
@@ -370,7 +388,7 @@ func (net *Network) startNewLeader(ctx context.Context) {
 	}
 	// TODO: filter servers again by reputation, capabilities and banlist
 
-	// start one node up as new leader
+	// start one node up as new leader .. from the pseudo randomized list
 	addr := toNetAddr(available[0])
 	err := net.startNewPeer(ctx, addr, true, false) // dialerCtx time limited to 10s
 	if err != nil {
@@ -378,6 +396,26 @@ func (net *Network) startNewLeader(ctx context.Context) {
 		net.removeServer(available[0])
 	}
 	fmt.Printf("startNewLeader: leader (untrusted) online: %s\n\n", addr.String())
+}
+
+func (net *Network) shufflePeers() {
+	numPeers := net.getNumPeers()
+	fmt.Println("shufflePeers", numPeers)
+	if numPeers > 1 {
+		rand.Shuffle(numPeers, func(i, j int) {
+			net.peers[i], net.peers[j] = net.peers[j], net.peers[i]
+		})
+	}
+}
+
+func shuffleAvailableKnownServers(available []*serverAddr) {
+	numServers := len(available)
+	fmt.Println("shuffleAvailableKnownServers", numServers)
+	if numServers > 1 {
+		rand.Shuffle(numServers, func(i, j int) {
+			available[i], available[j] = available[j], available[i]
+		})
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -388,7 +426,7 @@ func (net *Network) Tip() (int64, error) {
 	if !net.started {
 		return 0, errNoNetwork
 	}
-	return net.headers.getTip(), nil
+	return net.headers.getClientTip(), nil
 }
 
 func (net *Network) BlockHeader(height int64) (*wire.BlockHeader, error) {

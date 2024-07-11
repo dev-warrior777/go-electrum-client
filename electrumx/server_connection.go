@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"sync"
@@ -23,6 +22,8 @@ import (
 	"github.com/decred/go-socks/socks"
 )
 
+// Thanks to Chappjc for the original source code.
+
 // printer is a function with the signature of a logger method.
 type printer func(format string, params ...any)
 
@@ -31,43 +32,40 @@ var (
 	stderrPrinter = printer(func(format string, params ...any) {
 		fmt.Fprintf(os.Stderr, format+"\n", params...)
 	})
-
-	disabledPrinter = printer(func(string, ...any) {})
 )
 
-var errServerCanceled = errors.New("Server Cancelled")
+// from electrum code - a ping should be about 50% default server timeout for
+// ping which is ~10m .. so should be around 300s with a margin for error.
+// Unfortunately many servers have different time outs much shorter than this.
+//
+// We also do read deadline extension every 10s so do a ping there. Pings have
+// a high server anti-ddos session cost of 0.1 though .. so it's a balancing act.
+const keepAliveInterval = 10 * time.Second
 
-// from electrum code - about 50% default server timeout for ping which is ~10m
-// const pingInterval = 300 * time.Second
-const pingInterval = 10 * time.Second
-
-// serverConn represents a connection to an Electrum server e.g. ElectrumX. It
-// is a single use type that must be replaced if the connection is lost. Use
-// connectServer to construct a serverConn and connect to the server.
 type serverConn struct {
 	conn       net.Conn
 	nodeCancel context.CancelCauseFunc
 	done       chan struct{}
-	proto      string
-	addr       string // kept from connectServer for debug
+	addr       string // kept for debug
 	debug      printer
 
 	reqID uint64
 
-	respHandlersMtx sync.Mutex
+	// Response handlers per request with id. Closed in the 'listen' func below.
 	respHandlers    map[uint64]chan *response // reqID => requestor
+	respHandlersMtx sync.Mutex
 
 	// The single scripthash notification channel. The channel will be made on
-	// the ConnectServer call and lasts until connection is terminated. It is
+	// the connectServer call and lasts until connection is terminated. It is
 	// closed in the 'listen' func below.
-	scripthashNotifyMtx sync.Mutex
 	scripthashNotify    chan *ScripthashStatusResult
+	scripthashNotifyMtx sync.Mutex
 
 	// The single headers notification channel. The channel will be made on
-	// the ConnectServer call and lasts until connection is terminated. It is
+	// the connectServer call and lasts until connection is terminated. It is
 	// closed in the 'listen' below.
-	headersNotifyMtx sync.Mutex
 	headersNotify    chan *headersNotifyResult
+	headersNotifyMtx sync.Mutex
 }
 
 func (sc *serverConn) nextID() uint64 {
@@ -76,17 +74,18 @@ func (sc *serverConn) nextID() uint64 {
 
 const newline = byte('\n')
 
+// listen reads from the tcpip stream forwards replies to the response and notification
+// channels.
 func (sc *serverConn) listen(nodeCtx context.Context) {
-	// listen is charged with sending on the response and notification channels.
-	// As such only listen should close these channels, and only after the read
-	// loop has finished.
+	// Only listen should close these channels, and only after the read loop has finished
+	// so that requests are passed back to the caller after the connection is terminated.
 	defer sc.cancelRequests()        // close the response chans
 	defer sc.closeHeadersNotify()    // close the headers notify channel
 	defer sc.closeScripthashNotify() // close the scripthash notify channel
 
 	// make a reader with a buffer big enough to handle initial sync download
 	// of block headers from ElectrumX -> client in chunks of 2016 headers for
-	// each request. Chunks * Header size * safety margin.
+	// btc on each request. Chunks * Header size * safety margin.
 	reader := bufio.NewReaderSize(sc.conn, 2016*80*16)
 
 	for {
@@ -98,7 +97,7 @@ func (sc *serverConn) listen(nodeCtx context.Context) {
 		msg, err := reader.ReadBytes(newline)
 		if err != nil {
 			if nodeCtx.Err() == nil { // unexpected
-				fmt.Printf("ReadBytes: %v - conn closed\n", err)
+				sc.debug("ReadBytes: %v - conn closed\n", err)
 			}
 			sc.nodeCancel(errServerCanceled)
 			return
@@ -107,7 +106,6 @@ func (sc *serverConn) listen(nodeCtx context.Context) {
 		var jsonResp response
 		err = json.Unmarshal(msg, &jsonResp)
 		if err != nil {
-			fmt.Printf("response Unmarshal error: %v", err)
 			continue
 		}
 
@@ -123,15 +121,15 @@ func (sc *serverConn) listen(nodeCtx context.Context) {
 			}
 
 			if jsonResp.Method == "blockchain.headers.subscribe" {
-				fmt.Println("")
-				fmt.Println("---------------------------------------------------------------------------")
-				fmt.Println(" --- blockchain.headers.subscribe")
+				fmt.Println()
+				fmt.Println("------- debug -------------------------------------------------------------")
 				sc.headersTipChangeNotify(ntfnParams.Params)
 				continue
 			}
 
 			if jsonResp.Method == "blockchain.scripthash.subscribe" {
-				fmt.Println("---------------------------------------------------------------------------")
+				fmt.Println()
+				fmt.Println("------- debug -------------------------------------------------------------")
 				fmt.Println(" --- blockchain.scripthash.subscribe")
 				sc.scripthashStatusNotify(ntfnParams.Params)
 				continue
@@ -150,83 +148,39 @@ func (sc *serverConn) listen(nodeCtx context.Context) {
 	}
 }
 
-func (sc *serverConn) pinger(nodeCtx context.Context) {
-	t := time.NewTicker(pingInterval)
+// keepAlive pushes the stream read deadline further into the future every 10s
+// then pings the server.
+func (sc *serverConn) keepAlive(nodeCtx context.Context) {
+	t := time.NewTicker(keepAliveInterval)
 	defer t.Stop()
 
 	for {
-		// listen => ReadBytes cannot wait forever. Reset the read deadline for
-		// the next ping's response, as the ping loop is running.
-		newTime := time.Now().Add(pingInterval * 5 / 4)
+		// listen => ReadBytes cannot wait forever.
+		newTime := time.Now().Add(keepAliveInterval * 5 / 4)
 		err := sc.conn.SetReadDeadline(newTime)
 		if err != nil {
-			fmt.Printf("SetReadDeadline: %v\n", err) // just dropped conn, but for debugging...
 			return
 		}
 		if err = sc.ping(nodeCtx); err != nil {
-			fmt.Printf("Ping: %v\n", err)
 			return
 		}
 
 		select {
 		case <-nodeCtx.Done():
-			fmt.Printf("nodeCtx.Done in pinger\n")
 			return
 		case <-t.C:
 		}
 	}
 }
 
-// negotiateVersion should only be called once, and before starting the listen
-// read loop so this does not use the request method.
-func (sc *serverConn) negotiateVersion() (string, error) {
-	reqMsg, err := prepareRequest(sc.nextID(), "server.version", positional{"Electrum", "1.4"})
-	if err != nil {
-		return "", err
-	}
-	reqMsg = append(reqMsg, newline)
-
-	if err = sc.send(reqMsg); err != nil {
-		return "", err
-	}
-
-	err = sc.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-	if err != nil {
-		return "", err
-	}
-
-	reader := bufio.NewReader(io.LimitReader(sc.conn, 1<<18))
-	msg, err := reader.ReadBytes(newline)
-	if err != nil {
-		return "", err
-	}
-
-	var jsonResp response
-	err = json.Unmarshal(msg, &jsonResp)
-	if err != nil {
-		return "", err
-	}
-
-	var vers []string // [server_software_version, protocol_version]
-	err = json.Unmarshal(jsonResp.Result, &vers)
-	if err != nil {
-		return "", err
-	}
-	if len(vers) != 2 {
-		return "", fmt.Errorf("unexpected version response: %v", vers)
-	}
-	return vers[1], nil
-}
-
 type connectOpts struct {
-	TLSConfig   *tls.Config // nil means plain
-	TorProxy    string
-	DebugLogger printer
+	TLSConfig *tls.Config
+	TorProxy  string
 }
 
 // connectServer connects to the electrumx server at the given address. To close
-// the connection and shutdown serverConn cancel the context or use the then wait
-// on the channel from Done() to ensure a clean shutdown (connection closed and
+// the connection and shutdown serverConn cancel the context then wait on the
+// channel from Done() to ensure a clean shutdown (connection closed and
 // all requests handled).
 // There is no automatic reconnection functionality, as the caller should handle
 // dropped connections by cycling to a different server.
@@ -262,44 +216,27 @@ func connectServer(
 		}
 	}
 
-	logger := opts.DebugLogger
-	if logger == nil {
-		logger = disabledPrinter
-	}
-
 	sc := &serverConn{
-		conn:             conn,
-		nodeCancel:       nodeCancel,
-		done:             make(chan struct{}),
-		addr:             addr,
-		debug:            logger,
-		respHandlers:     make(map[uint64]chan *response),
-		scripthashNotify: make(chan *ScripthashStatusResult, 1), // 128 bytes/slot
-		headersNotify:    make(chan *headersNotifyResult),       // 168 bytes
-		// unbuffered because we have a queue downstream
+		conn:         conn,
+		nodeCancel:   nodeCancel,
+		done:         make(chan struct{}),
+		addr:         addr,
+		debug:        stderrPrinter,
+		respHandlers: make(map[uint64]chan *response),
+		// 128 bytes/slot - TODO: make downstream queue and remove buffer
+		scripthashNotify: make(chan *ScripthashStatusResult, 1),
+		// 168 bytes - unbuffered because we have a queue downstream
+		headersNotify: make(chan *headersNotifyResult),
 	}
 
-	// Negotiate protocol version.
-	sc.proto, err = sc.negotiateVersion()
-	if err != nil {
-		conn.Close()
-		return nil, err // e.g. code 1: "unsupported protocol version: 1.4"
-	}
-
-	sc.debug("network: connected to server %s using negotiated protocol version %s",
-		addr, sc.proto)
-
-	go sc.listen(nodeCtx) // must be running to receive response & notifications
-	go sc.pinger(nodeCtx) // must be running or the server will disconnect after some time
+	go sc.listen(nodeCtx)
+	go sc.keepAlive(nodeCtx)
 	go func() {
 		<-nodeCtx.Done()
 		cause := context.Cause(nodeCtx)
-		fmt.Printf("nodeCtx.Done in connectServer for %s - cause %v - waiting for connection to finish\n",
-			cause, sc.addr)
+		sc.debug("nodeCtx.Done in connectServer for %s - cause %v\n", sc.addr, cause)
 		conn.Close()
-		fmt.Printf("serverConn -- conn Closed - closing sc.Done channel\n")
 		close(sc.done)
-		fmt.Printf("serverConn -- sc.Done channel closed - exiting thread\n")
 	}()
 
 	return sc, nil
@@ -308,11 +245,6 @@ func connectServer(
 // Done returns a channel that is closed when serverConn is *fully* shut down.
 func (sc *serverConn) Done() <-chan struct{} {
 	return sc.done
-}
-
-// electrumxProto returns the electrum protocol of the connected server. e.g. "1.4.2".
-func (sc *serverConn) electrumxProto() string {
-	return sc.proto
 }
 
 func (sc *serverConn) send(msg []byte) error {
@@ -341,14 +273,12 @@ func (sc *serverConn) responseChan(id uint64) chan *response {
 }
 
 // cancelRequests deletes all response handlers from the respHandlers map and
-// closes all of the channels. This method MUST be called from the same goroutine
-// that sends on the channel.
+// closes all of the channels. This method MUST be called the listen thread.
 func (sc *serverConn) cancelRequests() {
-	fmt.Println("cancelRequests")
 	sc.respHandlersMtx.Lock()
 	defer sc.respHandlersMtx.Unlock()
 	for id, c := range sc.respHandlers {
-		close(c) // requester receives nil immediately
+		close(c)
 		delete(sc.respHandlers, id)
 	}
 }
@@ -377,10 +307,8 @@ func (sc *serverConn) scripthashStatusNotify(raw json.RawMessage) {
 	}
 }
 
-// closeScripthashNotify closes the scripthash subscription notify channel
-// once and once only. Called from the listen thread when it exits.
+// closeScripthashNotify closes the scripthash subscription notify channel.
 func (sc *serverConn) closeScripthashNotify() {
-	fmt.Println("closeScripthashNotify")
 	sc.scripthashNotifyMtx.Lock()
 	defer sc.scripthashNotifyMtx.Unlock()
 	close(sc.scripthashNotify)
@@ -407,10 +335,8 @@ func (sc *serverConn) headersTipChangeNotify(raw json.RawMessage) {
 	}
 }
 
-// closeScripthashNotify closes the scripthash subscription notify channel
-// once and once only. Called from the listen thread when it exits.
+// closeScripthashNotify closes the scripthash subscription notify channel.
 func (sc *serverConn) closeHeadersNotify() {
-	fmt.Println("closeHeadersNotify")
 	sc.headersNotifyMtx.Lock()
 	defer sc.headersNotifyMtx.Unlock()
 	close(sc.headersNotify)
@@ -440,13 +366,11 @@ func (sc *serverConn) request(nodeCtx context.Context, method string, args any, 
 	var resp *response
 	select {
 	case <-nodeCtx.Done():
-		fmt.Printf("nodeCtx.Done in request\n")
-		return nodeCtx.Err() // either timeout or canceled
+		return nodeCtx.Err()
 	case resp = <-c:
 	}
 
-	if resp == nil { // channel closed
-		fmt.Printf("server conn request: response channel closed\n")
+	if resp == nil {
 		return errors.New("response channel closed")
 	}
 
@@ -460,11 +384,27 @@ func (sc *serverConn) request(nodeCtx context.Context, method string, args any, 
 	return nil
 }
 
-// ping pings the remote server. This can be used as a connectivity test on
-// demand, although a serverConn started with ConnectServer will launch a pinger
-// goroutine to keep the connection alive.
+// ----------------------------------------------------------------------------
+// Server API
+// ----------------------------------------------------------------------------
+
+// ping the remote server.
 func (sc *serverConn) ping(nodeCtx context.Context) error {
 	return sc.request(nodeCtx, "server.ping", nil, nil)
+}
+
+// serverVersion returns the server's software version and electrumx protocol
+// of the connected server
+func (sc *serverConn) serverVersion(nodeCtx context.Context, client, proto string) ([]string, error) {
+	var vers []string
+	err := sc.request(nodeCtx, "server.version", positional{client, proto}, &vers)
+	if err != nil {
+		return nil, err
+	}
+	if len(vers) != 2 {
+		return nil, fmt.Errorf("unexpected version response: %v", vers)
+	}
+	return vers, nil
 }
 
 // serverFeatures represents the result of a server features request.
@@ -479,8 +419,7 @@ type serverFeatures struct {
 	Services []string                     `json:"services,omitempty"` // e.g. ["tcp://host.com:51001", "ssl://host.com:51002"]
 }
 
-// features requests the features claimed by the server. The caller should check
-// the Genesis hash field to ensure it is the intended network.
+// features requests the features claimed by the server.
 func (sc *serverConn) features(nodeCtx context.Context) (*serverFeatures, error) {
 	var feats serverFeatures
 	err := sc.request(nodeCtx, "server.features", nil, &feats)
@@ -499,10 +438,9 @@ type peersResult struct {
 	Feats []string
 }
 
-// Peers requests the known peers from a server (other servers). Occasionaly a
-// testnet server such as  "testnet.qtornado.com:51002" doesn't send peers. But
-// is still useful as a non-leader for blockHeader(s) calls when testing latest
-// incoming headers to see if we have a reorg
+// serverPeers requests the known peers from a server (other servers). Occasionaly
+// a testnet server such as  "testnet.qtornado.com:51002" doesn't send peers. But
+// is still useful as a non-leader.
 func (sc *serverConn) serverPeers(nodeCtx context.Context) ([]*peersResult, error) {
 	// Note that the Electrum exchange wallet type does not  use this
 	// method since it follows the Electrum wallet server peer or one of the
@@ -574,7 +512,6 @@ type vin struct {
 }
 
 // pkScript represents the pkScript/scriptPubKey of a transaction output
-// returned by a transaction requests.
 type pkScript struct {
 	Asm       string   `json:"asm"`
 	Hex       string   `json:"hex"`
@@ -611,7 +548,7 @@ type GetTransactionResult struct {
 }
 
 // getTransaction requests a transaction with verbose output. Some servers such
-// as Blockstream do not support this to save on the resources used.
+// as Blockstream do not support this to save on the heavy resources used.
 func (sc *serverConn) getTransaction(nodeCtx context.Context, txid string) (*GetTransactionResult, error) {
 	verbose := true
 	// verbose result
@@ -639,7 +576,7 @@ func (sc *serverConn) getRawTransaction(nodeCtx context.Context, txid string) (s
 // /////////////////////
 
 // blockHeader requests the block header at the given height, returning
-// hexadecimal encoded serialized header.
+// hex encoded serialized header.
 func (sc *serverConn) blockHeader(nodeCtx context.Context, height uint32) (string, error) {
 	var resp string
 	err := sc.request(nodeCtx, "blockchain.block.header", positional{height}, &resp)
@@ -649,8 +586,8 @@ func (sc *serverConn) blockHeader(nodeCtx context.Context, height uint32) (strin
 	return resp, nil
 }
 
-// getBlockHeadersResult represent the result of a batch request for block
-// headers via the BlockHeaders method. The serialized block headers are
+// getBlockHeadersResult represents the result of a batch request for block
+// headers via the block.headers method. The serialized block headers are
 // concatenated in the HexConcat field, which contains Count headers.
 type getBlockHeadersResult struct {
 	Count     int    `json:"count"`
@@ -677,14 +614,14 @@ type headersNotifyResult struct {
 }
 
 // getHeadersNotify returns this connection owned recv channel for headers
-// tip change notifications. This connection will close the channel.
+// tip change notifications.
 func (sc *serverConn) getHeadersNotify() chan *headersNotifyResult {
 	return sc.headersNotify
 }
 
-// subscribeHeaders subscribes for block header notifications. There seems to be
-// no guarantee that we will be notified of all new blocks, such as when there
-// are blocks in rapid succession.
+// subscribeHeaders subscribes for block header notifications. There is no
+// guarantee that we will be notified of all new blocks when the electrumx
+// server is busy processing blocks.
 func (sc *serverConn) subscribeHeaders(nodeCtx context.Context) (*headersNotifyResult, error) {
 	const method = "blockchain.headers.subscribe"
 
@@ -709,7 +646,7 @@ type ScripthashStatusResult struct {
 }
 
 // GetScripthashNotify returns this connection owned recv channel for scripthash
-// status change notifications. This connection will close the channel.
+// status change notifications.
 func (sc *serverConn) GetScripthashNotify() chan *ScripthashStatusResult {
 	return sc.scripthashNotify
 }
@@ -742,10 +679,8 @@ func (sc *serverConn) UnsubscribeScripthash(nodeCtx context.Context, scripthash 
 	var resp string
 	err := sc.request(nodeCtx, method, positional{scripthash}, &resp)
 	if err != nil {
-		fmt.Println("dbg: ", err)
+		sc.debug("UnsubscribeScripthash: %v\n", err)
 	}
-
-	// TODO: analyse good response
 }
 
 type History struct {
@@ -757,7 +692,7 @@ type History struct {
 type HistoryResult []History
 
 // GetHistory gets a list of [{height, txid and fee (only mempool)},...] for the
-// scripthash of an address of interest to the client wallet.
+// scripthash of an address.
 func (sc *serverConn) GetHistory(nodeCtx context.Context, scripthash string) (HistoryResult, error) {
 	var resp HistoryResult
 	err := sc.request(nodeCtx, "blockchain.scripthash.get_history", positional{scripthash}, &resp)
@@ -777,7 +712,7 @@ type ListUnspent struct {
 type ListUnspentResult []ListUnspent
 
 // GetListUnspent gets a list of [{height, txid tx_pos and value},...] for the
-// scripthash of an address of interest to the client wallet.
+// scripthash of an address.
 func (sc *serverConn) GetListUnspent(nodeCtx context.Context, scripthash string) (ListUnspentResult, error) {
 	var resp ListUnspentResult
 	err := sc.request(nodeCtx, "blockchain.scripthash.listunspent", positional{scripthash}, &resp)
