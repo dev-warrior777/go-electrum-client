@@ -59,7 +59,7 @@ type peerNode struct {
 }
 
 func newPeerNodeWithId(
-	isLeader,
+	isLeader bool,
 	isTrusted bool,
 	netAddr *NodeServerAddr,
 	node *Node,
@@ -233,8 +233,6 @@ func (net *Network) getLeader() *peerNode {
 
 // bootstrap peers and monitor leader - run as goroutine
 func (net *Network) peersMonitor(ctx context.Context) {
-	// for shuffling []net.peer - shuffle on same thread
-	rand.NewPRNG()
 	// "The ticker will adjust the time interval or drop ticks to make up for
 	// slow receivers." go doc
 	t := time.NewTicker(5 * time.Second)
@@ -402,9 +400,7 @@ func (net *Network) shufflePeers() {
 	numPeers := net.getNumPeers()
 	fmt.Println("shufflePeers", numPeers)
 	if numPeers > 1 {
-		rand.Shuffle(numPeers, func(i, j int) {
-			net.peers[i], net.peers[j] = net.peers[j], net.peers[i]
-		})
+		rand.ShuffleSlice(net.peers)
 	}
 }
 
@@ -412,9 +408,7 @@ func shuffleAvailableKnownServers(available []*serverAddr) {
 	numServers := len(available)
 	fmt.Println("shuffleAvailableKnownServers", numServers)
 	if numServers > 1 {
-		rand.Shuffle(numServers, func(i, j int) {
-			available[i], available[j] = available[j], available[i]
-		})
+		rand.ShuffleSlice(available)
 	}
 }
 

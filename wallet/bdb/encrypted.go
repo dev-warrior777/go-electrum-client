@@ -3,7 +3,6 @@ package bdb
 import (
 	"errors"
 	"fmt"
-	"io"
 	"runtime"
 	"sync"
 
@@ -83,9 +82,7 @@ func (e *EncDB) GetDecrypted(pw string) ([]byte, error) {
 func encryptBytes(unencrypted []byte, password string) ([]byte, error) {
 	secretKey := getEncryptionKey32(password)
 	var nonce [24]byte
-	if _, err := io.ReadFull(rand.Reader(), nonce[:]); err != nil {
-		return nil, err
-	}
+	rand.Read(nonce[:])
 	encrypted := secretbox.Seal(nonce[:], unencrypted, &nonce, &secretKey)
 	// nonce is the first 24 bytes of encrypted. the rest is the actual
 	// encryption result. [nonce 24][ ...the encryption result...]

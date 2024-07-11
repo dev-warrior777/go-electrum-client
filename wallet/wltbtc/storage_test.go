@@ -85,7 +85,6 @@ func TestStoreRetrieveEncryptedStore(t *testing.T) {
 }
 
 func TestValidPw(t *testing.T) {
-	//TODO: FIX TEST (code usage works!)
 	sm := createStorageManager()
 	populateStorage(sm)
 
@@ -97,8 +96,8 @@ func TestValidPw(t *testing.T) {
 	sm.store.blank()
 	sm.Get(pw)
 
-	// if !sm.IsValidPw("abc") {
-	// 	t.Fatal("invalid pw")
-	// }
+	if !sm.IsValidPw("abc") {
+		t.Fatal("invalid pw")
+	}
 	fmt.Println("valid pw")
 }

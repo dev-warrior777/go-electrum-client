@@ -28,7 +28,6 @@ import (
 type printer func(format string, params ...any)
 
 var (
-	// stderrPrinter is a debugLogger that uses fmt.Fprintf(os.Stderr, ...).
 	stderrPrinter = printer(func(format string, params ...any) {
 		fmt.Fprintf(os.Stderr, format+"\n", params...)
 	})
@@ -181,7 +180,7 @@ type connectOpts struct {
 // connectServer connects to the electrumx server at the given address. To close
 // the connection and shutdown serverConn cancel the context then wait on the
 // channel from Done() to ensure a clean shutdown (connection closed and
-// all requests handled).
+// all incoming responses handled).
 // There is no automatic reconnection functionality, as the caller should handle
 // dropped connections by cycling to a different server.
 func connectServer(
