@@ -25,6 +25,7 @@ type Node struct {
 
 func newNode(
 	netAddr *NodeServerAddr,
+	proxyAddr string,
 	isLeader bool,
 	networkHeaders *headers,
 	clientTipChangeNotify chan int64,
@@ -53,6 +54,7 @@ func newNode(
 	}
 	connectOpts := &connectOpts{
 		TLSConfig: tlsConfig,
+		TorProxy:  proxyAddr,
 	}
 
 	n := &Node{
@@ -158,7 +160,7 @@ func (n *Node) promoteToLeader(nodeCtx context.Context) error {
 // Server API
 //-----------------------------------------------------------------------------
 
-// getServerPeers gets this node's electrumx server's peers - not public!
+// getServerPeers gets this node's electrumx server's peers!
 func (n *Node) getServerPeers(nodeCtx context.Context) ([]*peersResult, error) {
 	if !n.server.connected {
 		return nil, ErrNotConnected

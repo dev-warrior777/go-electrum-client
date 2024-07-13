@@ -1,11 +1,12 @@
 package electrumx
 
 import (
+	"fmt"
+	netIp "net"
 	"os"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
 var peerNoResults = []*peersResult{}
@@ -79,10 +80,23 @@ var peerResults3 = []*peersResult{ // mixed: some in the above some new
 	},
 }
 
+var peerResultsIPv6 = []*peersResult{ // mixed: some in the above some new
+	{
+		Addr:  "2600:1900:40f0:964b::",
+		Host:  "testIPv6.test.org",
+		Feats: []string{"v1.5.3", "s50002", "t50001"},
+	},
+	{
+		Addr:  "2600:1901:81c0:6a5:0:3::",
+		Host:  "2600:1901:81c0:6a5:0:3::",
+		Feats: []string{"v1.5.3", "s50002", "t50001"},
+	},
+}
+
 func mkNetwork(testDir string) *Network {
 	net := &Network{
 		config: &ElectrumXConfig{
-			Chain:   wallet.Bitcoin,
+			// Chain:   wallet.Bitcoin,
 			Params:  &chaincfg.MainNetParams,
 			DataDir: testDir,
 		},
@@ -154,5 +168,23 @@ func TestNetworkServers(t *testing.T) {
 	err = net.removeServer(nil)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	err = net.addIncomingservers(peerResultsIPv6)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	n = 0
+	for _, ks := range net.knownServers {
+		h, _, _ := netIp.SplitHostPort(ks.Address)
+		if nil == netIp.ParseIP(h) {
+			fmt.Printf("bad ip addr: %s\n", ks.Address)
+			continue
+		}
+		n++
+	}
+	if len(net.knownServers) != n {
+		t.Fatal()
 	}
 }

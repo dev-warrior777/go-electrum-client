@@ -64,14 +64,21 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		cfg.Params = &chaincfg.RegressionNetParams
 		cfg.TrustedPeer = &electrumx.NodeServerAddr{
 			// Net: "ssl", Addr: "127.0.0.1:57002", // debug server
-			Net: "ssl", Addr: "127.0.0.1:53002",
+			Net: "ssl", Addr: "127.0.0.1:53002", // harness server
 		}
 		cfg.StoreEncSeed = true
+		cfg.RPCTestPort = 28887
 		cfg.Testing = true
 	case "testnet":
 		cfg.Params = &chaincfg.TestNet3Params
+		cfg.ProxyPort = "9050"
 		cfg.TrustedPeer = &electrumx.NodeServerAddr{
-			Net: "ssl", Addr: "testnet.aranguren.org:51002", // down?
+			// Net: "ssl", Addr: "testnet.aranguren.org:51002", // ok
+
+			Net:   "ssl",
+			Addr:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion:51002",
+			Onion: true,
+
 			// Net: "ssl", Addr: "testnet.hsmiths.com:53012", // down?
 			// Net: "ssl", Addr: "electrum.blockstream.info:60002", // no verbose gtx
 			// Net: "ssl", Addr: "blackie.c3-soft.com:57006", // down
@@ -80,12 +87,15 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 			// Net: "tcp", Addr: "testnet.qtornado.com:51001",
 		}
 		cfg.StoreEncSeed = true
+		cfg.RPCTestPort = 18887
 		cfg.Testing = true
 	case "mainnet":
 		cfg.Params = &chaincfg.MainNetParams
 		cfg.TrustedPeer = &electrumx.NodeServerAddr{
+			// Net: "ssl", Addr: "[2a01:4f9:c010:e9d3::1]:50002",
 			Net: "ssl", Addr: "elx.bitske.com:50002",
 		}
+		cfg.RPCTestPort = 8887
 		cfg.StoreEncSeed = false
 		cfg.Testing = false
 	}

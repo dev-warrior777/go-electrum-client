@@ -190,21 +190,36 @@ func connectServer(
 	opts *connectOpts) (*serverConn, error) {
 
 	var dial func(nodeCtx context.Context, network, addr string) (net.Conn, error)
+	var dialCtx context.Context
+	var dialCancel context.CancelFunc
+
 	if opts.TorProxy != "" {
 		proxy := &socks.Proxy{
-			Addr: opts.TorProxy,
+			Addr:         opts.TorProxy,
+			TorIsolation: true,
 		}
 		dial = proxy.DialContext
+		dialCtx, dialCancel = context.WithTimeout(nodeCtx, 20*time.Second)
+		defer dialCancel()
 	} else {
 		dial = new(net.Dialer).DialContext
+		dialCtx, dialCancel = context.WithTimeout(nodeCtx, 5*time.Second)
+		defer dialCancel()
 	}
 
-	dialCtx, cancel := context.WithTimeout(nodeCtx, 10*time.Second)
-	defer cancel()
 	conn, err := dial(dialCtx, "tcp", addr)
 	if err != nil {
+		fmt.Printf("dial - %v\n", err)
 		return nil, err
 	}
+
+	// dialer := net.Dialer{}
+	// dialCtx, dialCancel := context.WithTimeout(nodeCtx, 10*time.Second)
+	// defer dialCancel()
+	// conn, err := dialer.DialContext(dialCtx, "tcp", addr)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	if opts.TLSConfig != nil {
 		conn = tls.Client(conn, opts.TLSConfig)

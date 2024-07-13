@@ -9,13 +9,14 @@ import (
 )
 
 const (
+	BTC_COIN                     = "btc"
 	BTC_HEADER_SIZE              = 80
 	BTC_STARTPOINT_REGTEST       = 0
 	BTC_STARTPOINT_TESTNET       = 2560000
 	BTC_STARTPOINT_MAINNET       = 823000
 	BTC_MAX_ONLINE_PEERS_REGTEST = 0
 	BTC_MAX_ONLINE_PEERS_TESTNET = 5
-	BTC_MAX_ONLINE_PEERS_MAINNET = 5
+	BTC_MAX_ONLINE_PEERS_MAINNET = 10
 )
 
 type ElectrumXInterface struct {
@@ -24,6 +25,7 @@ type ElectrumXInterface struct {
 }
 
 func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterface, error) {
+	config.Coin = BTC_COIN
 	config.BlockHeaderSize = BTC_HEADER_SIZE
 	config.StartPoints = make(map[string]int64)
 	config.StartPoints[electrumx.REGTEST] = int64(BTC_STARTPOINT_REGTEST)

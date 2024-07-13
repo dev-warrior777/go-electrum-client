@@ -7,7 +7,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"golang.org/x/net/proxy"
 
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
@@ -32,27 +31,32 @@ type ClientConfig struct {
 	// Network parameters - make more general if it cannot adapt to other coins.
 	Params *chaincfg.Params
 
-	// Store the seed in encrypted storage
-	StoreEncSeed bool
-
-	// The user-agent visible to the network
-	UserAgent string
-
 	// Location of the data directory
 	DataDir string
+
+	// Currently we use this electrumX server to bootstrap others so it should
+	// be set.
+	TrustedPeer *electrumx.NodeServerAddr
+
+	// A localhost socks5 proxy port can be set here and will be used as to proxy
+	// ElectrumX server onion connections.
+	//
+	// If not "" setting this enables goele to connect to a limited number of
+	// onion servers. Default is "".
+	//
+	// You must have already set up a localhost socks5 proxy and tor service.
+	//
+	// Note: This is tested on Linux and is still considered *Experimental*
+	ProxyPort string
+
+	// Store the seed in encrypted storage
+	StoreEncSeed bool
 
 	// Database implementation type (bbolt or sqlite)
 	DbType string
 
 	// An implementation of the Datastore interface
 	DB wallet.Datastore
-
-	// Currently we use this electrumX server to bootstrap others so it should
-	// be set.
-	TrustedPeer *electrumx.NodeServerAddr
-
-	// A Tor proxy can be set here. TODO:
-	Proxy proxy.Dialer
 
 	// The default fee-per-byte for each level
 	LowFee    int64
@@ -83,7 +87,7 @@ func NewDefaultConfig() *ClientConfig {
 		Coin:                 "btc",
 		NetType:              "mainnet",
 		Params:               &chaincfg.MainNetParams,
-		UserAgent:            appName,
+		ProxyPort:            "",
 		DataDir:              btcutil.AppDataDir(appName, false),
 		DbType:               DbTypeBolt,
 		DB:                   nil, // concrete impl
@@ -111,17 +115,16 @@ func (cc *ClientConfig) MakeWalletConfig() *wallet.WalletConfig {
 }
 
 func (cc *ClientConfig) MakeElectrumXConfig() *electrumx.ElectrumXConfig {
-	nc := electrumx.ElectrumXConfig{
-		Chain:       cc.Chain,
+	ex := electrumx.ElectrumXConfig{
+		// 		Chain:       cc.Chain,
 		NetType:     cc.NetType,
 		Params:      cc.Params,
-		UserAgent:   cc.UserAgent,
 		DataDir:     cc.DataDir,
 		TrustedPeer: cc.TrustedPeer,
-		Proxy:       cc.Proxy,
+		ProxyPort:   cc.ProxyPort,
 		Testing:     cc.Testing,
 	}
-	return &nc
+	return &ex
 }
 
 func GetConfigPath() (string, error) {

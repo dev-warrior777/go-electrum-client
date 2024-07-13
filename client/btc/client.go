@@ -18,18 +18,24 @@ import (
 
 // BtcElectrumClient - implements ElectrumClient interface
 type BtcElectrumClient struct {
+	// Cancel is the cancel func for the goele context
+	Cancel context.CancelFunc
+	// The Goele configuration
 	ClientConfig *client.ClientConfig
-	Wallet       wallet.ElectrumWallet
-	X            electrumx.ElectrumX
-	// receive tip change from electrumx
+	// Goele wallet
+	Wallet wallet.ElectrumWallet
+	// Interface tp ElectrumX servers for a coin network
+	X electrumx.ElectrumX
+	// Receive tip change notify channel from electrumx
 	rcvTipChangeNotify <-chan int64
-	// forward tip change notify to external user if connected
+	// Forward tip change notify to external user if regustered
 	sendTipChangeNotify    chan int64
 	sendTipChangeNotifyMtx sync.RWMutex
 }
 
 func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 	ec := BtcElectrumClient{
+		Cancel:              nil,
 		ClientConfig:        cfg,
 		Wallet:              nil,
 		X:                   nil,
@@ -107,12 +113,14 @@ func (ec *BtcElectrumClient) createElectrumXInterface() error {
 
 // client interface implementation
 
-func (ec *BtcElectrumClient) Start(ctx context.Context) error {
+func (ec *BtcElectrumClient) Start(parentCtx context.Context) error {
+	goeleCtx, goeleCancel := context.WithCancel(parentCtx)
+	ec.Cancel = goeleCancel
 	err := ec.createElectrumXInterface()
 	if err != nil {
 		return err
 	}
-	err = ec.X.Start(ctx)
+	err = ec.X.Start(goeleCtx)
 	if err != nil {
 		return err
 	}
@@ -120,8 +128,12 @@ func (ec *BtcElectrumClient) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	go ec.tipChange(ctx)
+	go ec.tipChange(goeleCtx)
 	return nil
+}
+
+func (ec *BtcElectrumClient) Stop() {
+	ec.Cancel()
 }
 
 // CreateWallet makes a new wallet with a new seed. The password is to encrypt

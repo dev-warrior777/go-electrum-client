@@ -40,6 +40,7 @@ const (
 
 type ElectrumClient interface {
 	Start(ctx context.Context) error
+	Stop()
 	//
 	GetConfig() *ClientConfig
 	GetWallet() wallet.ElectrumWallet
@@ -84,6 +85,4 @@ type ElectrumClient interface {
 	GetRawTransaction(ctx context.Context, txid string) ([]byte, error)
 	GetAddressHistory(ctx context.Context, addr string) (electrumx.HistoryResult, error)
 	GetAddressUnspent(ctx context.Context, addr string) (electrumx.ListUnspentResult, error)
-	//...
-
 }

@@ -6,9 +6,9 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/dev-warrior777/go-electrum-client/wallet"
-	"golang.org/x/net/proxy"
 )
+
+const LOCALHOST = "127.0.0.1"
 
 type Server struct {
 	conn            *serverConn
@@ -19,7 +19,9 @@ type Server struct {
 }
 
 type NodeServerAddr struct {
-	Net, Addr string
+	Net   string
+	Addr  string
+	Onion bool
 }
 
 func (nsa NodeServerAddr) Network() string {
@@ -30,11 +32,15 @@ func (nsa NodeServerAddr) String() string {
 	return nsa.Addr
 }
 
+func (nsa NodeServerAddr) IsOnion() bool {
+	return nsa.Onion
+}
+
 func (nsa *NodeServerAddr) IsEqual(other *NodeServerAddr) bool {
 	return nsa.Addr == other.Addr && nsa.Net == other.Net
 }
 
-// Ensure simpleAddr implements the net.Addr interface.
+// Ensure NodeServerAddr implements the net.Addr interface.
 var _ net.Addr = NodeServerAddr{}
 
 const (
@@ -50,7 +56,7 @@ const (
 
 type ElectrumXConfig struct {
 	// The blockchain, Bitcoin, Dash, etc
-	Chain wallet.CoinType
+	// Chain wallet.CoinType
 
 	// Coin ticker to id the coin
 	// Filled in by each coin in ElectrumXInterface
@@ -74,18 +80,17 @@ type ElectrumXConfig struct {
 	// NetType parameters.. can chaincfg adapt for all coins? for now we use the NetType
 	Params *chaincfg.Params
 
-	// The user-agent visible to the network
-	UserAgent string
+	// A localhost socks5 proxy port. E.g.  9050
+	ProxyPort string
 
 	// Location of the data directory
 	DataDir string
 
-	// If you wish to connect to a single trusted electrumX peer set this.
-	// For now it *must be set* while we move to multi-node electrum interface
+	// If you wish to connect to a single trusted electrumX peer set this. It is
+	// recommended to set this for security.
+	//
+	// For now it *must be set* while we move to the multi-node electrum interface
 	TrustedPeer *NodeServerAddr
-
-	// A Tor proxy can be set here causing the wallet will use Tor. TODO:
-	Proxy proxy.Dialer
 
 	// If not testing do not overwrite existing wallet files
 	Testing bool

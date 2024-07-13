@@ -32,7 +32,8 @@ import (
 // within it's own child context of the goele ctx. The nodeCtx of each can
 // be cancelled by either the Network or the server connection on disconnect.
 // Mis-behaving nodes can also cancel in rare cases such as obviously wrong
-// information sent.
+// information sent. One case currently for sending headers which are below
+// the start checkpoint for the coin.
 
 // Network was the cancel cause
 var errNetworkCanceled = errors.New("Network Canceled")
@@ -89,25 +90,33 @@ type Network struct {
 	peersMtx        sync.RWMutex
 	knownServers    []*serverAddr
 	knownServersMtx sync.Mutex
+	proxyAddr       string // socks5
+	onlineOnions    int
 	headers         *headers
-	// static channels to client for the lifetime of the main context
+	// static channels to client for the lifetime of the main goele context
 	clientTipChangeNotify  chan int64
 	clientScripthashNotify chan *ScripthashStatusResult
 }
 
 func NewNetwork(config *ElectrumXConfig) *Network {
+	var proxyAddr = ""
+	if config.ProxyPort != "" {
+		proxyAddr = fmt.Sprintf("%s:%s", LOCALHOST, config.ProxyPort)
+	}
 	h := newHeaders(config)
-	n := &Network{
+	network := &Network{
 		config:                 config,
 		started:                false,
 		leader:                 nil,
 		peers:                  make([]*peerNode, 0, 10),
 		knownServers:           make([]*serverAddr, 0, 30),
+		proxyAddr:              proxyAddr,
+		onlineOnions:           0,
 		headers:                h,
 		clientTipChangeNotify:  make(chan int64), // unbuffered
 		clientScripthashNotify: make(chan *ScripthashStatusResult, 16),
 	}
-	return n
+	return network
 }
 
 // GetTipChangeNotify returns a channel to client to receive tip change
@@ -158,9 +167,15 @@ func (net *Network) start(ctx context.Context, startServer *NodeServerAddr) erro
 }
 
 // startNewPeer starts up a new peer and adds to peersList - not locked
-func (net *Network) startNewPeer(ctx context.Context, netAddr *NodeServerAddr, isLeader, isTrusted bool) error {
+func (net *Network) startNewPeer(
+	ctx context.Context,
+	netAddr *NodeServerAddr,
+	isLeader,
+	isTrusted bool) error {
+
 	node, err := newNode(
 		netAddr,
+		net.proxyAddr,
 		isLeader,
 		net.headers,
 		net.clientTipChangeNotify,
@@ -168,7 +183,7 @@ func (net *Network) startNewPeer(ctx context.Context, netAddr *NodeServerAddr, i
 	if err != nil {
 		return err
 	}
-	network := net.config.Chain.String()
+	network := net.config.Coin
 	nettype := net.config.Params.Name
 	genesis := net.config.Params.GenesisHash.String()
 	// node runs in a new child context
@@ -185,7 +200,8 @@ func (net *Network) startNewPeer(ctx context.Context, netAddr *NodeServerAddr, i
 	} else {
 		net.addPeer(peer)
 	}
-	// ask our peer for it's electrumx server's Peers & load server list from file
+	// ask our peer for it's electrumx server's Peers then update known servers
+	// list & update network_servers.json file
 	net.getServerPeers(ctx)
 	return nil
 }
@@ -288,7 +304,7 @@ func (net *Network) checkLeader(ctx context.Context) {
 			return
 		}
 	}
-	// no running peers so make new leader
+	// no available running peers so make new leader
 	net.startNewLeader(ctx)
 }
 

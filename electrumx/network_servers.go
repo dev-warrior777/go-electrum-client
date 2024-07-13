@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
 	"path"
 	"strings"
@@ -63,10 +64,9 @@ func (net *Network) getServers(ctx context.Context) error {
 // addIncomingservers converts incoming peerResults and updates memory & stored
 // server lists
 func (net *Network) addIncomingservers(in []*peersResult) error {
-	servers := net.makeIncomingServerAddrs(in)
+	servers := makeIncomingServerAddrs(in)
 	if len(servers) == 0 {
-		// probably redundant but at least one peer on testnet returned
-		// an empty list
+		// at least one peer on testnet returned an empty list
 		return errors.New("no incoming")
 	}
 	err := net.updateNetworkServers(servers)
@@ -81,17 +81,34 @@ func (net *Network) addIncomingservers(in []*peersResult) error {
 	return nil
 }
 
-func (net *Network) makeIncomingServerAddrs(in []*peersResult) []*serverAddr {
+func makeIncomingServerAddrs(in []*peersResult) []*serverAddr {
 	var servers = make([]*serverAddr, 0, 2*len(in))
+	var goodAddresses = 0
+	var badAddresses = 0
 
 	for _, pres := range in {
+		isOnion := false
+		if strings.HasSuffix(pres.Addr, ".onion") {
+			onionAddr := strings.Split(pres.Addr, ".")
+			isOnion = true
+			if len(onionAddr[0]) != 56 { // no V2
+				badAddresses++
+				continue
+			}
+		} else {
+			if net.ParseIP(pres.Addr) == nil {
+				fmt.Printf("bad IP: %s\n", pres.Addr)
+				badAddresses++
+				continue
+			}
+		}
+
 		var isTcp bool
 		var isSsl bool
 
 		var version string
 		var tcpPort string
 		var sslPort string
-
 		feats := pres.Feats
 		for _, feat := range feats {
 			switch []rune(feat)[0] {
@@ -111,9 +128,9 @@ func (net *Network) makeIncomingServerAddrs(in []*peersResult) []*serverAddr {
 			}
 			saddr := &serverAddr{
 				Net:     "tcp",
-				Address: pres.Addr + ":" + tcpPort,
+				Address: net.JoinHostPort(pres.Addr, tcpPort),
 				Host:    pres.Host,
-				IsOnion: strings.HasSuffix(pres.Host, ".onion"),
+				IsOnion: isOnion,
 				Version: version,
 				Caps:    "",
 			}
@@ -125,21 +142,24 @@ func (net *Network) makeIncomingServerAddrs(in []*peersResult) []*serverAddr {
 			}
 			saddr := &serverAddr{
 				Net:     "ssl",
-				Address: pres.Addr + ":" + sslPort,
+				Address: net.JoinHostPort(pres.Addr, sslPort),
 				Host:    pres.Host,
-				IsOnion: strings.HasSuffix(pres.Host, ".onion"),
+				IsOnion: isOnion,
 				Version: version,
 				Caps:    "",
 			}
 			servers = append(servers, saddr)
 		}
+		goodAddresses++
 	}
+	fmt.Printf("server peer addresses: good: %d, bad: %d\n", goodAddresses, badAddresses)
 	return servers
 }
 
 func (net *Network) updateNetworkServers(servers []*serverAddr) error {
 	net.knownServersMtx.Lock()
 	defer net.knownServersMtx.Unlock()
+
 	if len(net.knownServers) == 0 {
 		net.knownServers = servers
 		return nil
@@ -165,6 +185,7 @@ func (net *Network) updateNetworkServers(servers []*serverAddr) error {
 func (net *Network) updateStoredServers(servers []*serverAddr) error {
 	net.knownServersMtx.Lock()
 	defer net.knownServersMtx.Unlock()
+
 	stored, numRead, err := net.readServerAddrFile()
 	if err != nil {
 		return err
@@ -198,6 +219,7 @@ func (net *Network) updateStoredServers(servers []*serverAddr) error {
 func (net *Network) removeServer(server *serverAddr) error {
 	net.knownServersMtx.Lock()
 	defer net.knownServersMtx.Unlock()
+
 	// remove from memory first
 	var lessKnown = []*serverAddr{}
 	for _, known := range net.knownServers {
@@ -208,11 +230,11 @@ func (net *Network) removeServer(server *serverAddr) error {
 	}
 	net.knownServers = lessKnown
 	// remove from file
-	stored, numRead, err := net.readServerAddrFile()
+	stored, _, err := net.readServerAddrFile()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("removeServer -- num read from file is %d\n", numRead)
+	// fmt.Printf("removeServer -- num read from file is %d\n", numRead)
 	// find server in the list and remove
 	var lessStored []*serverAddr = []*serverAddr{}
 	for _, got := range stored {
