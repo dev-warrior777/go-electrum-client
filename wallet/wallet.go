@@ -14,11 +14,11 @@ import (
 )
 
 type WalletConfig struct {
-	// The blockchain, btc, dash, etc
-	Chain CoinType
-
 	// Coin ticker to id the coin
 	Coin string
+
+	// The blockchain, btc, dash, etc
+	CoinType CoinType
 
 	// mainnet, testnet or regtest
 	NetType string

@@ -13,7 +13,7 @@ var peerNoResults = []*peersResult{}
 
 var peerResults = []*peersResult{
 	{
-		Addr:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd:onion",
+		Addr:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion",
 		Host:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion",
 		Feats: []string{"v1.5.3", "s51002", "t51001"},
 	},
@@ -31,12 +31,17 @@ var peerResults = []*peersResult{
 		Addr:  "3tc6nefii2fwoc66dqvrwcyj64dd3r35ihgxvp4u37itsopns5fjtead.onion",
 		Host:  "3tc6nefii2fwoc66dqvrwcyj64dd3r35ihgxvp4u37itsopns5fjtead.onion",
 		Feats: []string{"v1.5", "s51002", "t51001"},
+	},
+	{
+		Addr:  "2600:1900:40b0:3af2:0:5::",
+		Host:  "2600:1900:40b0:3af2:0:5::",
+		Feats: []string{"v1.4.2", "s50002", "t50001"},
 	},
 }
 
 var peerResults2 = []*peersResult{ // identical to peersResult above
 	{
-		Addr:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd:onion",
+		Addr:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion",
 		Host:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion",
 		Feats: []string{"v1.5.3", "s51002", "t51001"},
 	},
@@ -54,6 +59,11 @@ var peerResults2 = []*peersResult{ // identical to peersResult above
 		Addr:  "3tc6nefii2fwoc66dqvrwcyj64dd3r35ihgxvp4u37itsopns5fjtead.onion",
 		Host:  "3tc6nefii2fwoc66dqvrwcyj64dd3r35ihgxvp4u37itsopns5fjtead.onion",
 		Feats: []string{"v1.5", "s51002", "t51001"},
+	},
+	{
+		Addr:  "2600:1900:40b0:3af2:0:5::",
+		Host:  "2600:1900:40b0:3af2:0:5::",
+		Feats: []string{"v1.4.2", "s50002", "t50001"},
 	},
 }
 
@@ -128,7 +138,7 @@ func TestNetworkServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(net.knownServers) != 8 {
+	if len(net.knownServers) != 10 {
 		t.Fatal("net.knownServers should be 8")
 	}
 
@@ -137,23 +147,23 @@ func TestNetworkServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(net.knownServers) != 8 {
+	if len(net.knownServers) != 10 {
 		t.Fatalf("got %d net.knownServers should be 8", len(net.knownServers))
 	}
 
-	// update but some of the servers are different
+	// update but some of the servers are different and 2 IPs are rejected
 	err = net.addIncomingservers(peerResults3)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(net.knownServers) != 12 {
-		t.Fatalf("got %d net.knownServers should be 12", len(net.knownServers))
+	if len(net.knownServers) != 10 {
+		t.Fatalf("got %d net.knownServers should be 10", len(net.knownServers))
 	}
 	storedServers, n, err := net.readServerAddrFile()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 12 {
+	if n != 10 {
 		t.Fatalf("got %d stored servers should be 12", len(storedServers))
 	}
 
@@ -188,3 +198,20 @@ func TestNetworkServers(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+// func dumpPres(pr *peersResult) {
+// 	fmt.Printf("Addr  %s\n", pr.Addr)
+// 	fmt.Printf("Host  %s\n", pr.Host)
+// 	fmt.Printf("Feats %s\n", pr.Feats)
+// 	fmt.Println()
+// }
+
+// func dumpServer(sa *serverAddr) {
+// 	fmt.Printf("Net     %s\n", sa.Net)
+// 	fmt.Printf("Address %s\n", sa.Address)
+// 	fmt.Printf("Host    %s\n", sa.Host)
+// 	fmt.Printf("IsOnion %v\n", sa.IsOnion)
+// 	fmt.Printf("Version %s\n", sa.Version)
+// 	fmt.Printf("Caps    %s\n", sa.Caps)
+// 	fmt.Println()
+// }

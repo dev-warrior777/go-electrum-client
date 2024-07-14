@@ -83,6 +83,9 @@ type ElectrumXConfig struct {
 	// A localhost socks5 proxy port. E.g.  9050
 	ProxyPort string
 
+	// MaxOnion is the max onion peers we want to start for a coin
+	MaxOnion int
+
 	// Location of the data directory
 	DataDir string
 

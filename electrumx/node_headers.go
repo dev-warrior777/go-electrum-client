@@ -169,7 +169,7 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 	}
 	ourTip := h.getTip()
 	fmt.Println("subscribe headers - height", hdrRes.Height, "our tip", ourTip, "diff", hdrRes.Height-ourTip)
-	// qchan <- hdrRes
+	qchan <- hdrRes
 
 	go func(nodeCtx context.Context) {
 		defer close(qchan)
@@ -351,9 +351,12 @@ func (n *Node) connectTip(serverHeader string) bool {
 	}
 	// check connect block
 	if !h.checkCanConnect(incomingHdr) {
+		fmt.Printf("connectTip - cannot connect\n"+
+			" -- incoming hash:           %s\n"+
+			" -- incoming prev hash:      %s\n"+
+			" -- our current tip hash:    %s\n",
+			incomingHdr.BlockHash().String(), incomingHdr.PrevBlock.String(), h.getTipHash().String())
 		h.dbgDumpTipHashes(3)
-		fmt.Printf("connectTip - cannot connect\n -- incoming prev hash: %s\n -- current tip hash:   %s \n",
-			incomingHdr.PrevBlock.String(), h.getTipHash().String())
 		// fork maybe?
 		n.reorgRecovery()
 		fmt.Printf("*** removed %d stored headers from tip -  new tip is %d ***\n",

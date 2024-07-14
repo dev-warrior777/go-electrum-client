@@ -52,15 +52,16 @@ func newNode(
 	default:
 		return nil, fmt.Errorf("unknown protocol: %s", netProto)
 	}
+
 	connectOpts := &connectOpts{
 		TLSConfig: tlsConfig,
 		TorProxy:  proxyAddr,
 	}
 
 	n := &Node{
-		connectOpts:            connectOpts,
 		serverAddr:             addr,
 		netProto:               netProto,
+		connectOpts:            connectOpts,
 		server:                 &Server{},
 		leader:                 isLeader,
 		networkHeaders:         networkHeaders,

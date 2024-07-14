@@ -44,7 +44,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		return nil, errors.New("invalid coin")
 	}
 	cfg := client.NewDefaultConfig()
-	cfg.Chain = wallet.Bitcoin
+	cfg.CoinType = wallet.Bitcoin
 	cfg.StoreEncSeed = true
 	appDir, err := client.GetConfigPath()
 	if err != nil {

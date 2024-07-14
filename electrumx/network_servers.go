@@ -89,7 +89,7 @@ func makeIncomingServerAddrs(in []*peersResult) []*serverAddr {
 	for _, pres := range in {
 		isOnion := false
 		if strings.HasSuffix(pres.Addr, ".onion") {
-			onionAddr := strings.Split(pres.Addr, ".")
+			onionAddr := strings.Split(pres.Host, ".")
 			isOnion = true
 			if len(onionAddr[0]) != 56 { // no V2
 				badAddresses++

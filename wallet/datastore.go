@@ -18,7 +18,7 @@ type CoinType uint32
 const (
 	Bitcoin     CoinType = 0
 	Litecoin    CoinType = 1
-	Dash        CoinType = 5 // TODO: impl
+	Dash        CoinType = 5
 	Zcash       CoinType = 133
 	BitcoinCash CoinType = 145
 	Ethereum    CoinType = 60
@@ -105,7 +105,7 @@ type Enc interface {
 }
 
 type Utxos interface {
-	// Put a utxo to the database
+	// Put a utxo into the database
 	Put(utxo Utxo) error
 
 	// Fetch all utxos from the db

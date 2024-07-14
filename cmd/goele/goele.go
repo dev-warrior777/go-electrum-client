@@ -45,7 +45,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		return nil, errors.New("invalid coin")
 	}
 	cfg := client.NewDefaultConfig()
-	cfg.Chain = wallet.Bitcoin
+	cfg.CoinType = wallet.Bitcoin
 	cfg.Coin = coin
 	cfg.NetType = net
 	cfg.StoreEncSeed = true
@@ -73,27 +73,26 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		cfg.Params = &chaincfg.TestNet3Params
 		cfg.ProxyPort = "9050"
 		cfg.TrustedPeer = &electrumx.NodeServerAddr{
-			// Net: "ssl", Addr: "testnet.aranguren.org:51002", // ok
+			// Net: "ssl", Addr: "testnet.aranguren.org:51002", // in trouble 2024-07-14 .. no new blks
 
-			Net:   "ssl",
-			Addr:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion:51002",
-			Onion: true,
+			// Net:   "ssl",
+			// Addr:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion:51002",
+			// Onion: true,
 
-			// Net: "ssl", Addr: "testnet.hsmiths.com:53012", // down?
-			// Net: "ssl", Addr: "electrum.blockstream.info:60002", // no verbose gtx
-			// Net: "ssl", Addr: "blackie.c3-soft.com:57006", // down
-			// Net: "tcp", Addr: "blackie.c3-soft.com:57005", // down
-			// Net: "ssl", Addr: "testnet.qtornado.com:51002", // doesn't send peers .. ok for BlockHeaders
-			// Net: "tcp", Addr: "testnet.qtornado.com:51001",
+			Net: "ssl", Addr: "electrum.blockstream.info:60002", // no verbose gtx
+
+			// Net: "ssl", Addr: "testnet.qtornado.com:51002", // doesn't sends same 3 peers or none .. suspect hanky panky
+			// Net: "tcp", Addr: "testnet.qtornado.com:51001", // suspect hanky panky
 		}
 		cfg.StoreEncSeed = true
 		cfg.RPCTestPort = 18887
 		cfg.Testing = true
 	case "mainnet":
 		cfg.Params = &chaincfg.MainNetParams
+		cfg.ProxyPort = "9050"
 		cfg.TrustedPeer = &electrumx.NodeServerAddr{
-			// Net: "ssl", Addr: "[2a01:4f9:c010:e9d3::1]:50002",
-			Net: "ssl", Addr: "elx.bitske.com:50002",
+			Net: "ssl", Addr: "[2a01:4f9:c010:e9d3::1]:50002",
+			// Net: "ssl", Addr: "elx.bitske.com:50002",
 		}
 		cfg.RPCTestPort = 8887
 		cfg.StoreEncSeed = false

@@ -19,11 +19,11 @@ const (
 )
 
 type ClientConfig struct {
-	// The blockchain, btc, dash, etc
-	Chain wallet.CoinType
-
 	// Coin ticker to id the coin
 	Coin string
+
+	// bip44 mainnet
+	CoinType wallet.CoinType
 
 	// Net type - mainnet, testnet or regtest
 	NetType string
@@ -34,7 +34,7 @@ type ClientConfig struct {
 	// Location of the data directory
 	DataDir string
 
-	// Currently we use this electrumX server to bootstrap others so it should
+	// We use this electrumX server to bootstrap others so it should
 	// be set.
 	TrustedPeer *electrumx.NodeServerAddr
 
@@ -44,7 +44,7 @@ type ClientConfig struct {
 	// If not "" setting this enables goele to connect to a limited number of
 	// onion servers. Default is "".
 	//
-	// You must have already set up a localhost socks5 proxy and tor service.
+	// You should have already set up a localhost socks5 proxy and tor service.
 	//
 	// Note: This is tested on Linux and is still considered *Experimental*
 	ProxyPort string
@@ -66,13 +66,11 @@ type ClientConfig struct {
 	// The highest allowable fee-per-byte
 	MaxFee int64
 
-	// External API to query to look up fees. If this field is nil then the default fees will be used.
-	// If the API is unreachable then the default fees will likewise be used. If the API returns a fee
-	// greater than MaxFee then the MaxFee will be used instead.
+	// External API to query to look up fees. If this field is nil then the
+	// default fees will be used. If the API is unreachable then the default
+	// fees will likewise be used. If the API returns a fee greater than MaxFee
+	// then the MaxFee will be used instead.
 	FeeAPI url.URL
-
-	// Disable the exchange rate provider
-	DisableExchangeRates bool
 
 	// If not testing do not overwrite existing wallet files
 	Testing bool
@@ -83,22 +81,21 @@ type ClientConfig struct {
 
 func NewDefaultConfig() *ClientConfig {
 	return &ClientConfig{
-		Chain:                wallet.Bitcoin,
-		Coin:                 "btc",
-		NetType:              "mainnet",
-		Params:               &chaincfg.MainNetParams,
-		ProxyPort:            "",
-		DataDir:              btcutil.AppDataDir(appName, false),
-		DbType:               DbTypeBolt,
-		DB:                   nil, // concrete impl
-		DisableExchangeRates: true,
-		RPCTestPort:          8888,
+		Coin:        "btc",
+		CoinType:    wallet.Bitcoin,
+		NetType:     "mainnet",
+		Params:      &chaincfg.MainNetParams,
+		ProxyPort:   "",
+		DataDir:     btcutil.AppDataDir(appName, false),
+		DbType:      DbTypeBolt,
+		DB:          nil, // concrete impl
+		RPCTestPort: 8888,
 	}
 }
 func (cc *ClientConfig) MakeWalletConfig() *wallet.WalletConfig {
 	wc := wallet.WalletConfig{
-		Chain:        cc.Chain,
 		Coin:         cc.Coin,
+		CoinType:     cc.CoinType,
 		NetType:      cc.NetType,
 		Params:       cc.Params,
 		StoreEncSeed: cc.StoreEncSeed,
@@ -116,7 +113,6 @@ func (cc *ClientConfig) MakeWalletConfig() *wallet.WalletConfig {
 
 func (cc *ClientConfig) MakeElectrumXConfig() *electrumx.ElectrumXConfig {
 	ex := electrumx.ElectrumXConfig{
-		// 		Chain:       cc.Chain,
 		NetType:     cc.NetType,
 		Params:      cc.Params,
 		DataDir:     cc.DataDir,

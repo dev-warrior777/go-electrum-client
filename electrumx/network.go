@@ -173,9 +173,14 @@ func (net *Network) startNewPeer(
 	isLeader,
 	isTrusted bool) error {
 
+	proxy := ""
+	if netAddr.IsOnion() {
+		proxy = net.proxyAddr
+	}
+
 	node, err := newNode(
 		netAddr,
-		net.proxyAddr,
+		proxy,
 		isLeader,
 		net.headers,
 		net.clientTipChangeNotify,
@@ -200,8 +205,6 @@ func (net *Network) startNewPeer(
 	} else {
 		net.addPeer(peer)
 	}
-	// ask our peer for it's electrumx server's Peers then update known servers
-	// list & update network_servers.json file
 	net.getServerPeers(ctx)
 	return nil
 }
@@ -249,8 +252,6 @@ func (net *Network) getLeader() *peerNode {
 
 // bootstrap peers and monitor leader - run as goroutine
 func (net *Network) peersMonitor(ctx context.Context) {
-	// "The ticker will adjust the time interval or drop ticks to make up for
-	// slow receivers." go doc
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
 	for {
@@ -336,7 +337,7 @@ func (net *Network) startNewPeerMaybe(ctx context.Context) {
 		fmt.Println("startNewPeerMaybe: no known servers")
 		return
 	}
-	available := net.availableServers()
+	available := net.availableServers(false)
 	if len(available) == 0 {
 		fmt.Println("startNewPeerMaybe: no known servers that are not already connected")
 		return
@@ -354,18 +355,21 @@ func (net *Network) startNewPeerMaybe(ctx context.Context) {
 
 func toNetAddr(saddr *serverAddr) *NodeServerAddr {
 	return &NodeServerAddr{
-		Net:  saddr.Net,
-		Addr: saddr.Address,
+		Net:   saddr.Net,
+		Addr:  saddr.Address,
+		Onion: saddr.IsOnion,
 	}
 }
 
 // build a pseudo randomized list of known servers that have not yet been started
-func (net *Network) availableServers() []*serverAddr {
+func (net *Network) availableServers(forLeader bool) []*serverAddr {
 	var available = make([]*serverAddr, 0)
 	servers := net.knownServers
 	for _, server := range servers {
 		if server.IsOnion {
-			continue
+			if forLeader || net.proxyAddr == "" {
+				continue
+			}
 		}
 		matchedAnyNetAddr := false
 		for _, peer := range net.peers {
@@ -395,14 +399,14 @@ func (net *Network) startNewLeader(ctx context.Context) {
 		fmt.Println("startNewLeader: no known servers")
 		return
 	}
-	available := net.availableServers()
+	available := net.availableServers(true)
 	if len(available) == 0 {
 		fmt.Println("startNewLeader: no known servers that are not already connected")
 		return
 	}
 	// TODO: filter servers again by reputation, capabilities and banlist
 
-	// start one node up as new leader .. from the pseudo randomized list
+	// start one node up as new leader
 	addr := toNetAddr(available[0])
 	err := net.startNewPeer(ctx, addr, true, false) // dialerCtx time limited to 10s
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
+// These configure ElectrumX network for: BTC
 const (
 	BTC_COIN                     = "btc"
 	BTC_HEADER_SIZE              = 80
@@ -15,8 +16,9 @@ const (
 	BTC_STARTPOINT_TESTNET       = 2560000
 	BTC_STARTPOINT_MAINNET       = 823000
 	BTC_MAX_ONLINE_PEERS_REGTEST = 0
-	BTC_MAX_ONLINE_PEERS_TESTNET = 5
+	BTC_MAX_ONLINE_PEERS_TESTNET = 3
 	BTC_MAX_ONLINE_PEERS_MAINNET = 10
+	BTC_MAX_ONION                = 2
 )
 
 type ElectrumXInterface struct {
@@ -31,6 +33,7 @@ func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterfa
 	config.StartPoints[electrumx.REGTEST] = int64(BTC_STARTPOINT_REGTEST)
 	config.StartPoints[electrumx.TESTNET] = int64(BTC_STARTPOINT_TESTNET)
 	config.StartPoints[electrumx.MAINNET] = int64(BTC_STARTPOINT_MAINNET)
+	config.MaxOnion = BTC_MAX_ONION
 	switch config.NetType {
 	case electrumx.Regtest:
 		config.MaxOnlinePeers = BTC_MAX_ONLINE_PEERS_REGTEST

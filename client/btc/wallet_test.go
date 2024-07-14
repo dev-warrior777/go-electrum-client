@@ -13,7 +13,7 @@ import (
 
 func makeBitcoinRegtestTestConfig() (*client.ClientConfig, error) {
 	cfg := client.NewDefaultConfig()
-	cfg.Chain = wallet.Bitcoin
+	cfg.CoinType = wallet.Bitcoin
 	cfg.Params = &chaincfg.RegressionNetParams
 	cfg.StoreEncSeed = true
 	appDir, err := client.GetConfigPath()
