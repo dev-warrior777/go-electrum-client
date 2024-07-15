@@ -221,7 +221,7 @@ func (net *Network) removeServer(server *serverAddr) error {
 	defer net.knownServersMtx.Unlock()
 
 	// remove from memory first
-	var lessKnown = []*serverAddr{}
+	var lessKnown = make([]*serverAddr, 0)
 	for _, known := range net.knownServers {
 		if known.Address == server.Address {
 			continue

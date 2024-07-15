@@ -168,7 +168,18 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 		return err
 	}
 	ourTip := h.getTip()
-	fmt.Println("subscribe headers - height", hdrRes.Height, "our tip", ourTip, "diff", hdrRes.Height-ourTip)
+	diff := hdrRes.Height - ourTip
+	fmt.Println("subscribe headers - height", hdrRes.Height, "our tip", ourTip, "diff", diff)
+
+	// ------------------------------------------------------------------------
+	// See notes in node_debug.go
+	// ------------------------------------------------------------------------
+	if diff < 0 {
+		return fmt.Errorf("ExpBug0: diff %d between our tip and server tip"+
+			" reported in subscribe.headers is negative after sync", diff)
+	}
+	// ------------------------------------------------------------------------
+
 	qchan <- hdrRes
 
 	go func(nodeCtx context.Context) {

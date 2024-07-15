@@ -73,14 +73,17 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		cfg.Params = &chaincfg.TestNet3Params
 		cfg.ProxyPort = "9050"
 		cfg.TrustedPeer = &electrumx.NodeServerAddr{
-			// Net: "ssl", Addr: "testnet.aranguren.org:51002", // in trouble 2024-07-14 .. no new blks
+			// Net: "ssl", Addr: "testnet.aranguren.org:51002", // Fulcrum - ExpBug0
 
-			// Net:   "ssl",
-			// Addr:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion:51002",
+			// Net:   "ssl", // Fulcrum - ExpBug0
+			// Addr:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion:51002", // Fulcrum - ExpBug0
 			// Onion: true,
 
-			Net: "ssl", Addr: "electrum.blockstream.info:60002", // no verbose gtx
+			Net:   "tcp", // electrs-esplora 0.4.1
+			Addr:  "explorerzydxu5ecjrkwceayqybizmpjjznk5izmitf2modhcusuqlid.onion:143",
+			Onion: true,
 
+			// Net: "ssl", Addr: "electrum.blockstream.info:60002", // no verbose gtx
 			// Net: "ssl", Addr: "testnet.qtornado.com:51002", // doesn't sends same 3 peers or none .. suspect hanky panky
 			// Net: "tcp", Addr: "testnet.qtornado.com:51001", // suspect hanky panky
 		}

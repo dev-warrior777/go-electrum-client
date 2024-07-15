@@ -32,7 +32,7 @@ import (
 // within it's own child context of the goele ctx. The nodeCtx of each can
 // be cancelled by either the Network or the server connection on disconnect.
 // Mis-behaving nodes can also cancel in rare cases such as obviously wrong
-// information sent. One case currently for sending headers which are below
+// information sent; one case currently for sending headers which are below
 // the start checkpoint for the coin.
 
 // Network was the cancel cause
@@ -142,6 +142,7 @@ func (net *Network) Start(ctx context.Context) error {
 		return errors.New("a trusted peer is required in config")
 	}
 	serverAddress := net.config.TrustedPeer
+	// singleton
 	net.startMtx.Lock()
 	defer net.startMtx.Unlock()
 	if net.started {
@@ -159,7 +160,7 @@ func (net *Network) start(ctx context.Context, startServer *NodeServerAddr) erro
 	}
 	// leader up and headers synced
 	net.started = true
-	// ask leader for it's known peers
+	// ask leader for it's own current known peers
 	net.getServerPeers(ctx)
 	// bootstrap peers loop with leader's connection
 	go net.peersMonitor(ctx)

@@ -130,7 +130,8 @@ func (n *Node) start(nodeCtx context.Context, nodeCancel context.CancelCauseFunc
 	return nil
 }
 
-// promoteToLeader makes a non-leader responsible for incoming notifications
+// promoteToLeader makes a non-leader responsible for continuing sync if not
+// synced & receiving incoming notifications
 func (n *Node) promoteToLeader(nodeCtx context.Context) error {
 	h := n.networkHeaders
 	fmt.Printf("promoteToLeader: %s synced %v\n", n.server.conn.addr, h.synced)
