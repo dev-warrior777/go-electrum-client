@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-const serverAddrFileName = "network_servers.json"
+const ServerAddrFileName = "network_servers.json"
 
 type serverAddr struct {
 	Net     string `json:"net"`
@@ -248,7 +248,7 @@ func (net *Network) removeServer(server *serverAddr) error {
 }
 
 func (net *Network) readServerAddrFile() ([]*serverAddr, int, error) {
-	serverAddrFile := path.Join(net.config.DataDir, serverAddrFileName)
+	serverAddrFile := path.Join(net.config.DataDir, ServerAddrFileName)
 	f, err := os.OpenFile(serverAddrFile, os.O_CREATE|os.O_RDONLY, 0644)
 	if err != nil {
 		return nil, 0, err
@@ -285,7 +285,7 @@ func (net *Network) writeServerAddrFile(servers []*serverAddr) error {
 		jsonBytes = []byte(nil)
 	}
 	// write all marshalled json after truncating file to 0 bytes
-	serverAddrFile := path.Join(net.config.DataDir, serverAddrFileName)
+	serverAddrFile := path.Join(net.config.DataDir, ServerAddrFileName)
 	f, err := os.OpenFile(serverAddrFile, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return err

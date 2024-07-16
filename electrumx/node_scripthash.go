@@ -3,31 +3,49 @@ package electrumx
 import (
 	"context"
 	"errors"
+	"fmt"
 )
 
 func (n *Node) scriptHashNotify(nodeCtx context.Context) error {
+	// get a channel to receive scripthash notifications from this node's <- server connection
 	scriptHashNotifyChan := n.getScripthashNotify()
 	if scriptHashNotifyChan == nil {
 		return errors.New("server scripthash notify channel is nil")
 	}
 
-	// TODO: make a queue & use 'range over incoming channel' pattern
+	// start scripthash queue with depth 8
+	qchan := make(chan *ScripthashStatusResult, 8)
+	go n.scriptHashQueue(nodeCtx, qchan)
 
 	go func() {
+		defer close(qchan)
+		fmt.Println("=== Waiting for Scripthash Notifications")
 		for {
-			select {
-			case <-nodeCtx.Done():
-				<-n.server.conn.Done()
+			if nodeCtx.Err() != nil {
+				<-n.server.conn.done
 				return
-			case scriptHashStatusResult, ok := <-scriptHashNotifyChan:
-				if !ok {
-					return
-				}
-				// forward to client wallet_synchronize.go - can block
-				n.clientScriptHashNotify <- scriptHashStatusResult
 			}
+			// from server into queue
+			ntfn := <-scriptHashNotifyChan
+			qchan <- ntfn
 		}
 	}()
 
 	return nil
+}
+
+func (n *Node) scriptHashQueue(nodeCtx context.Context, qchan <-chan *ScripthashStatusResult) {
+	for {
+		if nodeCtx.Err() != nil {
+			<-n.server.conn.Done()
+			return
+		}
+
+		for ntfn := range qchan {
+			if ntfn == nil {
+				return
+			}
+			n.clientScriptHashNotify <- ntfn
+		}
+	}
 }

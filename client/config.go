@@ -89,7 +89,7 @@ func NewDefaultConfig() *ClientConfig {
 		DataDir:     btcutil.AppDataDir(appName, false),
 		DbType:      DbTypeBolt,
 		DB:          nil, // concrete impl
-		RPCTestPort: 8888,
+		RPCTestPort: 8887,
 	}
 }
 func (cc *ClientConfig) MakeWalletConfig() *wallet.WalletConfig {

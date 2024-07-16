@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/rpc"
 	"os"
 	"strconv"
@@ -18,7 +19,7 @@ func usage() {
 	fmt.Println("rpctest v0.1.0")
 	fmt.Println()
 	fmt.Println("usage:")
-	fmt.Println("  cmd [positional args]")
+	fmt.Println("  client <--network> cmd [positional args]")
 	fmt.Println("")
 	fmt.Println("  help", "\t\t\t\t\t This help")
 	fmt.Println("  echo <any>", "\t\t\t\t Echo any input args - test only")
@@ -29,6 +30,9 @@ func usage() {
 	fmt.Println("  getchangeaddress", "\t\t\t Get a new unused wallet change address")
 	fmt.Println("  spend pw amount address feeType", "\t Make signed transaction from wallet utxos")
 	fmt.Println("  broadcast rawTx", "\t\t\t Broadcast rawTx to ElectrumX")
+	fmt.Println()
+	fmt.Println("Example: client --regtest tip")
+	fmt.Println()
 	fmt.Println("-------------------------------------------------------------")
 	fmt.Println()
 }
@@ -185,10 +189,26 @@ func (c *cmd) broadcast(client *rpc.Client) {
 }
 
 func main() {
+	var port = "" // no default
 	args := os.Args
+	if len(args) > 2 {
+		switch args[1] {
+		case "-regtest", "--regtest":
+			port = "28887"
+		case "-testnet", "--testnet":
+			port = "18887"
+		case "-mainnet", "--mainnet":
+			port = "8887"
+		default:
+			fmt.Println("please set a network: -mainnet, -testnet, -regtest")
+			os.Exit(1)
+		}
+	}
+
+	args = args[1:]
 	if len(args) < 2 {
 		usage()
-		log.Fatal("no args given")
+		log.Fatal("no command given")
 	}
 
 	var c = cmd{
@@ -256,7 +276,7 @@ func main() {
 		log.Fatal(c.String(), "unknown command")
 	}
 
-	client, err := rpc.DialHTTP("tcp", "127.0.0.1:8888")
+	client, err := rpc.DialHTTP("tcp", net.JoinHostPort("127.0.0.1", port))
 	if err != nil {
 		log.Fatal("dialing:", err)
 	}

@@ -230,8 +230,8 @@ func connectServer(
 		addr:         addr,
 		debug:        stderrPrinter,
 		respHandlers: make(map[uint64]chan *response),
-		// 128 bytes/slot - TODO: make downstream queue and remove buffer
-		scripthashNotify: make(chan *ScripthashStatusResult, 1),
+		// 128 bytes - unbuffered because we have a queue downstream
+		scripthashNotify: make(chan *ScripthashStatusResult),
 		// 168 bytes - unbuffered because we have a queue downstream
 		headersNotify: make(chan *headersNotifyResult),
 	}

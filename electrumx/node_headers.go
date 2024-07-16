@@ -154,7 +154,7 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 //     protocol does not guarantee notification of all intermediate block headers.
 func (n *Node) headersNotify(nodeCtx context.Context) error {
 	h := n.networkHeaders
-	// get a channel to receive notifications from this node's <- server connection
+	// get a channel to receive headers notifications from this node's <- server connection
 	hdrsNotifyChan := n.getHeadersNotify()
 	if hdrsNotifyChan == nil {
 		return errors.New("server headers notify channel is nil")
@@ -172,7 +172,7 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 	fmt.Println("subscribe headers - height", hdrRes.Height, "our tip", ourTip, "diff", diff)
 
 	// ------------------------------------------------------------------------
-	// See notes in node_debug.go
+	// See notes in node_headers_doc.go
 	// ------------------------------------------------------------------------
 	if diff < 0 {
 		return fmt.Errorf("ExpBug0: diff %d between our tip and server tip"+
@@ -182,20 +182,19 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 
 	qchan <- hdrRes
 
-	go func(nodeCtx context.Context) {
+	go func() {
 		defer close(qchan)
-		fmt.Println("=== Waiting for headers ===")
+		fmt.Println("=== Waiting for headers")
 		for {
 			if nodeCtx.Err() != nil {
 				<-n.server.conn.done
 				return
 			}
-
-			// from server into the queue
+			// from server into queue
 			hdrs := <-hdrsNotifyChan
 			qchan <- hdrs
 		}
-	}(nodeCtx)
+	}()
 
 	return nil
 }
@@ -205,14 +204,12 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 // The client local 'blockhain_headers' file is appended and the headers map updated and verified.
 func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyResult) {
 	h := n.networkHeaders
-	fmt.Println("headrs queue started")
+	fmt.Println("headers queue started")
 	for {
 		if nodeCtx.Err() != nil {
 			<-n.server.conn.Done()
 			return
 		}
-
-		// process at leisure? can sleep a bit maybe
 
 		for hdrRes := range qchan {
 
