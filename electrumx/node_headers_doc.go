@@ -31,11 +31,12 @@ package electrumx
 // Analysis & Fix:
 
 // - I think it is a bug in Fulcrum 1.11.0 code because I only saw this on servers
-//   running that software and only on testnet. It could be malicious on testnet -
-//   probes maybe - but I also saw for `testnet.aranguren.org` which ran for many
-//   days successfully as the trusted peer.
+//   running that software and only on testnet as yet. It could be malicious on
+//   testnet - probes maybe - but I also saw for `testnet.aranguren.org` which ran
+//   for many days successfully as the trusted peer.
 
-// - Suggested experimental fix in node_headers.go:headersNotify sends back error:
+// - Suggested experimental fix in node_headers.go:headersNotify is to send back
+//   an annotated error:
 //   1. If we are starting trusted peer as the leader server then the program just
 //      fails.
 //   2. If promoting a running peer to leader it should failover to another peer
