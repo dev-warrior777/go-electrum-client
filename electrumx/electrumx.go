@@ -54,6 +54,14 @@ const (
 	//...
 )
 
+type BlockEncoder interface {
+	Encode(b []byte) (any, error)
+}
+
+type BlockDecoder interface {
+	Decode(any) ([]byte, error)
+}
+
 type ElectrumXConfig struct {
 	// The blockchain, Bitcoin, Dash, etc
 	// Chain wallet.CoinType
@@ -66,8 +74,16 @@ type ElectrumXConfig struct {
 	// Filled in by each coin in ElectrumXInterface
 	BlockHeaderSize int
 
-	// Checkpoints for each network: mainnet, testnet, regtest
+	// How the coin encodes the block header - future
 	// Filled in by each coin in ElectrumXInterface
+	BlockEncoder *BlockEncoder
+
+	// How the coin decodes the block header - future
+	// Filled in by a concrete fn. for each coin in ElectrumXInterface
+	BlockDecoder *BlockDecoder
+
+	// Checkpoints for each network: mainnet, testnet, regtest
+	// Filled in by a concrete fn. for each coin in ElectrumXInterface
 	StartPoints map[string]int64
 
 	// Maximum online peers for each network

@@ -1,6 +1,6 @@
 module github.com/dev-warrior777/go-electrum-client/cmd/goele
 
-go 1.20
+go 1.19
 
 require (
 	github.com/btcsuite/btcd v0.24.0
