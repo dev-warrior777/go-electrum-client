@@ -44,8 +44,8 @@ func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterfa
 	default:
 		config.MaxOnlinePeers = 2
 	}
-	config.BlockEncoder = nil
-	config.BlockDecoder = nil
+	config.HeaderDeserializer = nil
+	config.HeaderSerializer = nil
 	x := ElectrumXInterface{
 		config:  config,
 		network: nil,

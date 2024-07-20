@@ -54,12 +54,14 @@ const (
 	//...
 )
 
-type BlockEncoder interface {
-	Encode(b []byte) (any, error)
+type HeaderDeserializer interface {
+	Deserialize(b []byte) (any, error)
 }
 
-type BlockDecoder interface {
-	Decode(any) ([]byte, error)
+type HeaderSerializer interface {
+	Serializer(any) ([]byte, error)
+	BlockHash() []byte
+	PrevHash() []byte
 }
 
 type ElectrumXConfig struct {
@@ -74,13 +76,13 @@ type ElectrumXConfig struct {
 	// Filled in by each coin in ElectrumXInterface
 	BlockHeaderSize int
 
-	// How the coin encodes the block header - future
+	// How the coin serializes the block header - future
 	// Filled in by each coin in ElectrumXInterface
-	BlockEncoder *BlockEncoder
+	HeaderDeserializer HeaderDeserializer
 
-	// How the coin decodes the block header - future
+	// How the coin deserializes the block header - future
 	// Filled in by a concrete fn. for each coin in ElectrumXInterface
-	BlockDecoder *BlockDecoder
+	HeaderSerializer HeaderSerializer
 
 	// Checkpoints for each network: mainnet, testnet, regtest
 	// Filled in by a concrete fn. for each coin in ElectrumXInterface
