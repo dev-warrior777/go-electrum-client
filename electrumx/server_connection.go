@@ -1,9 +1,5 @@
 // This code is available on the terms of the project LICENSE.md file,
 // also available online at https://blueoakcouncil.org/license/1.0.0.
-
-// Package electrum provides a client for an ElectrumX server. Not all methods
-// are implemented. For the methods and their request and response types, see
-// https://electrumx.readthedocs.io/en/latest/protocol-methods.html.
 package electrumx
 
 import (

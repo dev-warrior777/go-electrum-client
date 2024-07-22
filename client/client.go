@@ -20,7 +20,6 @@ package client
 import (
 	"context"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
@@ -59,8 +58,8 @@ type ElectrumClient interface {
 	//
 	// Small subset of electrum-like methods
 	Tip() int64
-	GetBlockHeader(height int64) (*wire.BlockHeader, error)
-	GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error)
+	GetBlockHeader(height int64) (*electrumx.ClientBlockHeader, error)
+	GetBlockHeaders(startHeight, count int64) ([]*electrumx.ClientBlockHeader, error)
 	Spend(pw string, amount int64, toAddress string, feeLevel wallet.FeeLevel) (int, string, string, error)
 	GetPrivKeyForAddress(pw, addr string) (string, error)
 	ListUnspent() ([]wallet.Utxo, error)

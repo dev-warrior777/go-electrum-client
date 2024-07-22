@@ -3,6 +3,7 @@ package elxbtc
 import (
 	"context"
 	"errors"
+	"io"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
@@ -20,6 +21,23 @@ const (
 	BTC_MAX_ONLINE_PEERS_MAINNET = 10
 	BTC_MAX_ONION                = 2
 )
+
+type headerDeserialzer struct{}
+
+func (d headerDeserialzer) Deserialize(r io.Reader) (*electrumx.BlockHeader, error) {
+	wireHdr := &wire.BlockHeader{}
+	err := wireHdr.Deserialize(r)
+	if err != nil {
+		return nil, err
+	}
+	blockHeader := &electrumx.BlockHeader{}
+	blockHeader.Version = wireHdr.Version
+	chainHash := wireHdr.BlockHash()
+	blockHeader.Hash = electrumx.WireHash(chainHash)
+	blockHeader.Prev = electrumx.WireHash(wireHdr.PrevBlock)
+	blockHeader.Merkle = electrumx.WireHash(wireHdr.MerkleRoot)
+	return blockHeader, nil
+}
 
 type ElectrumXInterface struct {
 	config  *electrumx.ElectrumXConfig
@@ -44,8 +62,8 @@ func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterfa
 	default:
 		config.MaxOnlinePeers = 2
 	}
-	config.HeaderDeserializer = nil
-	config.HeaderSerializer = nil
+	deserializer := headerDeserialzer{}
+	config.HeaderDeserializer = &deserializer
 	x := ElectrumXInterface{
 		config:  config,
 		network: nil,
@@ -76,14 +94,14 @@ func (x *ElectrumXInterface) GetTip() int64 {
 	return tip
 }
 
-func (x *ElectrumXInterface) GetBlockHeader(height int64) (*wire.BlockHeader, error) {
+func (x *ElectrumXInterface) GetBlockHeader(height int64) (*electrumx.ClientBlockHeader, error) {
 	if x.network == nil {
 		return nil, ErrNoNetwork
 	}
 	return x.network.BlockHeader(height)
 }
 
-func (x *ElectrumXInterface) GetBlockHeaders(startHeight int64, blockCount int64) ([]*wire.BlockHeader, error) {
+func (x *ElectrumXInterface) GetBlockHeaders(startHeight int64, blockCount int64) ([]*electrumx.ClientBlockHeader, error) {
 	if x.network == nil {
 		return nil, ErrNoNetwork
 	}

@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/crypto/rand"
 )
 
@@ -190,7 +189,7 @@ func (net *Network) startNewPeer(
 		return err
 	}
 	network := net.config.Coin
-	nettype := net.config.Params.Name
+	nettype := net.config.NetType
 	genesis := net.config.Params.GenesisHash.String()
 	// node runs in a new child context
 	nodeCtx, nodeCancel := context.WithCancelCause(ctx)
@@ -444,14 +443,14 @@ func (net *Network) Tip() (int64, error) {
 	return net.headers.getClientTip(), nil
 }
 
-func (net *Network) BlockHeader(height int64) (*wire.BlockHeader, error) {
+func (net *Network) BlockHeader(height int64) (*ClientBlockHeader, error) {
 	if !net.started {
 		return nil, errNoNetwork
 	}
 	return net.headers.getBlockHeader(height)
 }
 
-func (net *Network) BlockHeaders(startHeight int64, blockCount int64) ([]*wire.BlockHeader, error) {
+func (net *Network) BlockHeaders(startHeight int64, blockCount int64) ([]*ClientBlockHeader, error) {
 	if !net.started {
 		return nil, errNoNetwork
 	}

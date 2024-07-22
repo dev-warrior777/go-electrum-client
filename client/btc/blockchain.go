@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/btcsuite/btcd/wire"
+	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
 // Tip returns ElectrumXInterface current tip
@@ -64,11 +64,11 @@ func (ec *BtcElectrumClient) UnregisterTipChangeNotify() {
 }
 
 // GetBlockHeader returns a block header from ElectrumXInterface current stored headers
-func (ec *BtcElectrumClient) GetBlockHeader(height int64) (*wire.BlockHeader, error) {
+func (ec *BtcElectrumClient) GetBlockHeader(height int64) (*electrumx.ClientBlockHeader, error) {
 	return ec.GetX().GetBlockHeader(height)
 }
 
 // GetBlockHeaders returns a range of block headers from ElectrumXInterface current stored headers
-func (ec *BtcElectrumClient) GetBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error) {
+func (ec *BtcElectrumClient) GetBlockHeaders(startHeight, count int64) ([]*electrumx.ClientBlockHeader, error) {
 	return ec.GetX().GetBlockHeaders(startHeight, count)
 }

@@ -114,7 +114,7 @@ func (cc *ClientConfig) MakeWalletConfig() *wallet.WalletConfig {
 func (cc *ClientConfig) MakeElectrumXConfig() *electrumx.ElectrumXConfig {
 	ex := electrumx.ElectrumXConfig{
 		NetType:     cc.NetType,
-		Params:      cc.Params,
+		Params:      cc.Params, // only genesis .. TODO: remove
 		DataDir:     cc.DataDir,
 		TrustedPeer: cc.TrustedPeer,
 		ProxyPort:   cc.ProxyPort,

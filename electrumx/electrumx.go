@@ -1,11 +1,16 @@
 package electrumx
 
+// Package electrumx provides a client for an ElectrumX server. Not all methods
+// are implemented. For the methods and their request and response types, see
+// https://electrumx.readthedocs.io/en/latest/protocol-methods.html.
+
 import (
 	"context"
+	"encoding/hex"
+	"io"
 	"net"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
 )
 
 const LOCALHOST = "127.0.0.1"
@@ -54,20 +59,34 @@ const (
 	//...
 )
 
-type HeaderDeserializer interface {
-	Deserialize(b []byte) (any, error)
+// Assumption: all hashes are 32 bytes long
+const HashSize = 32
+
+type WireHash [HashSize]byte
+
+func (wh *WireHash) String() string {
+	return hex.EncodeToString(wh[:])
 }
 
-type HeaderSerializer interface {
-	Serializer(any) ([]byte, error)
-	BlockHash() []byte
-	PrevHash() []byte
+type BlockHeader struct {
+	Version int32
+	Hash    WireHash
+	Prev    WireHash
+	Merkle  WireHash
+}
+
+type HeaderDeserializer interface {
+	Deserialize(r io.Reader) (*BlockHeader, error)
+}
+
+// For client use
+type ClientBlockHeader struct {
+	Hash   string
+	Prev   string
+	Merkle string
 }
 
 type ElectrumXConfig struct {
-	// The blockchain, Bitcoin, Dash, etc
-	// Chain wallet.CoinType
-
 	// Coin ticker to id the coin
 	// Filled in by each coin in ElectrumXInterface
 	Coin string
@@ -76,13 +95,10 @@ type ElectrumXConfig struct {
 	// Filled in by each coin in ElectrumXInterface
 	BlockHeaderSize int
 
-	// How the coin serializes the block header - future
+	// How the coin serializes the block header into a version, block hash,
+	// previous block hash and merkle root.
 	// Filled in by each coin in ElectrumXInterface
 	HeaderDeserializer HeaderDeserializer
-
-	// How the coin deserializes the block header - future
-	// Filled in by a concrete fn. for each coin in ElectrumXInterface
-	HeaderSerializer HeaderSerializer
 
 	// Checkpoints for each network: mainnet, testnet, regtest
 	// Filled in by a concrete fn. for each coin in ElectrumXInterface
@@ -96,6 +112,7 @@ type ElectrumXConfig struct {
 	NetType string
 
 	// NetType parameters.. can chaincfg adapt for all coins? for now we use the NetType
+	// except for genesis block hash
 	Params *chaincfg.Params
 
 	// A localhost socks5 proxy port. E.g.  9050
@@ -127,8 +144,8 @@ type ElectrumX interface {
 	Start(ctx context.Context) error
 
 	GetTip() int64
-	GetBlockHeader(height int64) (*wire.BlockHeader, error)
-	GetBlockHeaders(startHeight int64, blockCount int64) ([]*wire.BlockHeader, error)
+	GetBlockHeader(height int64) (*ClientBlockHeader, error)
+	GetBlockHeaders(startHeight int64, blockCount int64) ([]*ClientBlockHeader, error)
 	GetTipChangeNotify() (<-chan int64, error)
 
 	SubscribeScripthashNotify(ctx context.Context, scripthash string) (*ScripthashStatusResult, error)

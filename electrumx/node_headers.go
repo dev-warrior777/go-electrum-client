@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"log"
 	"time"
-
-	"github.com/btcsuite/btcd/wire"
 )
 
 const REWIND = 8 // reorg
@@ -228,7 +226,7 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyR
 				fmt.Println("our header at tip is nil")
 				ourTipHash = "<nil>"
 			} else {
-				ourTipHash = tipHdr.BlockHash().String()
+				ourTipHash = tipHdr.Hash.StringRev()
 				fmt.Printf("our tip hash: %s\n", ourTipHash)
 			}
 			// enddbg: TODO: remove <------------------------------------------
@@ -363,7 +361,7 @@ func (n *Node) connectTip(serverHeader string) bool {
 			" -- incoming hash:           %s\n"+
 			" -- incoming prev hash:      %s\n"+
 			" -- our current tip hash:    %s\n",
-			incomingHdr.BlockHash().String(), incomingHdr.PrevBlock.String(), h.getTipHash().String())
+			incomingHdr.Hash.StringRev(), incomingHdr.Prev.StringRev(), h.getTipHash().StringRev())
 		h.dbgDumpTipHashes(3)
 		// fork maybe?
 		n.reorgRecovery()
@@ -421,23 +419,23 @@ func (n *Node) reorgRecovery() {
 }
 
 // ----------------------------------------------------------------------------
-// Utils
+// Util
 // ----------------------------------------------------------------------------
 
-func (n *Node) convertStringHdrToBlkHdr(svrHdr string) (*wire.BlockHeader, []byte, error) {
+func (n *Node) convertStringHdrToBlkHdr(svrHdr string) (*BlockHeader, []byte, error) {
 	h := n.networkHeaders
 	rawBytes, err := hex.DecodeString(svrHdr)
 	if err != nil {
 		return nil, nil, err
 	}
 	if len(rawBytes) != h.headerSize {
-		return nil, nil, fmt.Errorf("corrupted header - length %d", len(rawBytes))
+		return nil, nil, fmt.Errorf("corrupted header - length %d, expected %d",
+			len(rawBytes), h.headerSize)
 	}
-	r := bytes.NewBuffer(rawBytes)
-	hdr := &wire.BlockHeader{}
-	err = hdr.Deserialize(r)
+	rdr := bytes.NewBuffer(rawBytes)
+	blkHdr, err := h.headerDeserialzer.Deserialize(rdr)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.New("corrupted header - cannot deserialize BlockHash")
 	}
-	return hdr, rawBytes, nil
+	return blkHdr, rawBytes, nil
 }

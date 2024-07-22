@@ -5,8 +5,6 @@ import (
 	netIp "net"
 	"os"
 	"testing"
-
-	"github.com/btcsuite/btcd/chaincfg"
 )
 
 var peerNoResults = []*peersResult{}
@@ -107,7 +105,7 @@ func mkNetwork(testDir string) *Network {
 	net := &Network{
 		config: &ElectrumXConfig{
 			// Chain:   wallet.Bitcoin,
-			Params:  &chaincfg.MainNetParams,
+			// Params:  &chaincfg.MainNetParams,
 			DataDir: testDir,
 		},
 	}

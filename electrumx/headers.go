@@ -1,23 +1,15 @@
 package electrumx
 
-// This is the Client's copy of the blockchain headers for a blockchain.
-// Backed by a file in the datadir of the chain (main, test, reg nets)
-// We store here as a map and not a tree so we must trust the server if
-// SingleNode. When grabbing new blocks some attempt is made to understand
-// reorgs but the true longest chain with the most work cannot be known
-// without connecting to many servers using MultiNode which is a TODO:
+// This is the blockchain headers for a blockchain.
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
-
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 )
 
 const (
@@ -29,20 +21,39 @@ const (
 
 var ErrSyncing = errors.New("syncing in progress")
 
+func reverseHash(arr [HashSize]byte) [HashSize]byte {
+	var newArr [HashSize]byte
+	left := 0
+	right := HashSize - 1
+	for left < right {
+		arr[left], arr[right] = arr[right], arr[left]
+		left++
+		right--
+	}
+	copy(newArr[:], arr[:])
+	return newArr
+}
+
+func (wh WireHash) StringRev() string {
+	revHash := reverseHash(wh)
+	hexStr := hex.EncodeToString(revHash[:])
+	return hexStr
+}
+
 type headers struct {
 	// blockchain header size - per coin.
 	headerSize int
 	// blockchain_headers file to persist headers we know in datadir
 	hdrFilePath string
 	// chain parameters for genesis.
-	p *chaincfg.Params
 	// for each coin/nettype we use the most recent checkpoint (or a specific
 	// but arbitrary one) for the start of the block_headers file. For regtest
 	// that is block 0.
-	startPoint int64
+	startPoint        int64
+	headerDeserialzer HeaderDeserializer
 	// decoded headers stored by height
-	hdrs        map[int64]*wire.BlockHeader
-	blkHdrs     map[chainhash.Hash]int64
+	hdrs        map[int64]*BlockHeader
+	blkHdrs     map[WireHash]int64
 	hdrsMtx     sync.RWMutex
 	tip         int64
 	synced      bool
@@ -54,19 +65,21 @@ func newHeaders(cfg *ElectrumXConfig) *headers {
 	filePath := filepath.Join(cfg.DataDir, HEADER_FILE_NAME)
 	startPoint := getStartPointHeight(cfg)
 	hdrsMapInitSize := 2 * ELECTRUM_MAGIC_NUMHDR //4032
-	hdrsMap := make(map[int64]*wire.BlockHeader, hdrsMapInitSize)
-	bhdrsMap := make(map[chainhash.Hash]int64, hdrsMapInitSize)
+	hdrsMap := make(map[int64]*BlockHeader, hdrsMapInitSize)
+	bhdrsMap := make(map[WireHash]int64, hdrsMapInitSize)
+	headerDeserialzer := cfg.HeaderDeserializer
 	hdrs := headers{
 		headerSize:  cfg.BlockHeaderSize,
 		hdrFilePath: filePath,
-		p:           cfg.Params,
-		startPoint:  startPoint,
-		hdrs:        hdrsMap,
-		blkHdrs:     bhdrsMap,
-		tip:         0,
-		synced:      false,
-		recovery:    false,
-		recoveryTip: 0,
+		// p:                 cfg.Params,
+		startPoint:        startPoint,
+		headerDeserialzer: headerDeserialzer,
+		hdrs:              hdrsMap,
+		blkHdrs:           bhdrsMap,
+		tip:               0,
+		synced:            false,
+		recovery:          false,
+		recoveryTip:       0,
 	}
 	return &hdrs
 }
@@ -84,6 +97,10 @@ func getStartPointHeight(cfg *ElectrumXConfig) int64 {
 	}
 	return startAtHeight
 }
+
+// ----------------------------------------------------------------------------
+// Headers file
+// ----------------------------------------------------------------------------
 
 // Get the 'blockchain_headers' file size. Error is returned unexamined as
 // we assume the file exists and ENOENT will not be valid.
@@ -169,7 +186,11 @@ func (h *headers) readAllBytesFromFile() ([]byte, error) {
 	return b, nil
 }
 
-// Store headers starting at startHeight in the 'hdrs' map
+// ----------------------------------------------------------------------------
+// Maps
+// ----------------------------------------------------------------------------
+
+// Store blockHeaders starting at startHeight in the 'hdrs' map
 func (h *headers) store(b []byte, startHeight int64) error {
 	numHdrs, err := h.bytesToNumHdrs(int64(len(b)))
 	if err != nil {
@@ -180,14 +201,13 @@ func (h *headers) store(b []byte, startHeight int64) error {
 	defer h.hdrsMtx.Unlock()
 	var i int64
 	for i = 0; i < numHdrs; i++ {
-		blkHdr := &wire.BlockHeader{}
-		err := blkHdr.Deserialize(rdr)
+		blkHdr, err := h.headerDeserialzer.Deserialize(rdr)
 		if err != nil {
 			return err
 		}
 		at := startHeight + i
 		h.hdrs[at] = blkHdr
-		blkHash := blkHdr.BlockHash()
+		blkHash := blkHdr.Hash
 		h.blkHdrs[blkHash] = at
 	}
 	return nil
@@ -217,71 +237,31 @@ func (h *headers) getTip() int64 {
 	return h.tip
 }
 
-// getBlockHeader returns the block header for height. If out of range will
-// return nil.
-func (h *headers) getBlockHeader(height int64) (*wire.BlockHeader, error) {
-	h.hdrsMtx.RLock()
-	defer h.hdrsMtx.RUnlock()
-	hdr := h.hdrs[height]
-	if hdr == nil {
-		return nil, fmt.Errorf("no block header stored for height %d", height)
-	}
-	return hdr, nil
-}
-
-// getBlockHeaders returns the stored block headers for the requested range.
-// If startHeight < startPoint or startHeight > tip or startHeight+count > tip
-// will return error.
-func (h *headers) getBlockHeaders(startHeight, count int64) ([]*wire.BlockHeader, error) {
-	h.hdrsMtx.RLock()
-	defer h.hdrsMtx.RUnlock()
-	if h.startPoint > startHeight {
-		// error for now. If there is a need for blocks before the last checkpoint
-		// consider making a server call if api users need that.
-		return nil, errors.New("requested start height < start of stored block headers")
-	}
-	if startHeight > h.tip {
-		return nil, errors.New("requested start height > local tip")
-	}
-	blkEndRange := startHeight + count
-	if blkEndRange > h.tip {
-		return nil, errors.New("requested range is past the local tip")
-	}
-	var headers = make([]*wire.BlockHeader, 0, 3)
-	for i := startHeight; i < blkEndRange; i++ {
-		headers = append(headers, h.hdrs[i])
-	}
-	return headers, nil
-}
-
-// func (n *Node) getHeaderForBlockHash(blkHash *chainhash.Hash) *wire.BlockHeader {
+// // reverse lookup
+// func (n *Node) getHeaderForBlockHash(blkHash *WireHash) *BlockHeader {
 // 	h := n.networkHeaders
-// 	h.hdrsMtx.RLock()
-// 	defer h.hdrsMtx.RUnlock()
 // 	height := h.blkHdrs[*blkHash]
 // 	return h.hdrs[height]
 // }
 
-func (h *headers) getTipHash() chainhash.Hash {
-	// h.hdrsMtx.RLock()
-	// defer h.hdrsMtx.RUnlock()
+func (h *headers) getTipHash() WireHash {
 	hdr := h.hdrs[h.tip]
-	return hdr.BlockHash()
+	return hdr.Hash
 }
 
-func (h *headers) checkCanConnect(incomingHdr *wire.BlockHeader) bool {
+func (h *headers) checkCanConnect(incomingHdr *BlockHeader) bool {
 	ourTipHash := h.getTipHash()
-	return ourTipHash == incomingHdr.PrevBlock
+	return ourTipHash == incomingHdr.Prev
 }
 
-// storeOneHdr stores one wire block header at h.tip+1 and updates h.tip
+// storeOneHdr stores one block header at h.tip+1 and updates h.tip
 // the header is assumed to be valid and can connect
-func (h *headers) storeOneHdr(blkHdr *wire.BlockHeader) {
+func (h *headers) storeOneHdr(blkHdr *BlockHeader) {
 	h.hdrsMtx.Lock()
 	defer h.hdrsMtx.Unlock()
 	at := h.tip + 1
 	h.hdrs[at] = blkHdr
-	blkHash := blkHdr.BlockHash()
+	blkHash := blkHdr.Hash
 	h.blkHdrs[blkHash] = at
 	h.tip = at
 }
@@ -299,12 +279,12 @@ func (h *headers) verifyFromTip(depth int64, all bool) error {
 	for height = h.tip; height > downTo; height-- {
 		thisHdr := h.hdrs[height]
 		prevHdr := h.hdrs[height-1]
-		prevHdrBlkHash := prevHdr.BlockHash()
-		if prevHdrBlkHash != thisHdr.PrevBlock {
+		prevHdrBlkHash := prevHdr.Hash
+		if prevHdrBlkHash != thisHdr.Prev {
 			return fmt.Errorf("verify failed: height %d", height)
 		}
 		// fmt.Printf("verified header at height %d has blockhash %s\n",
-		// 	height-1, prevHdrBlkHash.String())
+		// 	height-1, prevHdrBlkHash.StringRev())
 	}
 	return nil
 }
@@ -330,6 +310,59 @@ func (h *headers) bytesToNumHdrs(numBytes int64) (int64, error) {
 }
 
 // ----------------------------------------------------------------------------
+// Client api
+// ----------------------------------------------------------------------------
+
+// getBlockHeader returns the block header for height. If out of range will
+// return nil.
+func (h *headers) getBlockHeader(height int64) (*ClientBlockHeader, error) {
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
+	blkHdr := h.hdrs[height]
+	if blkHdr == nil {
+		return nil, fmt.Errorf("no block header stored for height %d", height)
+	}
+	hdr := &ClientBlockHeader{
+		Hash:   blkHdr.Hash.StringRev(),
+		Prev:   blkHdr.Prev.StringRev(),
+		Merkle: blkHdr.Merkle.StringRev(),
+	}
+	return hdr, nil
+}
+
+// getBlockHeaders returns the stored block headers for the requested range.
+// If startHeight < startPoint or startHeight > tip or startHeight+count > tip
+// will return error.
+func (h *headers) getBlockHeaders(startHeight, count int64) ([]*ClientBlockHeader, error) {
+	h.hdrsMtx.RLock()
+	defer h.hdrsMtx.RUnlock()
+	if h.startPoint > startHeight {
+		// error for now:
+		//   If there is a need for blocks before the last checkpoint consider
+		//   making a server call if api users need that.
+		return nil, errors.New("requested start height < start of stored block headers")
+	}
+	if startHeight > h.tip {
+		return nil, errors.New("requested start height > local tip")
+	}
+	blkEndRange := startHeight + count
+	if blkEndRange > h.tip {
+		return nil, errors.New("requested range is past the local tip")
+	}
+	var hdrs = make([]*ClientBlockHeader, 0, 3)
+	for i := startHeight; i < blkEndRange; i++ {
+		blkHdr := h.hdrs[i]
+		hdr := &ClientBlockHeader{
+			Hash:   blkHdr.Hash.StringRev(),
+			Prev:   blkHdr.Prev.StringRev(),
+			Merkle: blkHdr.Merkle.StringRev(),
+		}
+		hdrs = append(hdrs, hdr)
+	}
+	return hdrs, nil
+}
+
+// ----------------------------------------------------------------------------
 // test
 // ----------------------------------------------------------------------------
 
@@ -337,8 +370,8 @@ func (h *headers) bytesToNumHdrs(numBytes int64) (int64, error) {
 func (h *headers) ClearMaps() {
 	h.hdrs = nil
 	h.blkHdrs = nil
-	h.hdrs = make(map[int64]*wire.BlockHeader, 10)
-	h.blkHdrs = make(map[chainhash.Hash]int64, 10)
+	h.hdrs = make(map[int64]*BlockHeader, 10)
+	h.blkHdrs = make(map[WireHash]int64, 10)
 }
 
 // dump the top 'depth' hash - prev hashes
@@ -346,8 +379,8 @@ func (h *headers) dbgDumpTipHashes(depth int64) {
 	tip := h.getTip()
 	fmt.Printf("--- Dump of the top %d stored headers ---\n", depth)
 	for i := tip; i > tip-depth; i-- {
-		hash := h.hdrs[i].BlockHash().String()
-		prev := h.hdrs[i].PrevBlock.String()
+		hash := h.hdrs[i].Hash.StringRev()
+		prev := h.hdrs[i].Prev.StringRev()
 		fmt.Printf("height: %d hash: %s prev: %s\n", i, hash, prev)
 	}
 }
@@ -357,21 +390,17 @@ func (h *headers) dumpAt(height int64) {
 	h.hdrsMtx.Lock()
 	defer h.hdrsMtx.Unlock()
 	hdr := h.hdrs[height]
-	fmt.Println("Hash: ", hdr.BlockHash(), "Height: ", height)
+	fmt.Println("Hash:          ", hdr.Hash.StringRev(), "Height: ", height)
 	fmt.Println("--------------------------")
-	fmt.Printf("Version: 0x%08x\n", hdr.Version)
-	fmt.Println("Previous Hash: ", hdr.PrevBlock)
-	fmt.Println("Merkle Root: ", hdr.MerkleRoot)
-	fmt.Println("Time Stamp: ", hdr.Timestamp)
-	fmt.Printf("Bits: 0x%08x\n", hdr.Bits)
-	fmt.Println("Nonce: ", hdr.Nonce)
+	fmt.Println("Previous Hash: ", hdr.Prev.StringRev())
+	fmt.Println("Merkle Root:   ", hdr.Merkle.StringRev())
 	fmt.Println()
 	fmt.Println("============================")
 }
 
 func (h *headers) dumpAll() {
 	var k int64
-	for k = 0; k <= h.tip; k++ {
+	for k = h.startPoint; k < h.tip; k++ {
 		h.dumpAt(k)
 	}
 }

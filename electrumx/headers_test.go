@@ -2,15 +2,12 @@ package electrumx
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"path"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -54,63 +51,68 @@ var hdrFileReg = []byte{
 	0xf6, 0xa9, 0xa1, 0x61, 0x91, 0x13, 0x39, 0x65, 0xff, 0xff, 0x7f, 0x20, 0x02, 0x00, 0x00, 0x00,
 }
 
-func mkHdrFile() (*os.File, int, error) {
-	f, err := os.CreateTemp("/tmp", "cli_tst_")
+// func mkHdrFile() (*os.File, int, error) {
+// 	f, err := os.CreateTemp("/tmp", "cli_tst_")
+// 	if err != nil {
+// 		return nil, 0, err
+// 	}
+// 	n, err := f.Write(hdrFileReg)
+// 	if err != nil {
+// 		return nil, n, err
+// 	}
+// 	if n != len(hdrFileReg) {
+// 		return nil, n, errors.New("file read truncated")
+// 	}
+// 	fmt.Printf("read and stored %d bytes into new headerfile\n", n)
+// 	return f, n, nil
+// }
+
+// Use BTC deserializer (tested in elxbtc.headers_deserialize_test.go) as the
+// data is from BTC
+type headerDeserialzer struct{}
+
+const BTC_HEADER_SIZE = 80
+
+func (d headerDeserialzer) Deserialize(r io.Reader) (*BlockHeader, error) {
+	wireHdr := &wire.BlockHeader{}
+	err := wireHdr.Deserialize(r)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
-	n, err := f.Write(hdrFileReg)
-	if err != nil {
-		return nil, n, err
-	}
-	if n != len(hdrFileReg) {
-		return nil, n, errors.New("file read truncated")
-	}
-	fmt.Printf("read and stored %d bytes into new headerfile\n", n)
-	return f, n, nil
+	blockHeader := &BlockHeader{}
+	blockHeader.Version = wireHdr.Version
+	chainHash := wireHdr.BlockHash()
+	blockHeader.Hash = WireHash(chainHash)
+	blockHeader.Prev = WireHash(wireHdr.PrevBlock)
+	blockHeader.Merkle = WireHash(wireHdr.MerkleRoot)
+	return blockHeader, nil
 }
 
+var btcDeserializer = &headerDeserialzer{}
+
 func TestAppendHeaders(t *testing.T) {
-	f, err := os.CreateTemp("/tmp", "cli_tst_")
+	f, err := os.CreateTemp("/tmp", "cli_")
 	if err != nil {
 		log.Fatal(err)
 	}
-	fi, err := f.Stat()
-	if err != nil {
-		fmt.Println(err.Error())
-		log.Fatal(err)
-	}
-	fname := fi.Name()
-	f.Close()
+	defer f.Close()
+	defer os.RemoveAll(f.Name())
 
 	h := headers{
-		headerSize:  80,
-		hdrFilePath: path.Join("/tmp", fname),
-		p:           &chaincfg.RegressionNetParams,
-		hdrs:        make(map[int64]*wire.BlockHeader),
-		blkHdrs:     make(map[chainhash.Hash]int64),
-		tip:         0,
-		synced:      false,
+		headerSize:        BTC_HEADER_SIZE,
+		headerDeserialzer: btcDeserializer,
+		hdrFilePath:       f.Name(),
+		startPoint:        0, // regtest
+		hdrs:              make(map[int64]*BlockHeader),
+		blkHdrs:           make(map[WireHash]int64),
+		tip:               0,
+		synced:            false,
 	}
 
-	var totalHdrs int64 = 0
-	numHdrs, err := h.appendHeadersFile(hdrFileReg[:160])
+	numHdrs, err := h.appendHeadersFile(hdrFileReg)
 	if err != nil {
 		log.Fatal(err)
 	}
-	totalHdrs += numHdrs
-	fmt.Println(numHdrs, " headers stored")
-	numHdrs, err = h.appendHeadersFile(hdrFileReg[160:320])
-	if err != nil {
-		log.Fatal(err)
-	}
-	totalHdrs += numHdrs
-	fmt.Println(numHdrs, " headers stored")
-	numHdrs, err = h.appendHeadersFile(hdrFileReg[320:])
-	if err != nil {
-		log.Fatal(err)
-	}
-	totalHdrs += numHdrs
 	fmt.Println(numHdrs, " headers stored")
 
 	fsize, err := h.statFileSize()
@@ -118,14 +120,13 @@ func TestAppendHeaders(t *testing.T) {
 		fmt.Println(err.Error())
 		log.Fatal(err)
 	}
-	fmt.Println(fsize, " total bytes stored ", totalHdrs, ", total headers stored")
 
-	if totalHdrs != fsize/int64(h.headerSize) {
+	if numHdrs != fsize/int64(h.headerSize) {
 		log.Fatal("total headers wrong")
 	}
 
 	// 'finished' appending - now grab the bytes back
-	maybeTip := totalHdrs - 1
+	maybeTip := numHdrs - 1
 
 	// read back bytes from file
 	b, err := h.readAllBytesFromFile()
@@ -149,82 +150,39 @@ func TestAppendHeaders(t *testing.T) {
 	h.synced = true
 }
 
-func TestReadStoreHeaderFile(t *testing.T) {
-	f, n, err := mkHdrFile()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-	f.Seek(0, 0)
-
-	// read all from file as bytes
-	b := make([]byte, n)
-	read, err := f.Read(b)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if read != n {
-		log.Fatal("read truncated")
-	}
-	// store headers
-	h := headers{
-		headerSize:  80,
-		hdrFilePath: f.Name(),
-		p:           &chaincfg.RegressionNetParams,
-		hdrs:        make(map[int64]*wire.BlockHeader),
-		blkHdrs:     make(map[chainhash.Hash]int64),
-		tip:         0,
-		synced:      false,
-	}
-	if read%h.headerSize != 0 {
-		log.Fatal("invalid file size")
-	}
-	numHdrs := read / h.headerSize
-	fmt.Printf("read %d bytes %d headers from headerfile\n", read, numHdrs)
-
-	err = h.store(b, 0)
-	if err != nil {
-		log.Fatal(err)
-	}
-	h.tip = int64(numHdrs - 1)
-	fmt.Printf("stored %d headers into hdrs map at height %d\n", numHdrs, 0)
-	// verify chain
-	err = h.verifyAll()
-	if err != nil {
-		log.Fatal(err)
-	}
-	// just visual confirmation
-	var height int64
-	for height = h.tip; height > 0; height-- {
-		thisHdr := h.hdrs[height]
-		prevHdr := h.hdrs[height-1]
-		prevHdrBlkHash := prevHdr.BlockHash()
-		if prevHdr.BlockHash() != thisHdr.PrevBlock {
-			log.Fatal("header chain verify failed")
-		}
-		fmt.Printf("verified header at height %d has blockhash %s\n", height-1, prevHdrBlkHash.String())
-	}
-}
-
 func TestTruncateHeadersFile(t *testing.T) {
-	f, size, err := mkHdrFile()
+	f, err := os.CreateTemp("/tmp", "cli_")
 	if err != nil {
 		log.Fatal(err)
 	}
-	fname := f.Name()
 	defer f.Close()
+	defer os.RemoveAll(f.Name())
+
 	h := headers{
-		headerSize:  80,
-		hdrFilePath: fname,
-		p:           &chaincfg.RegressionNetParams,
-		hdrs:        make(map[int64]*wire.BlockHeader),
-		blkHdrs:     make(map[chainhash.Hash]int64),
-		tip:         0,
-		synced:      false,
+		headerSize:        BTC_HEADER_SIZE,
+		headerDeserialzer: btcDeserializer,
+		hdrFilePath:       f.Name(),
+		startPoint:        0, // regtest
+		hdrs:              make(map[int64]*BlockHeader),
+		blkHdrs:           make(map[WireHash]int64),
+		tip:               0,
+		synced:            false,
 	}
-	numHeaders, err := h.bytesToNumHdrs(int64(size))
+
+	numHdrs, err := h.appendHeadersFile(hdrFileReg)
 	if err != nil {
 		log.Fatal(err)
+	}
+	fmt.Println(numHdrs, " headers stored")
+
+	fsize, err := h.statFileSize()
+	if err != nil {
+		fmt.Println(err.Error())
+		log.Fatal(err)
+	}
+
+	if numHdrs != fsize/int64(h.headerSize) {
+		log.Fatal("total headers wrong")
 	}
 
 	_, err = h.truncateHeadersFile(1)
@@ -240,21 +198,21 @@ func TestTruncateHeadersFile(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if newNumHeaders != numHeaders-1 {
+	if newNumHeaders != numHdrs-1 {
 		log.Fatalf("invaid number of headers returned %d", newNumHeaders)
 	}
 	newNumHeaders, err = h.truncateHeadersFile(5)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if newNumHeaders != numHeaders-1-5 {
+	if newNumHeaders != numHdrs-1-5 {
 		log.Fatalf("invaid number of headers returned %d", newNumHeaders)
 	}
 	newNumHeaders, err = h.truncateHeadersFile(1)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if newNumHeaders != numHeaders-1-5-1 {
+	if newNumHeaders != numHdrs-1-5-1 {
 		log.Fatalf("invaid number of headers returned %d", newNumHeaders)
 	}
 
@@ -313,14 +271,16 @@ var hdr3 = []byte{
 
 func TestStore(t *testing.T) {
 	h := headers{
-		headerSize:  80,
-		hdrFilePath: "<empty>",
-		p:           &chaincfg.RegressionNetParams,
-		hdrs:        make(map[int64]*wire.BlockHeader),
-		blkHdrs:     make(map[chainhash.Hash]int64),
-		tip:         0,
-		synced:      false,
+		headerSize:        BTC_HEADER_SIZE,
+		headerDeserialzer: btcDeserializer,
+		hdrFilePath:       "<no file>",
+		startPoint:        0, // regtest
+		hdrs:              make(map[int64]*BlockHeader),
+		blkHdrs:           make(map[WireHash]int64),
+		tip:               0,
+		synced:            false,
 	}
+
 	err := h.store(hdr, 0)
 	if err != nil {
 		log.Fatal(err)
@@ -357,41 +317,21 @@ func TestStore(t *testing.T) {
 	if err == nil {
 		log.Fatal("error expected")
 	}
-}
-
-func TestMapIter(t *testing.T) {
-	h := headers{
-		headerSize:  80,
-		hdrFilePath: "<empty>",
-		p:           &chaincfg.RegressionNetParams,
-		hdrs:        make(map[int64]*wire.BlockHeader),
-		blkHdrs:     make(map[chainhash.Hash]int64),
-		tip:         0,
-		synced:      false,
-	}
-	err := h.store(hdrFileReg, 0)
-	if err != nil {
-		log.Fatal(err)
-	}
-	numBytes := int64(len(hdrFileReg))
-	numHeaders, err := h.bytesToNumHdrs(numBytes)
-	if err != nil {
-		log.Fatal(err)
-	}
-	h.tip = numHeaders - 1
 	h.dumpAll()
 }
 
 func TestStoreHashes(t *testing.T) {
 	h := headers{
-		headerSize:  80,
-		hdrFilePath: "<empty>",
-		p:           &chaincfg.RegressionNetParams,
-		hdrs:        make(map[int64]*wire.BlockHeader),
-		blkHdrs:     make(map[chainhash.Hash]int64),
-		tip:         0,
-		synced:      false,
+		headerSize:        BTC_HEADER_SIZE,
+		headerDeserialzer: btcDeserializer,
+		hdrFilePath:       "<no file>",
+		startPoint:        0, // regtest
+		hdrs:              make(map[int64]*BlockHeader),
+		blkHdrs:           make(map[WireHash]int64),
+		tip:               0,
+		synced:            false,
 	}
+
 	err := h.store(hdrFileReg, 0)
 	if err != nil {
 		log.Fatal(err)
@@ -408,12 +348,13 @@ func TestStoreHashes(t *testing.T) {
 		if hdr == nil {
 			log.Fatalf("nil header returned from map at %d", i)
 		}
-		blkHash := hdr.BlockHash()
+		blkHash := hdr.Hash
 		height := h.blkHdrs[blkHash]
 		if i != height {
 			t.Errorf("height mismatch: wanted %d got %d", i, height)
 		}
 	}
+	h.dumpAll()
 }
 
 var hdrSerialized = []byte{
@@ -425,10 +366,23 @@ var hdrSerialized = []byte{
 }
 
 func TestDeserializeHeader(t *testing.T) {
-	blkHdr := wire.BlockHeader{}
+	h := headers{
+		headerSize:        BTC_HEADER_SIZE,
+		headerDeserialzer: btcDeserializer,
+		hdrFilePath:       "<no file>",
+		startPoint:        0, // regtest
+		hdrs:              make(map[int64]*BlockHeader),
+		blkHdrs:           make(map[WireHash]int64),
+		tip:               0,
+		synced:            false,
+	}
+
 	r := bytes.NewBuffer(hdrSerialized)
-	err := blkHdr.Deserialize(r)
+	blkHdr, err := h.headerDeserialzer.Deserialize(r)
 	if err != nil {
 		log.Fatal(err)
 	}
+	h.tip = -1
+	h.storeOneHdr(blkHdr) // {tip++}
+	h.dumpAll()
 }
