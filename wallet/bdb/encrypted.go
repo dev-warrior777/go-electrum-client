@@ -108,7 +108,11 @@ func getEncryptionKey32(password string) [32]byte {
 		threads = THRDMAX
 	}
 	b := argon2.IDKey([]byte(password), SALT, TIME, MEM, threads, KEYLEN)
-	return ([32]byte)(b)
+	// revert to go19
+	// return ([32]byte)(b)
+	var arr32 [32]byte
+	copy(arr32[:], b)
+	return arr32
 }
 
 /////////////////////////////////

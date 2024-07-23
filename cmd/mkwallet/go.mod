@@ -1,6 +1,6 @@
 module github.com/dev-warrior777/go-electrum-client/cmd/mkwallet
 
-go 1.21
+go 1.19
 
 require (
 	github.com/btcsuite/btcd v0.24.0
@@ -9,7 +9,7 @@ require (
 
 require (
 	github.com/aead/siphash v1.0.1 // indirect
-	go.etcd.io/bbolt v1.3.1 // indirect
+	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.5 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
@@ -23,6 +23,7 @@ require (
 	github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23 // indirect
 	github.com/mattn/go-sqlite3 v1.14.17 // indirect
 	github.com/spf13/cast v1.5.1 // indirect
+	github.com/stretchr/testify v1.8.1 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	golang.org/x/crypto v0.13.0 // indirect
 	golang.org/x/net v0.15.0 // indirect
