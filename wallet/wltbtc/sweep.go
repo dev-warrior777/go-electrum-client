@@ -54,7 +54,6 @@ func (w *BtcElectrumWallet) SweepCoins(
 	prevOutValues = make(map[int]int64)
 
 	for i, coin := range coins {
-		fmt.Println(coin.String())
 		scriptForInput, err := txscript.PayToAddrScript(coin.LinkedAddress)
 		if err != nil {
 			// we could change policy to just ignore .. see how

@@ -2,7 +2,6 @@ package bdb
 
 import (
 	"errors"
-	"fmt"
 	"runtime"
 	"sync"
 
@@ -41,10 +40,6 @@ func (e *EncDB) PutEncrypted(b []byte, pw string) error {
 	if err != nil {
 		return err
 	}
-	for _, b := range eb {
-		fmt.Printf("%02x", b)
-	}
-	fmt.Println()
 	// store in db
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -124,19 +119,16 @@ func PrivKeyToWif() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("made privkey")
 	wif, err := btcutil.NewWIF(key, &chaincfg.MainNetParams, false)
 	if err != nil {
 		return err
 	}
 	wifStr := wif.String()
-	fmt.Println("WIF:", wifStr)
 
 	_, err = btcutil.DecodeWIF(wifStr)
 	if err != nil {
 		return err
 	}
-
 	// Can also do this
 	key.ToECDSA()
 	return nil

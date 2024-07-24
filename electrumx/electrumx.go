@@ -56,7 +56,6 @@ const (
 
 const (
 	COIN_BTC = "btc"
-	//...
 )
 
 // Assumption: all hashes are 32 bytes long
@@ -112,7 +111,7 @@ type ElectrumXConfig struct {
 	NetType string
 
 	// NetType parameters.. can chaincfg adapt for all coins? for now we use the NetType
-	// except for genesis block hash
+	// for everything except for genesis block hash.
 	Params *chaincfg.Params
 
 	// A localhost socks5 proxy port. E.g.  9050
@@ -127,7 +126,7 @@ type ElectrumXConfig struct {
 	// If you wish to connect to a single trusted electrumX peer set this. It is
 	// recommended to set this for security.
 	//
-	// For now it *must be set* while we move to the multi-node electrum interface
+	// For now it *must be set*
 	TrustedPeer *NodeServerAddr
 
 	// If not testing do not overwrite existing wallet files

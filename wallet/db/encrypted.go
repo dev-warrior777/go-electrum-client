@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"runtime"
 	"sync"
 
@@ -126,19 +125,15 @@ func PrivKeyToWif() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("made privkey")
 	wif, err := btcutil.NewWIF(key, &chaincfg.MainNetParams, false)
 	if err != nil {
 		return err
 	}
 	wifStr := wif.String()
-	fmt.Println("WIF:", wifStr)
-
 	_, err = btcutil.DecodeWIF(wifStr)
 	if err != nil {
 		return err
 	}
-
 	// Can also do this
 	key.ToECDSA()
 	return nil

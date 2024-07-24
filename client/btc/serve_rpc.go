@@ -219,11 +219,10 @@ func RPCServe(electrumClient client.ElectrumClient) error {
 			fmt.Printf("rpc http server Shutdown: %v\n", err)
 		}
 		close(rpcConnsClosed)
-		fmt.Println("rpc channel closed")
 	}()
 
 	fmt.Println("=== rpc http server Serve() start - Ctl-c to stop ===")
-	fmt.Println("")
+	fmt.Println()
 	if err := srv.Serve(listener); err != http.ErrServerClosed {
 		// error closing listener
 		fmt.Printf("rpc http server Serve: %v\n", err)

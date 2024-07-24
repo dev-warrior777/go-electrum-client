@@ -3,7 +3,6 @@ package btc
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
@@ -26,8 +25,6 @@ func (ec *BtcElectrumClient) tipChange(ctx context.Context) {
 			if !ok {
 				return
 			}
-			fmt.Printf("     ..client tip change - new headers tip is %d\n", tip)
-			fmt.Println("--------------------------------------------------------------------------------")
 			// update wallet's notion of the tip for confirmations
 			ec.updateWalletTip(tip)
 			// user

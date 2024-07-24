@@ -113,7 +113,7 @@ func NewNetwork(config *ElectrumXConfig) *Network {
 		onlineOnions:           0,
 		headers:                h,
 		clientTipChangeNotify:  make(chan int64), // unbuffered
-		clientScripthashNotify: make(chan *ScripthashStatusResult, 16),
+		clientScripthashNotify: make(chan *ScripthashStatusResult),
 	}
 	return network
 }
@@ -131,17 +131,15 @@ func (net *Network) GetScripthashNotify() <-chan *ScripthashStatusResult {
 }
 
 func (net *Network) Start(ctx context.Context) error {
-	numLoaded, err := net.loadKnownServers()
+	_, err := net.loadKnownServers()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("loaded %d known servers from file\n", numLoaded)
 	if net.config.TrustedPeer == nil {
 		// TODO: start a stored server if no trusted peer
 		return errors.New("a trusted peer is required in config")
 	}
 	serverAddress := net.config.TrustedPeer
-	// singleton
 	net.startMtx.Lock()
 	defer net.startMtx.Unlock()
 	if net.started {
@@ -213,7 +211,7 @@ func (net *Network) startNewPeer(
 func (net *Network) getServerPeers(ctx context.Context) {
 	err := net.getServers(ctx)
 	if err != nil {
-		return
+		fmt.Printf("getServerPeers: ignoring error - %v\n", err)
 	}
 }
 
@@ -279,10 +277,6 @@ func (net *Network) checkLeader(ctx context.Context) {
 			// fast path
 			return
 		}
-		fmt.Printf("checkLeader: need a new leader for: %s nodeCtx.Err(): %v\n",
-			leader.netAddr, context.Cause(leader.nodeCtx))
-	} else {
-		fmt.Printf("checkLeader: need a new leader - current leader is <nil>\n")
 	}
 
 	// we need a new leader
@@ -297,7 +291,6 @@ func (net *Network) checkLeader(ctx context.Context) {
 			}
 			err := peer.node.promoteToLeader(peer.nodeCtx)
 			if err != nil {
-				fmt.Printf("checkLeader: cannot start %s %v\n", peer.netAddr, err)
 				peer.nodeCancel(errNetworkCanceled)
 				continue
 			}
@@ -319,9 +312,8 @@ func (net *Network) reapDeadPeers() {
 			peersToRemove = append(peersToRemove, peer)
 		}
 	}
-	for i, peer := range peersToRemove {
+	for _, peer := range peersToRemove {
 		net.removePeer(peer)
-		fmt.Printf("reapDeadPeers - online peers after reap (#%d) is: %d\n\n", i+1, net.getNumPeers())
 	}
 }
 
@@ -334,23 +326,20 @@ func (net *Network) startNewPeerMaybe(ctx context.Context) {
 		return
 	}
 	if len(net.knownServers) == 0 {
-		fmt.Println("startNewPeerMaybe: no known servers")
 		return
 	}
 	available := net.availableServers(false)
 	if len(available) == 0 {
-		fmt.Println("startNewPeerMaybe: no known servers that are not already connected")
 		return
 	}
-	// start one new peer .. from the pseudo randomized list
+	// start one new peer .. from the pseudo-randomized list
 	addr := toNetAddr(available[0])
 	err := net.startNewPeer(ctx, addr, false, false) // dialerCtx time limited to 10s
 	if err != nil {
-		fmt.Printf(" ..cannot start %s %v\n", addr.String(), err)
 		net.removeServer(available[0])
 	}
 	net.shufflePeers()
-	fmt.Printf("startNewPeerMaybe: online peers: %d\n\n", net.getNumPeers())
+	fmt.Printf("online peers: %d\n\n", net.getNumPeers())
 }
 
 func toNetAddr(saddr *serverAddr) *NodeServerAddr {
@@ -393,15 +382,12 @@ func (net *Network) availableServers(forLeader bool) []*serverAddr {
 }
 
 func (net *Network) startNewLeader(ctx context.Context) {
-	fmt.Printf("startNewLeader\n")
 	// get a free known server
 	if len(net.knownServers) == 0 {
-		fmt.Println("startNewLeader: no known servers")
 		return
 	}
 	available := net.availableServers(true)
 	if len(available) == 0 {
-		fmt.Println("startNewLeader: no known servers that are not already connected")
 		return
 	}
 	// TODO: filter servers again by reputation, capabilities and banlist
@@ -410,15 +396,12 @@ func (net *Network) startNewLeader(ctx context.Context) {
 	addr := toNetAddr(available[0])
 	err := net.startNewPeer(ctx, addr, true, false) // dialerCtx time limited to 10s
 	if err != nil {
-		fmt.Printf(" ..cannot start %s %v\n", addr.String(), err)
 		net.removeServer(available[0])
 	}
-	fmt.Printf("startNewLeader: leader (untrusted) online: %s\n\n", addr.String())
 }
 
 func (net *Network) shufflePeers() {
 	numPeers := net.getNumPeers()
-	fmt.Println("shufflePeers", numPeers)
 	if numPeers > 1 {
 		rand.ShuffleSlice(net.peers)
 	}
@@ -426,7 +409,6 @@ func (net *Network) shufflePeers() {
 
 func shuffleAvailableKnownServers(available []*serverAddr) {
 	numServers := len(available)
-	fmt.Println("shuffleAvailableKnownServers", numServers)
 	if numServers > 1 {
 		rand.ShuffleSlice(available)
 	}

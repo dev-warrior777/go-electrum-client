@@ -73,7 +73,6 @@ func newNode(
 }
 
 func (n *Node) start(nodeCtx context.Context, nodeCancel context.CancelCauseFunc, network, nettype, genesis string) error {
-	fmt.Printf("starting a new node on %s %s\n", network, nettype)
 	// connect to electrumX
 	sc, err := connectServer(nodeCtx, nodeCancel, n.serverAddr, n.connectOpts)
 	if err != nil {
@@ -134,7 +133,6 @@ func (n *Node) start(nodeCtx context.Context, nodeCancel context.CancelCauseFunc
 // synced & receiving incoming notifications
 func (n *Node) promoteToLeader(nodeCtx context.Context) error {
 	h := n.networkHeaders
-	fmt.Printf("promoteToLeader: %s synced %v\n", n.server.conn.addr, h.synced)
 	// start sync if not synced
 	if !h.synced {
 		err := n.syncHeaders(nodeCtx)
@@ -145,13 +143,11 @@ func (n *Node) promoteToLeader(nodeCtx context.Context) error {
 	// start header notifications
 	err := n.headersNotify(nodeCtx)
 	if err != nil {
-		fmt.Printf("promoteToLeader start headersNotify: %s err: %v\n", n.server.conn.addr, err)
 		return err
 	}
 	// start scripthash notifications
 	err = n.scriptHashNotify(nodeCtx)
 	if err != nil {
-		fmt.Printf("promoteToLeader start scriptHashNotify: %s err: %v\n", n.server.conn.addr, err)
 		return err
 	}
 	n.leader = true

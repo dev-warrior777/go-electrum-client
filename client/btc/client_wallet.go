@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -241,7 +240,7 @@ func (ec *BtcElectrumClient) Broadcast(ctx context.Context, rawTx []byte) (strin
 			backToWallet[idx] = pkScript
 		}
 	}
-	fmt.Printf("found %d address(es) back to our wallet\n", len(backToWallet))
+	// fmt.Printf("found %d address(es) back to our wallet\n", len(backToWallet))
 
 	// Send tx to ElectrumX for broadcasting to the bitcoin network
 	rawTxStr := hex.EncodeToString(rawTx)

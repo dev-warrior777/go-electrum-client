@@ -43,7 +43,7 @@ func (ec *BtcElectrumClient) RescanWallet(ctx context.Context) error {
 				fmt.Printf("cannot make script hash for address: %s\n", address.String())
 				continue
 			}
-			fmt.Printf("%s %s  Index:purpose %d:%d\n", address.String(), scripthash, keyIndex, purpose)
+			// fmt.Printf("%s %s  Index:purpose %d:%d\n", address.String(), scripthash, keyIndex, purpose)
 
 			history, err := node.GetHistory(ctx, scripthash)
 			if err != nil {
@@ -56,11 +56,11 @@ func (ec *BtcElectrumClient) RescanWallet(ctx context.Context) error {
 			}
 			// got history - update the highest hit index
 			historyHitIndex = keyIndex
-			for _, h := range history {
-				fmt.Println(" Height:", h.Height)
-				fmt.Println(" TxHash: ", h.TxHash)
-				fmt.Println(" Fee: ", h.Fee)
-			}
+			// for _, h := range history {
+			// 	fmt.Println(" Height:", h.Height)
+			// 	fmt.Println(" TxHash: ", h.TxHash)
+			// 	fmt.Println(" Fee: ", h.Fee)
+			// }
 			pkScriptBytes, err := w.AddressToScript(address)
 			if err != nil {
 				fmt.Printf("cannot make pkScript for address: %s\n", address.String())
@@ -78,14 +78,13 @@ func (ec *BtcElectrumClient) RescanWallet(ctx context.Context) error {
 				// ec.dumpSubscription("failed to add", subscription)
 				continue
 			}
-			fmt.Printf("Added subscritpion for address: %s to wallet subscriptions\n", address.String())
+			// fmt.Printf("Added subscritpion for address: %s to wallet subscriptions\n", address.String())
 		}
 
-		// ** Experimental - if no more history hits for another GAP_LIMIT tries **
-		// consider the job done.
+		// if no more history hits for another GAP_LIMIT tries consider the job done.
 		if keyIndex > historyHitIndex+client.GAP_LIMIT {
-			fmt.Printf("keyIndex: %d greater than highest history found index %d by GAP_LIMIT %d\n\n",
-				keyIndex, historyHitIndex, client.GAP_LIMIT)
+			// fmt.Printf("keyIndex: %d greater than highest history found index %d by GAP_LIMIT %d\n\n",
+			// 	keyIndex, historyHitIndex, client.GAP_LIMIT)
 			break
 		}
 	}

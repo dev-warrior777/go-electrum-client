@@ -225,9 +225,6 @@ func (ec *BtcElectrumClient) SubscribeAddressNotify(ctx context.Context, newSub 
 	if !subscribed {
 		ec.addSubscription(newSub)
 	}
-
-	// fmt.Println("Subscribed scripthash", res.Scripthash, " status:", res.Status)
-
 	return res.Status, nil
 }
 
@@ -251,7 +248,6 @@ func (ec *BtcElectrumClient) UnsubscribeAddressNotify(ctx context.Context, pkScr
 		fmt.Println("removeSubscription", err)
 		return
 	}
-	fmt.Println("unsubscribed scripthash")
 }
 
 // GetAddressHistoryFromNode requests address history from ElectrumX  for a
@@ -312,7 +308,7 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(ctx context.Context, history e
 		if err != nil {
 			continue
 		}
-		fmt.Printf("adding/updating transaction txid: %s, height: %d, fee %d\n", h.TxHash, h.Height, h.Fee)
+		// fmt.Printf("adding/updating transaction txid: %s, height: %d, fee %d\n", h.TxHash, h.Height, h.Fee)
 		err = ec.GetWallet().AddTransaction(msgTx, h.Height, txtime)
 		if err != nil {
 			fmt.Println(err)

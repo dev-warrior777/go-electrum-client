@@ -106,7 +106,7 @@ func (s *session) bumpCost(incurred float32) {
 	s.costMtx.Lock()
 	defer s.costMtx.Unlock()
 	s.cost += incurred
-	fmt.Printf(" - incurred: %f, total-cost: %f\n", incurred, s.cost)
+	// fmt.Printf(" - incurred: %f, total-cost: %f\n", incurred, s.cost)
 }
 
 func (s *session) bumpCostBytes(numBytes int) {

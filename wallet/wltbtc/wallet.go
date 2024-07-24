@@ -2,7 +2,6 @@ package wltbtc
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -45,8 +44,7 @@ type BtcElectrumWallet struct {
 
 	creationDate time.Time
 
-	blockchainSynced bool
-	blockchainTip    int64
+	blockchainTip int64
 
 	running bool
 }
@@ -66,8 +64,6 @@ func NewBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrumW
 	if err != nil {
 		return nil, err
 	}
-	// TODO: dbg remove
-	fmt.Println("Save: ", mnemonic)
 
 	seed := bip39.NewSeed(mnemonic, "")
 
@@ -89,9 +85,6 @@ func RecreateElectrumWallet(config *wallet.WalletConfig, pw, mnemonic string) (*
 }
 
 func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) (*BtcElectrumWallet, error) {
-
-	// dbg
-	fmt.Println("seed: ", hex.EncodeToString(seed))
 
 	mPrivKey, err := hdkeychain.NewMaster(seed, config.Params)
 	if err != nil {
@@ -142,15 +135,6 @@ func makeBtcElectrumWallet(config *wallet.WalletConfig, pw string, seed []byte) 
 		return nil, err
 	}
 
-	// TODO: Debug: remove
-	if config.Params != &chaincfg.MainNetParams {
-		fmt.Println("Created: ", w.creationDate)
-		fmt.Println(hex.EncodeToString(sm.store.Seed))
-		fmt.Println("Created Addresses:")
-		for _, adr := range w.txstore.adrs {
-			fmt.Printf("%v\n", adr)
-		}
-	}
 	return w, nil
 }
 
@@ -201,16 +185,6 @@ func loadBtcElectrumWallet(config *wallet.WalletConfig, pw string) (*BtcElectrum
 	if err != nil {
 		return nil, err
 	}
-
-	// // TODO: Debug: remove
-	// if config.Params != &chaincfg.MainNetParams {
-	// fmt.Println("Stored Creation Date: ", w.creationDate)
-	// fmt.Println(hex.EncodeToString(sm.store.Seed))
-	// fmt.Println("Loaded Addresses:")
-	// for _, adr := range w.txstore.adrs {
-	// 	fmt.Printf("%v  %s\n", adr, hex.EncodeToString(adr.ScriptAddress()))
-	// }
-	// }
 
 	return w, nil
 }

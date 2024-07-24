@@ -116,16 +116,11 @@ func (sc *serverConn) listen(nodeCtx context.Context) {
 			}
 
 			if jsonResp.Method == "blockchain.headers.subscribe" {
-				fmt.Println()
-				fmt.Println("------- debug headers change ----------------------------------------------")
 				sc.headersTipChangeNotify(ntfnParams.Params)
 				continue
 			}
 
 			if jsonResp.Method == "blockchain.scripthash.subscribe" {
-				fmt.Println()
-				fmt.Println("------- debug -------------------------------------------------------------")
-				fmt.Println(" --- blockchain.scripthash.subscribe")
 				sc.scripthashStatusNotify(ntfnParams.Params)
 				continue
 			}
@@ -194,7 +189,6 @@ func connectServer(
 			Addr:         opts.TorProxy,
 			TorIsolation: true,
 		}
-		fmt.Printf("using tor isolation proxy: %s\n - to connect to %s \n", proxy.Addr, addr)
 		dial = proxy.DialContext
 		dialCtx, dialCancel = context.WithTimeout(nodeCtx, 20*time.Second)
 		defer dialCancel()
@@ -206,7 +200,6 @@ func connectServer(
 
 	conn, err := dial(dialCtx, "tcp", addr)
 	if err != nil {
-		fmt.Printf("dial - %v\n", err)
 		return nil, err
 	}
 

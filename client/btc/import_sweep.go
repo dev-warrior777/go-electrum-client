@@ -14,21 +14,18 @@ import (
 // Import UTXO's for a known privkey from another wallet from electrumX. Partially
 // implemented (P2WPKH,P2PKH) as it is not the most important tool for this wallet.
 
-func (ec *BtcElectrumClient) getWitnessScriptHashRedeemUtxos( /*ctx*/ context.Context /*keyPair*/, *btcutil.WIF) ([]wallet.InputInfo, error) {
+func (ec *BtcElectrumClient) getWitnessScriptHashRedeemUtxos(_ context.Context /*keyPair*/, _ *btcutil.WIF) ([]wallet.InputInfo, error) {
 	utxoList := make([]wallet.InputInfo, 0)
-	fmt.Println("looking for P2WSH redemptions - Not implemented")
 	return utxoList, nil
 }
 
-func (ec *BtcElectrumClient) getScriptHashRedeemUtxos( /*ctx*/ context.Context /*keyPair*/, *btcutil.WIF) ([]wallet.InputInfo, error) {
+func (ec *BtcElectrumClient) getScriptHashRedeemUtxos(_ context.Context /*keyPair*/, _ *btcutil.WIF) ([]wallet.InputInfo, error) {
 	utxoList := make([]wallet.InputInfo, 0)
-	fmt.Println("looking for P2SH Redemptions  - Not implemented")
 	return utxoList, nil
 }
 
-func (ec *BtcElectrumClient) getPubKeyUtxos( /*ctx*/ context.Context /*keyPair*/, *btcutil.WIF) ([]wallet.InputInfo, error) {
+func (ec *BtcElectrumClient) getPubKeyUtxos(_ context.Context, _ *btcutil.WIF) ([]wallet.InputInfo, error) {
 	utxoList := make([]wallet.InputInfo, 0)
-	fmt.Println("looking for P2PK - Not implemented")
 	return utxoList, nil
 }
 
@@ -121,22 +118,20 @@ func (ec *BtcElectrumClient) getWitnessPubKeyHashUtxos(ctx context.Context, keyP
 func (ec *BtcElectrumClient) getUtxos(ctx context.Context, keyPair *btcutil.WIF) ([]wallet.InputInfo, error) {
 	inputList := make([]wallet.InputInfo, 0, 1)
 
-	// P2WSH Redeem - not yet implemented
+	// P2WSH
 	p2wshInputList, err := ec.getWitnessScriptHashRedeemUtxos(ctx, keyPair)
 	if err != nil {
 		return inputList, err
 	}
-	fmt.Printf("found %d P2WSH Redemption utxos\n", len(p2wshInputList))
 	if len(p2wshInputList) > 0 {
 		inputList = append(inputList, p2wshInputList...)
 	}
 
-	// P2SH Redeem - not yet implemented
+	// P2SH - not yet implemented
 	p2shInputList, err := ec.getScriptHashRedeemUtxos(ctx, keyPair)
 	if err != nil {
 		return inputList, err
 	}
-	fmt.Printf("found %d P2SH Redemption utxos\n", len(p2shInputList))
 	if len(p2shInputList) > 0 {
 		inputList = append(inputList, p2shInputList...)
 	}
@@ -146,7 +141,6 @@ func (ec *BtcElectrumClient) getUtxos(ctx context.Context, keyPair *btcutil.WIF)
 	if err != nil {
 		return inputList, err
 	}
-	fmt.Printf("found %d P2PK utxos\n", len(p2pkInputList))
 	if len(p2pkInputList) > 0 {
 		inputList = append(inputList, p2pkInputList...)
 	}
@@ -156,7 +150,6 @@ func (ec *BtcElectrumClient) getUtxos(ctx context.Context, keyPair *btcutil.WIF)
 	if err != nil {
 		return inputList, err
 	}
-	fmt.Printf("found %d P2PKH utxos\n", len(p2pkhInputList))
 	if len(p2pkhInputList) > 0 {
 		inputList = append(inputList, p2pkhInputList...)
 	}
@@ -166,7 +159,6 @@ func (ec *BtcElectrumClient) getUtxos(ctx context.Context, keyPair *btcutil.WIF)
 	if err != nil {
 		return inputList, err
 	}
-	fmt.Printf("found %d P2WPKH utxos\n", len(p2wpkhInputList))
 	if len(p2wpkhInputList) > 0 {
 		inputList = append(inputList, p2wpkhInputList...)
 	}
@@ -215,8 +207,6 @@ func (ec *BtcElectrumClient) ImportAndSweep(ctx context.Context, importedKeyPair
 		var sweepBuf bytes.Buffer
 		sweepBuf.Grow(tx.SerializeSize())
 		tx.Serialize(&sweepBuf)
-		fmt.Printf("Sweep Tx:      %x\n\n", sweepBuf.Bytes())
-		fmt.Printf("Sweep TxHash: (%v):\n", tx.TxHash())
 	}
 
 	return nil

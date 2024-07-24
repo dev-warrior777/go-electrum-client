@@ -119,20 +119,20 @@ func TestNetworkServers(t *testing.T) {
 	t.Logf("datadir: %s\n", net.config.DataDir)
 
 	// test nil input
-	err := net.addIncomingservers(nil)
+	err := net.addIncomingServers(nil)
 	if err == nil {
 		// should error "no incoming"
 		t.Fatal(err)
 	}
 
-	err = net.addIncomingservers(peerNoResults)
+	err = net.addIncomingServers(peerNoResults)
 	if err == nil {
 		t.Fatal(err)
 	}
 	t.Logf("%v .. OK!", err)
 
 	// add first results to known servers and an empty file
-	err = net.addIncomingservers(peerResults)
+	err = net.addIncomingServers(peerResults)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestNetworkServers(t *testing.T) {
 	}
 
 	// update but all the same servers
-	err = net.addIncomingservers(peerResults2)
+	err = net.addIncomingServers(peerResults2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestNetworkServers(t *testing.T) {
 	}
 
 	// update but some of the servers are different and 2 IPs are rejected
-	err = net.addIncomingservers(peerResults3)
+	err = net.addIncomingServers(peerResults3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +178,7 @@ func TestNetworkServers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = net.addIncomingservers(peerResultsIPv6)
+	err = net.addIncomingServers(peerResultsIPv6)
 	if err != nil {
 		t.Fatal(err)
 	}

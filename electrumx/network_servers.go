@@ -54,19 +54,19 @@ func (net *Network) getServers(ctx context.Context) error {
 	if len(peerResults) == 0 {
 		return nil
 	}
-	err = net.addIncomingservers(peerResults)
+	err = net.addIncomingServers(peerResults)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// addIncomingservers converts incoming peerResults and updates memory & stored
+// addIncomingServers converts incoming peerResults and updates memory & stored
 // server lists
-func (net *Network) addIncomingservers(in []*peersResult) error {
+func (net *Network) addIncomingServers(in []*peersResult) error {
 	servers := makeIncomingServerAddrs(in)
 	if len(servers) == 0 {
-		// at least one peer on testnet returned an empty list
+		// I have seen at least one peer on testnet return an empty list
 		return errors.New("no incoming")
 	}
 	err := net.updateNetworkServers(servers)
@@ -75,8 +75,7 @@ func (net *Network) addIncomingservers(in []*peersResult) error {
 	}
 	err = net.updateStoredServers(servers)
 	if err != nil {
-		// if error we still have the old file contents; so just log
-		fmt.Printf("error: %v\n", err)
+		return err
 	}
 	return nil
 }
@@ -97,7 +96,6 @@ func makeIncomingServerAddrs(in []*peersResult) []*serverAddr {
 			}
 		} else {
 			if net.ParseIP(pres.Addr) == nil {
-				fmt.Printf("bad IP: %s\n", pres.Addr)
 				badAddresses++
 				continue
 			}
@@ -152,7 +150,6 @@ func makeIncomingServerAddrs(in []*peersResult) []*serverAddr {
 		}
 		goodAddresses++
 	}
-	fmt.Printf("server peer addresses: good: %d, bad: %d\n", goodAddresses, badAddresses)
 	return servers
 }
 
@@ -190,7 +187,6 @@ func (net *Network) updateStoredServers(servers []*serverAddr) error {
 	if err != nil {
 		return err
 	}
-	// fmt.Printf("updateStoredServers - num read from file is %d - update done\n", numRead)
 	if numRead == 0 {
 		stored = servers
 		return net.writeServerAddrFile(stored)
@@ -234,7 +230,6 @@ func (net *Network) removeServer(server *serverAddr) error {
 	if err != nil {
 		return err
 	}
-	// fmt.Printf("removeServer -- num read from file is %d\n", numRead)
 	// find server in the list and remove
 	var lessStored []*serverAddr = []*serverAddr{}
 	for _, got := range stored {
@@ -267,7 +262,6 @@ func (net *Network) readServerAddrFile() ([]*serverAddr, int, error) {
 	d := json.NewDecoder(buf)
 	err = d.Decode(&servers)
 	if err != nil {
-		fmt.Printf("json Decode: %v\n", err)
 		return nil, 0, err
 	}
 	return servers, len(servers), nil

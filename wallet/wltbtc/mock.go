@@ -35,7 +35,6 @@ func createTxStore() (*TxStore, *StorageManager) {
 	}
 
 	seed := makeRegtestSeed()
-	// fmt.Println("Made test seed")
 	key, _ := hdkeychain.NewMaster(seed, &chaincfg.RegressionNetParams)
 	km, _ := NewKeyManager(mockDb.Keys(), &chaincfg.RegressionNetParams, key)
 	sm := NewStorageManager(mockDb.Enc(), &chaincfg.RegressionNetParams)

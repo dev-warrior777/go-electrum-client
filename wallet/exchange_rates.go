@@ -12,8 +12,8 @@ type ExchangeRates interface {
 	// Returns all available rates
 	GetAllRates(cacheOK bool) (map[string]float64, error)
 
-	/* Return the number of currency units per coin. For example, in bitcoin
-	   this is 100m satoshi per BTC. This is used when converting from fiat
-	   to the smaller currency unit. */
+	// Return the number of currency units per coin. For example, in bitcoin
+	// this is 100m satoshi per BTC. This is used when converting from fiat
+	// to the smaller currency unit.
 	UnitsPerCoin() int64
 }
