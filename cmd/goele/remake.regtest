@@ -1,0 +1,12 @@
+ls /home/dev/.config/goele/btc/regtest
+echo 'deleting wallet & blockchain_headers'
+rm /home/dev/.config/goele/btc/regtest/wallet.db
+rm /home/dev/.config/goele/btc/regtest/wallet.bdb
+rm /home/dev/.config/goele/btc/regtest/blockchain_headers
+echo 'deleted'
+/home/dev/gex/go-electrum-client/cmd/mkwallet/mkwallet -action recreate -pass abc -tw -dbtype=bbolt
+/home/dev/gex/go-electrum-client/cmd/mkwallet/mkwallet -action recreate -pass abc -tw -dbtype=sqlite
+ls -al /home/dev/.config/goele/btc/regtest
+
+
+

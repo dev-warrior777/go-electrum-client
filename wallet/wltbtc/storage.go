@@ -21,27 +21,11 @@ type Storage struct {
 	Seed    []byte `json:"seed,omitempty"`
 }
 
-// String returns the string representation of the Storage but only of the
-// fields that are always present
+// String returns the string representation of the Storage.
 func (s *Storage) String() string {
 	b := new(bytes.Buffer)
-	fmt.Fprintf(b, "{\n%s\n%s\n%s\n}\n", s.Version, s.Xprv, s.Xpub)
+	fmt.Fprintf(b, "{\n%s\n%s\n%s\n%v\n%v\n}\n", s.Version, s.Xprv, s.Xpub, s.ShaPw, s.Seed)
 	return b.String()
-}
-
-func (s *Storage) blank() {
-	zero := func(b []byte) {
-		blen := len(b)
-		for i := 0; i < blen; i++ {
-			b[i] = 0
-		}
-	}
-	// This could be better with unsafe
-	s.Xprv = ""
-	s.Xpub = ""
-	zero(s.ShaPw)
-	zero(s.Seed)
-	// runtime.GC()
 }
 
 type StorageManager struct {

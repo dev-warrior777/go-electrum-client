@@ -20,7 +20,7 @@ import (
 
 var (
 	coins = []string{"btc"} // add as implemented
-	nets  = []string{"mainnet", "testnet", "testnet3", "regtest", "simnet"}
+	nets  = []string{"mainnet", "testnet", "testnet3", "testnet4", "regtest", "simnet"}
 )
 
 func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
@@ -32,59 +32,74 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		}
 		return false
 	}
-	if !contains(coins, coin) {
-		return nil, errors.New("invalid coin")
-	}
+
+	cfg := client.NewDefaultConfig()
 	if !contains(nets, net) {
 		return nil, errors.New("invalid net")
 	}
+	if !contains(coins, coin) {
+		return nil, errors.New("invalid coin")
+	}
+
 	switch coin {
 	case "btc":
+		cfg.CoinType = wallet.Bitcoin
+		cfg.Coin = coin
+		switch net {
+		case "simnet", "regtest":
+			cfg.NetType = electrumx.Regtest
+			cfg.RPCTestPort = 28887
+			cfg.Params = &chaincfg.RegressionNetParams
+			cfg.TrustedPeer = &electrumx.NodeServerAddr{
+				// Net: "ssl", Addr: "127.0.0.1:57002", // debug server
+				Net: "ssl", Addr: "127.0.0.1:53002",
+			}
+			cfg.StoreEncSeed = true
+			cfg.Testing = true
+			fmt.Println(net)
+		case "testnet", "testnet3", "testnet4":
+			cfg.NetType = electrumx.Testnet
+			cfg.RPCTestPort = 18887
+			cfg.Params = &chaincfg.TestNet3Params
+			cfg.TrustedPeer = &electrumx.NodeServerAddr{
+				// Net: "ssl", Addr: "testnet.aranguren.org:51002",
+				// Net: "tcp", Addr: "testnet.aranguren.org:51001",
+				// Net: "ssl", Addr: "testnet.hsmiths.com:53012",
+				Net: "ssl", Addr: "testnet.qtornado.com:51002",
+				// Net: "ssl", Addr: "tn.not.fyi:55002",
+			}
+			cfg.StoreEncSeed = true
+			cfg.Testing = true
+			fmt.Println(net)
+		case "mainnet":
+			cfg.Params = &chaincfg.MainNetParams
+			cfg.NetType = electrumx.Mainnet
+			cfg.RPCTestPort = 8887
+			cfg.TrustedPeer = &electrumx.NodeServerAddr{
+				Net: "ssl", Addr: "elx.bitske.com:50002",
+			}
+			cfg.StoreEncSeed = false
+			cfg.Testing = false
+			fmt.Println(net)
+		default:
+			fmt.Printf("unknown net %s - exiting\n", net)
+			flag.Usage()
+			os.Exit(1)
+		}
 	default:
 		return nil, errors.New("invalid coin")
 	}
-	cfg := client.NewDefaultConfig()
-	cfg.CoinType = wallet.Bitcoin
-	cfg.StoreEncSeed = true
+
 	appDir, err := client.GetConfigPath()
 	if err != nil {
 		return nil, err
 	}
-	coinNetDir := filepath.Join(appDir, coin, net)
+	coinNetDir := filepath.Join(appDir, coin, cfg.NetType)
 	err = os.MkdirAll(coinNetDir, os.ModeDir|0777)
 	if err != nil {
 		return nil, err
 	}
 	cfg.DataDir = coinNetDir
-	switch net {
-	case "regtest", "simnet":
-		cfg.Params = &chaincfg.RegressionNetParams
-		cfg.TrustedPeer = &electrumx.NodeServerAddr{
-			// Net: "ssl", Addr: "127.0.0.1:57002", // debug server
-			Net: "ssl", Addr: "127.0.0.1:53002",
-		}
-		cfg.StoreEncSeed = true
-		cfg.Testing = true
-	case "testnet", "testnet3":
-		cfg.Params = &chaincfg.TestNet3Params
-		cfg.TrustedPeer = &electrumx.NodeServerAddr{
-			// Net: "ssl", Addr: "testnet.aranguren.org:51002",
-			// Net: "tcp", Addr: "testnet.aranguren.org:51001",
-			// Net: "ssl", Addr: "testnet.hsmiths.com:53012",
-			Net: "ssl", Addr: "testnet.qtornado.com:51002",
-			// Net: "ssl", Addr: "tn.not.fyi:55002",
-
-		}
-		cfg.StoreEncSeed = true
-		cfg.Testing = true
-	case "mainnet":
-		cfg.Params = &chaincfg.MainNetParams
-		cfg.TrustedPeer = &electrumx.NodeServerAddr{
-			Net: "ssl", Addr: "elx.bitske.com:50002",
-		}
-		cfg.StoreEncSeed = false
-		cfg.Testing = false
-	}
 	return cfg, nil
 }
 
@@ -168,17 +183,15 @@ func checkSimnetHelp(cfg *client.ClientConfig) string {
 }
 
 func main() {
-	fmt.Println("Goele", client.GoeleVersion)
+	fmt.Println("Goele mkwallet", client.GoeleVersion)
 	action, pass, seed, cfg, err := configure()
 	fmt.Println(action, pass, seed)
 	if err != nil {
 		fmt.Println(err, " - exiting")
 		flag.Usage()
 		os.Exit(1)
-	}
-	net := cfg.Params.Name
-	fmt.Println(net)
 
+	}
 	// make basic client
 	ec := btc.NewBtcElectrumClient(cfg)
 
@@ -198,26 +211,11 @@ func main() {
 	}
 
 	// recreate the client's wallet
-
-	if net == "regtest" {
-		// for non-mainnet testing recreate a wallet with a known set of keys ..
-		// var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
-		// err := ec.RecreateWallet(pass, mnemonic)
-		err := ec.RecreateWallet(context.TODO(), pass, seed)
-		if err != nil {
-			fmt.Println(err, " - exiting")
-		}
-	} else if net == "testnet3" {
-		// for non-mainnet testing recreate a wallet with a known set of keys ..
-		// err := ec.RecreateWallet("abc", "canyon trip truly ritual lonely quiz romance rose alone journey like bronze")
-		err := ec.RecreateWallet(context.TODO(), pass, seed)
-		if err != nil {
-			fmt.Println(err)
-		}
-	} else if net == "mainnet" {
-		err := ec.RecreateWallet(context.TODO(), pass, seed)
-		if err != nil {
-			fmt.Println(err)
-		}
+	// for non-mainnet testing recreate a wallet with a known set of keys ..
+	// var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
+	// err := ec.RecreateWallet(pass, mnemonic)
+	err = ec.RecreateWallet(context.TODO(), pass, seed)
+	if err != nil {
+		fmt.Println(err, " - exiting")
 	}
 }

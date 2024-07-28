@@ -122,11 +122,16 @@ type mockStorage struct {
 
 // reverse simulates encryption/decryption between bytes and a database blob
 func reverse(s []byte) []byte {
-	var d = make([]byte, len(s))
-	for i, j := 0, len(s)-1; i < len(s); i, j = i+1, j-1 {
-		d[j] = s[i]
+	var newB = make([]byte, len(s))
+	copy(newB, s)
+	left := 0
+	right := len(s) - 1
+	for left < right {
+		newB[left], newB[right] = newB[right], newB[left]
+		left++
+		right--
 	}
-	return d
+	return newB
 }
 
 func (ms *mockStorage) PutEncrypted(b []byte, pw string) error {

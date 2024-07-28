@@ -295,6 +295,7 @@ func (net *Network) checkLeader(ctx context.Context) {
 				continue
 			}
 			net.leader = peer
+			fmt.Printf("promoted and started new (untrusted) leader %s\n", peer.netAddr)
 			return
 		}
 	}
@@ -398,6 +399,7 @@ func (net *Network) startNewLeader(ctx context.Context) {
 	if err != nil {
 		net.removeServer(available[0])
 	}
+	fmt.Printf("started new (untrusted) leader %s\n", addr.String())
 }
 
 func (net *Network) shufflePeers() {
