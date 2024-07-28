@@ -57,8 +57,6 @@ func TestStoreRetrieveEncryptedStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sm.store.blank()
-
 	err = sm.Get(pw)
 	if err != nil {
 		t.Fatal(err)
@@ -75,13 +73,6 @@ func TestStoreRetrieveEncryptedStore(t *testing.T) {
 	if !bytes.Equal(sm.store.ShaPw, shaPw) {
 		t.Fatal("pw check failed")
 	}
-
-	sm.store.blank()
-	afterBlank := sm.store.String()
-	fmt.Println("ret: ", afterBlank)
-
-	sm.Get("abc")
-	fmt.Println(sm.store.String())
 }
 
 func TestValidPw(t *testing.T) {
@@ -93,7 +84,6 @@ func TestValidPw(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sm.store.blank()
 	sm.Get(pw)
 
 	if !sm.IsValidPw("abc") {

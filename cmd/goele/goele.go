@@ -21,8 +21,88 @@ import (
 
 var (
 	coins = []string{"btc"} // add as implemented
-	nets  = []string{"mainnet", "testnet", "regtest", "simnet"}
+	nets  = []string{"mainnet", "testnet", "testnet3", "testnet4", "regtest", "simnet"}
 )
+
+// func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
+// 	contains := func(s []string, str string) bool {
+// 		for _, v := range s {
+// 			if v == str {
+// 				return true
+// 			}
+// 		}
+// 		return false
+// 	}
+// 	if !contains(coins, coin) {
+// 		return nil, errors.New("invalid coin")
+// 	}
+// 	if !contains(nets, net) {
+// 		return nil, errors.New("invalid net")
+// 	}
+// 	switch coin {
+// 	case "btc":
+// 	default:
+// 		return nil, errors.New("invalid coin")
+// 	}
+// 	cfg := client.NewDefaultConfig()
+// 	cfg.CoinType = wallet.Bitcoin
+// 	cfg.Coin = coin
+// 	cfg.NetType = net
+// 	cfg.StoreEncSeed = true
+// 	appDir, err := client.GetConfigPath()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	coinNetDir := filepath.Join(appDir, coin, net)
+// 	err = os.MkdirAll(coinNetDir, os.ModeDir|0777)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	cfg.DataDir = coinNetDir
+// 	switch net {
+// 	case "regtest", "simnet":
+// 		cfg.Params = &chaincfg.RegressionNetParams
+// 		cfg.TrustedPeer = &electrumx.NodeServerAddr{
+// 			// Net: "ssl", Addr: "127.0.0.1:57002", // debug server
+// 			Net: "ssl", Addr: "127.0.0.1:53002", // harness server
+// 		}
+// 		cfg.StoreEncSeed = true
+// 		cfg.RPCTestPort = 28887
+// 		cfg.Testing = true
+// 	case "testnet":
+// 		cfg.Params = &chaincfg.TestNet3Params
+// 		cfg.ProxyPort = "9050"
+// 		cfg.TrustedPeer = &electrumx.NodeServerAddr{
+// 			// Net: "ssl", Addr: "testnet.aranguren.org:51002", // Fulcrum - ExpBug0
+
+// 			// Net:   "ssl", // Fulcrum - ExpBug0
+// 			// Addr:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion:51002", // Fulcrum - ExpBug0
+// 			// Onion: true,
+
+// 			Net:   "tcp", // electrs-esplora 0.4.1
+// 			Addr:  "explorerzydxu5ecjrkwceayqybizmpjjznk5izmitf2modhcusuqlid.onion:143",
+// 			Onion: true,
+
+// 			// Net: "ssl", Addr: "electrum.blockstream.info:60002", // no verbose gtx
+// 			// Net: "ssl", Addr: "testnet.qtornado.com:51002", // doesn't sends same 3 peers or none .. suspect hanky panky
+// 			// Net: "tcp", Addr: "testnet.qtornado.com:51001", // suspect hanky panky
+// 		}
+// 		cfg.StoreEncSeed = true
+// 		cfg.RPCTestPort = 18887
+// 		cfg.Testing = true
+// 	case "mainnet":
+// 		cfg.Params = &chaincfg.MainNetParams
+// 		cfg.ProxyPort = "9050"
+// 		cfg.TrustedPeer = &electrumx.NodeServerAddr{
+// 			Net: "ssl", Addr: "[2a01:4f9:c010:e9d3::1]:50002",
+// 			// Net: "ssl", Addr: "elx.bitske.com:50002",
+// 		}
+// 		cfg.RPCTestPort = 8887
+// 		cfg.StoreEncSeed = false
+// 		cfg.Testing = false
+// 	}
+// 	return cfg, nil
+// }
 
 func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 	contains := func(s []string, str string) bool {
@@ -33,74 +113,74 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		}
 		return false
 	}
-	if !contains(coins, coin) {
-		return nil, errors.New("invalid coin")
-	}
+
+	cfg := client.NewDefaultConfig()
 	if !contains(nets, net) {
 		return nil, errors.New("invalid net")
 	}
+	if !contains(coins, coin) {
+		return nil, errors.New("invalid coin")
+	}
+
 	switch coin {
 	case "btc":
+		cfg.CoinType = wallet.Bitcoin
+		cfg.Coin = coin
+		switch net {
+		case "simnet", "regtest":
+			cfg.NetType = electrumx.Regtest
+			cfg.RPCTestPort = 28887
+			cfg.Params = &chaincfg.RegressionNetParams
+			cfg.TrustedPeer = &electrumx.NodeServerAddr{
+				// Net: "ssl", Addr: "127.0.0.1:57002", // debug server
+				Net: "ssl", Addr: "127.0.0.1:53002",
+			}
+			cfg.StoreEncSeed = true
+			cfg.Testing = true
+			fmt.Println(net)
+		case "testnet", "testnet3", "testnet4":
+			cfg.NetType = electrumx.Testnet
+			cfg.RPCTestPort = 18887
+			cfg.Params = &chaincfg.TestNet3Params
+			cfg.TrustedPeer = &electrumx.NodeServerAddr{
+				// Net: "ssl", Addr: "testnet.aranguren.org:51002",
+				// Net: "tcp", Addr: "testnet.aranguren.org:51001",
+				// Net: "ssl", Addr: "testnet.hsmiths.com:53012",
+				Net: "ssl", Addr: "testnet.qtornado.com:51002",
+				// Net: "ssl", Addr: "tn.not.fyi:55002",
+			}
+			cfg.StoreEncSeed = true
+			cfg.Testing = true
+			fmt.Println(net)
+		case "mainnet":
+			cfg.Params = &chaincfg.MainNetParams
+			cfg.NetType = electrumx.Mainnet
+			cfg.RPCTestPort = 8887
+			cfg.TrustedPeer = &electrumx.NodeServerAddr{
+				Net: "ssl", Addr: "elx.bitske.com:50002",
+			}
+			cfg.StoreEncSeed = false
+			cfg.Testing = false
+			fmt.Println(net)
+		default:
+			fmt.Printf("unknown net %s - exiting\n", net)
+			flag.Usage()
+			os.Exit(1)
+		}
 	default:
 		return nil, errors.New("invalid coin")
 	}
-	cfg := client.NewDefaultConfig()
-	cfg.CoinType = wallet.Bitcoin
-	cfg.Coin = coin
-	cfg.NetType = net
-	cfg.StoreEncSeed = true
+
 	appDir, err := client.GetConfigPath()
 	if err != nil {
 		return nil, err
 	}
-	coinNetDir := filepath.Join(appDir, coin, net)
+	coinNetDir := filepath.Join(appDir, coin, cfg.NetType)
 	err = os.MkdirAll(coinNetDir, os.ModeDir|0777)
 	if err != nil {
 		return nil, err
 	}
 	cfg.DataDir = coinNetDir
-	switch net {
-	case "regtest", "simnet":
-		cfg.Params = &chaincfg.RegressionNetParams
-		cfg.TrustedPeer = &electrumx.NodeServerAddr{
-			// Net: "ssl", Addr: "127.0.0.1:57002", // debug server
-			Net: "ssl", Addr: "127.0.0.1:53002", // harness server
-		}
-		cfg.StoreEncSeed = true
-		cfg.RPCTestPort = 28887
-		cfg.Testing = true
-	case "testnet":
-		cfg.Params = &chaincfg.TestNet3Params
-		cfg.ProxyPort = "9050"
-		cfg.TrustedPeer = &electrumx.NodeServerAddr{
-			// Net: "ssl", Addr: "testnet.aranguren.org:51002", // Fulcrum - ExpBug0
-
-			// Net:   "ssl", // Fulcrum - ExpBug0
-			// Addr:  "gsw6sn27quwf6u3swgra6o7lrp5qau6kt3ymuyoxgkth6wntzm2bjwyd.onion:51002", // Fulcrum - ExpBug0
-			// Onion: true,
-
-			Net:   "tcp", // electrs-esplora 0.4.1
-			Addr:  "explorerzydxu5ecjrkwceayqybizmpjjznk5izmitf2modhcusuqlid.onion:143",
-			Onion: true,
-
-			// Net: "ssl", Addr: "electrum.blockstream.info:60002", // no verbose gtx
-			// Net: "ssl", Addr: "testnet.qtornado.com:51002", // doesn't sends same 3 peers or none .. suspect hanky panky
-			// Net: "tcp", Addr: "testnet.qtornado.com:51001", // suspect hanky panky
-		}
-		cfg.StoreEncSeed = true
-		cfg.RPCTestPort = 18887
-		cfg.Testing = true
-	case "mainnet":
-		cfg.Params = &chaincfg.MainNetParams
-		cfg.ProxyPort = "9050"
-		cfg.TrustedPeer = &electrumx.NodeServerAddr{
-			Net: "ssl", Addr: "[2a01:4f9:c010:e9d3::1]:50002",
-			// Net: "ssl", Addr: "elx.bitske.com:50002",
-		}
-		cfg.RPCTestPort = 8887
-		cfg.StoreEncSeed = false
-		cfg.Testing = false
-	}
 	return cfg, nil
 }
 
@@ -148,7 +228,7 @@ func main() {
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
-	net := cfg.Params.Name
+	net := cfg.NetType
 	fmt.Println(net)
 
 	cfg.DbType = "sqlite"
@@ -175,8 +255,8 @@ func main() {
 	// - the rmwallet tool removes a wallet from the configured location.
 	//   regtest & testnet *only*
 
-	switch net {
-	case "regtest":
+	switch cfg.NetType {
+	case electrumx.Regtest:
 		// mnemonic := "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
 		// err := ec.RecreateWallet("abc", mnemonic)
 		err := ec.LoadWallet("abc")
@@ -184,7 +264,7 @@ func main() {
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}
-	case "testnet3":
+	case electrumx.Testnet:
 		// mnemonic := "canyon trip truly ritual lonely quiz romance rose alone journey like bronze"
 		// err := ec.RecreateWallet("abc", mnemonic)
 		ec.LoadWallet("abc")
@@ -192,7 +272,7 @@ func main() {
 			fmt.Println(err, " - exiting")
 			os.Exit(1)
 		}
-	case "mainnet":
+	case electrumx.Mainnet:
 		// production usage: load the client's wallet - needs -pass param
 		err := ec.LoadWallet(pass)
 		if err != nil {
