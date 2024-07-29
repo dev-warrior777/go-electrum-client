@@ -94,6 +94,13 @@ func (x *ElectrumXInterface) GetTip() int64 {
 	return tip
 }
 
+func (x *ElectrumXInterface) GetSyncStatus() bool {
+	if x.network == nil {
+		return false
+	}
+	return x.network.Synced()
+}
+
 func (x *ElectrumXInterface) GetBlockHeader(height int64) (*electrumx.ClientBlockHeader, error) {
 	if x.network == nil {
 		return nil, ErrNoNetwork

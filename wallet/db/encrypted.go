@@ -39,8 +39,8 @@ func (e *EncDB) PutEncrypted(b []byte, pw string) error {
 		return err
 	}
 	// store in db
-	e.lock.RLock()
-	defer e.lock.RUnlock()
+	e.lock.Lock()
+	defer e.lock.Unlock()
 	tx, err := e.db.Begin()
 	if err != nil {
 		return err

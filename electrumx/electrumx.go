@@ -143,6 +143,7 @@ type ElectrumX interface {
 	Start(ctx context.Context) error
 
 	GetTip() int64
+	GetSyncStatus() bool
 	GetBlockHeader(height int64) (*ClientBlockHeader, error)
 	GetBlockHeaders(startHeight int64, blockCount int64) ([]*ClientBlockHeader, error)
 	GetTipChangeNotify() (<-chan int64, error)

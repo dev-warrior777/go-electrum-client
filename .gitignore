@@ -30,6 +30,7 @@ cmd/goele/goele
 cmd/mkwallet/mkwallet
 cmd/rmwallet/rmwallet
 wallet/cmd/boltdmp/bd
+wallet/cmd/boltdmp/boltdmp
 client/btc/rpc_test/client
 client/btc/rpc_test/rpc_test
 

@@ -58,6 +58,7 @@ type ElectrumClient interface {
 	//
 	// Small subset of electrum-like methods
 	Tip() int64
+	Synced() bool
 	GetBlockHeader(height int64) (*electrumx.ClientBlockHeader, error)
 	GetBlockHeaders(startHeight, count int64) ([]*electrumx.ClientBlockHeader, error)
 	Spend(pw string, amount int64, toAddress string, feeLevel wallet.FeeLevel) (int, string, string, error)
@@ -75,11 +76,11 @@ type ElectrumClient interface {
 	GetWalletSpents() ([]wallet.Stxo, error)
 	Balance() (int64, int64, int64, error)
 
-	// adapt and pass thru
+	// adapt and pass thru to electrumx
 	Broadcast(ctx context.Context, rawTx []byte) (string, error)
 	FeeRate(ctx context.Context, confTarget int64) (int64, error)
 
-	//pass thru
+	//pass thru directly to electrumx
 	GetTransaction(ctx context.Context, txid string) (*electrumx.GetTransactionResult, error)
 	GetRawTransaction(ctx context.Context, txid string) ([]byte, error)
 	GetAddressHistory(ctx context.Context, addr string) (electrumx.HistoryResult, error)

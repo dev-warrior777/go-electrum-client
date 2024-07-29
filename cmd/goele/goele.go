@@ -57,7 +57,6 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 			}
 			cfg.StoreEncSeed = true
 			cfg.Testing = true
-			fmt.Println(net)
 		case "testnet", "testnet3", "testnet4":
 			cfg.NetType = electrumx.Testnet
 			cfg.RPCTestPort = 18887
@@ -71,7 +70,6 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 			}
 			cfg.StoreEncSeed = true
 			cfg.Testing = true
-			fmt.Println(net)
 		case "mainnet":
 			cfg.Params = &chaincfg.MainNetParams
 			cfg.NetType = electrumx.Mainnet
@@ -81,7 +79,6 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 			}
 			cfg.StoreEncSeed = false
 			cfg.Testing = false
-			fmt.Println(net)
 		default:
 			fmt.Printf("unknown net %s - exiting\n", net)
 			flag.Usage()
@@ -109,10 +106,7 @@ func configure() (string, *client.ClientConfig, error) {
 	net := flag.String("net", "regtest", "network type; testnet, mainnet, regtest")
 	pass := flag.String("pass", "", "wallet password")
 	flag.Parse()
-	fmt.Println("coin:", *coin)
-	fmt.Println("net:", *net)
 	cfg, err := makeBasicConfig(*coin, *net)
-	fmt.Printf("electrumX server address: %s\n", cfg.TrustedPeer)
 	return *pass, cfg, err
 }
 
@@ -148,25 +142,32 @@ func main() {
 		fmt.Println(err, " - exiting")
 		os.Exit(1)
 	}
+	fmt.Println(cfg.Coin)
+
 	net := cfg.NetType
 	fmt.Println(net)
 
-	cfg.DbType = "sqlite"
+	if net == electrumx.Regtest {
+		// Use SqLite3 for regtest as you can debug the wallet while running.
+		// BoltDb for production but only one instance of the bdb can be run
+		// concurrently on the same machine.
+		cfg.DbType = "sqlite"
+	}
 	fmt.Println(cfg.DbType)
+
+	fmt.Printf("electrumX server address: %s\n", cfg.TrustedPeer)
 
 	// make basic client
 	ec := btc.NewBtcElectrumClient(cfg)
 
-	// start client, create node & sync headers
+	// start client, create ElectrumXInterface & sync headers
 	clientCtx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
 	err = ec.Start(clientCtx)
 	if err != nil {
 		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
 		os.Exit(1)
 	}
-
-	feeRate, _ := ec.FeeRate(clientCtx, 6)
-	fmt.Println("Fee rate: ", feeRate)
+	fmt.Println("synced", ec.Synced())
 
 	// to make the client's wallet:
 	// - for regtest/testnet testing recreate a wallet with a known set of keys.

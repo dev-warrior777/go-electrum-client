@@ -427,6 +427,13 @@ func (net *Network) Tip() (int64, error) {
 	return net.headers.getClientTip(), nil
 }
 
+func (net *Network) Synced() bool {
+	if !net.started {
+		return false
+	}
+	return net.headers.getClientSynced()
+}
+
 func (net *Network) BlockHeader(height int64) (*ClientBlockHeader, error) {
 	if !net.started {
 		return nil, errNoNetwork

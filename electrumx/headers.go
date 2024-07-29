@@ -232,6 +232,11 @@ func (h *headers) getClientTip() int64 {
 	return h.tip
 }
 
+// getClientSynced returns the headers synced status - not locked
+func (h *headers) getClientSynced() bool {
+	return h.synced
+}
+
 // getTip returns the stored block headers tip height. Not locked
 func (h *headers) getTip() int64 {
 	return h.tip

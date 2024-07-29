@@ -7,7 +7,7 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
-// Tip returns ElectrumXInterface current tip
+// Tip returns the headers current tip
 func (ec *BtcElectrumClient) Tip() (tip int64) {
 	return ec.GetX().GetTip()
 }
@@ -58,6 +58,11 @@ func (ec *BtcElectrumClient) UnregisterTipChangeNotify() {
 		close(ec.sendTipChangeNotify)
 		ec.sendTipChangeNotify = nil
 	}
+}
+
+// Synced returns the headers sync status
+func (ec *BtcElectrumClient) Synced() bool {
+	return ec.GetX().GetSyncStatus()
 }
 
 // GetBlockHeader returns a block header from ElectrumXInterface current stored headers

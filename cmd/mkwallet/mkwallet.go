@@ -211,9 +211,7 @@ func main() {
 	}
 
 	// recreate the client's wallet
-	// for non-mainnet testing recreate a wallet with a known set of keys ..
-	// var mnemonic = "jungle pair grass super coral bubble tomato sheriff pulp cancel luggage wagon"
-	// err := ec.RecreateWallet(pass, mnemonic)
+	// for non-mainnet testing recreate a wallet with a known set of keys if -tw ..
 	err = ec.RecreateWallet(context.TODO(), pass, seed)
 	if err != nil {
 		fmt.Println(err, " - exiting")

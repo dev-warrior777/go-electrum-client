@@ -11,7 +11,7 @@ import (
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
-// Encrypted storage for btc. Stored as an encrypted blob in database.
+// Encrypted storage for btc. Stored as an encrypted blob in the wallet database.
 
 type Storage struct {
 	Version string `json:"version"`
@@ -58,7 +58,6 @@ func (sm *StorageManager) Put(pw string) error {
 	if err != nil {
 		return err
 	}
-
 	return sm.datastore.PutEncrypted(b, pw)
 }
 
@@ -71,7 +70,6 @@ func (sm *StorageManager) Get(pw string) error {
 	if err != nil {
 		return err
 	}
-
 	return json.Unmarshal(b, sm.store)
 }
 
