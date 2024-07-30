@@ -23,7 +23,7 @@ import (
 // https://electrumx.readthedocs.io/en/latest/protocol-basics.html
 //
 // It can get confusing! Here 'scripthash' is an electrum value. But the
-// ScriptHash from (btcutl.Address).SciptHash() is the normal RIPEMD160
+// ScriptHash from (btcutl.Address).ScriptHash() is the normal RIPEMD160
 // hash.
 //
 // An electrum scripthash is the full output payment script which is then

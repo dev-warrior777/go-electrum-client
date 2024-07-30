@@ -38,7 +38,7 @@ func (ec *BtcElectrumClient) getPubKeyHashUtxos(ctx context.Context, keyPair *bt
 		return inputList, ErrNoElectrumX
 	}
 	// make address p2pkh
-	pkHash := btcutil.Hash160(pubKey)
+	pkHash := hash160(pubKey)
 	addressPubKeyHash, err := btcutil.NewAddressPubKeyHash(pkHash, ec.GetConfig().Params)
 	if err != nil {
 		return inputList, err
@@ -81,7 +81,7 @@ func (ec *BtcElectrumClient) getWitnessPubKeyHashUtxos(ctx context.Context, keyP
 		return inputList, ErrNoElectrumX
 	}
 	// make address p2wpkh
-	pkHash := btcutil.Hash160(pubKey)
+	pkHash := hash160(pubKey)
 	addressWitnessPubKeyHash, err := btcutil.NewAddressWitnessPubKeyHash(pkHash, ec.GetConfig().Params)
 	if err != nil {
 		return inputList, err

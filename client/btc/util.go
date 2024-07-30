@@ -2,9 +2,12 @@ package btc
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
+	"hash"
 
 	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/crypto/ripemd160"
 )
 
 // /////////////////////////////////////////////////////////////////////////////
@@ -34,4 +37,15 @@ func serializeWireTx(tx *wire.MsgTx) ([]byte, error) {
 		return nil, err
 	}
 	return w.Bytes(), nil
+}
+
+// Calculate the hash of hasher over buf.
+func calcHash(buf []byte, hasher hash.Hash) []byte {
+	_, _ = hasher.Write(buf)
+	return hasher.Sum(nil)
+}
+
+// hash160 calculates the hash ripemd160(sha256(b)).
+func hash160(buf []byte) []byte {
+	return calcHash(calcHash(buf, sha256.New()), ripemd160.New())
 }
