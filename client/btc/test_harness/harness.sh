@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-# Tmux script that sets up a simnet harness for BTC regtest simnet.
+# Tmux script that sets up a simnet harness for BTC regtest. Unlike dex simnets 
+# it only has one btc node. It also keeps the chain by default, preserving txs.
+# To discard the chain set env DISCARD="y"
 
 SYMBOL="btc"
 DAEMON="bitcoind"
@@ -15,61 +17,52 @@ ALPHA_MINING_ADDR="bcrt1qy7agjj62epx0ydnqskgwlcfwu52xjtpj36hr0d"
 EXTRA_ARGS="--blockfilterindex --peerblockfilters --rpcbind=0.0.0.0 --rpcallowip=0.0.0.0/0"
 CREATE_DEFAULT_WALLET="1"
 GOELE_WALLET_ADDR="bcrt1q5v9qeuw63sxrdt5dvdakw3nrenetx8j9c68hk5"
-
-# Run the harness
-HARNESS_VER="1" # for outdated chain archive detection
-
-
-
-
-
-
-
-set -ex
-NODES_ROOT=~/dextest/${SYMBOL}
-rm -rf "${NODES_ROOT}"
-
-ALPHA_DIR="${NODES_ROOT}/alpha"
-BETA_DIR="${NODES_ROOT}/beta"
-HARNESS_DIR="${NODES_ROOT}/harness-ctl"
-
-echo "Writing node config files"
-mkdir -p "${HARNESS_DIR}"
-mkdir -p "${ALPHA_DIR}"
-
 WALLET_PASSWORD="abc"
 
-ALPHA_CLI_CFG="-rpcwallet= -rpcport=${ALPHA_RPC_PORT} -regtest=1 -rpcuser=user -rpcpassword=pass"
+NODES_ROOT=~/dextest/goele/${SYMBOL}
+ALPHA_DIR="${NODES_ROOT}/alpha"
+HARNESS_DIR="${NODES_ROOT}/harness-ctl"
+
+set -ex
+
+################################################################################
+# Check directories and discard.
+################################################################################
+
+echo "in directory $(pwd) DISCARD=$DISCARD"
+
+# Check old datadir exists and populated
+
+if [ ! -d "${NODES_ROOT}" ] || [ ! -d "${ALPHA_DIR}" ] || [ ! -d "${HARNESS_DIR}" ]
+then
+  echo "bad datadir ${NODES_ROOT} making new"
+  DISCARD="1"
+fi
+
+# Delete old datadir if discarding the chain
+
+if [ -n "$DISCARD" ]
+then
+  rm -rf "${NODES_ROOT}"
+  echo "Making new directories"
+  mkdir -p "${HARNESS_DIR}"
+  mkdir -p "${ALPHA_DIR}"
+fi
+
+
+################################################################################
+# Run the harness.
+################################################################################
+
+SESSION="${SYMBOL}-harness"
+export SHELL=$(which bash)
 
 # DONE can be used in a send-keys call along with a `wait-for btc` command to
 # wait for process termination.
 DONE="; tmux wait-for -S ${SYMBOL}"
 WAIT="wait-for ${SYMBOL}"
 
-SESSION="${SYMBOL}-harness"
-
-export SHELL=$(which bash)
-
-
 cd ${NODES_ROOT} && tmux new-session -d -s $SESSION $SHELL
-
-################################################################################
-# Write config files.
-################################################################################
-
-# These config files aren't actually used here, but can be used by other
-# programs. I would use them here, but bitcoind seems to have some issues
-# reading from the file when using regtest.
-
-cat > "${ALPHA_DIR}/alpha.conf" <<EOF
-rpcuser=user
-rpcpassword=pass
-datadir=${ALPHA_DIR}
-txindex=1
-port=${ALPHA_LISTEN_PORT}
-regtest=1
-rpcport=${ALPHA_RPC_PORT}
-EOF
 
 ################################################################################
 # Start the alpha node.
@@ -91,12 +84,19 @@ sleep 3
 # Setup the harness-ctl directory
 ################################################################################
 
+cd ${HARNESS_DIR}
+echo "in directory $(pwd)"
+
 tmux new-window -t $SESSION:2 -n 'harness-ctl' $SHELL
 tmux send-keys -t $SESSION:2 "set +o history" C-m
 tmux send-keys -t $SESSION:2 "cd ${HARNESS_DIR}" C-m
 sleep 1
 
-cd ${HARNESS_DIR}
+################################################################################# discard ->
+if [ -n "$DISCARD" ]
+then
+
+  ALPHA_CLI_CFG="-rpcwallet= -rpcport=${ALPHA_RPC_PORT} -regtest=1 -rpcuser=user -rpcpassword=pass"
 
 cat > "./alpha" <<EOF
 #!/usr/bin/env bash
@@ -150,19 +150,12 @@ chmod +x "${HARNESS_DIR}/quit"
     tmux send-keys -t $SESSION:2 "./alpha sendtoaddress ${ALPHA_MINING_ADDR} ${i}${DONE}" C-m\; ${WAIT}
   done
 
-  #################################################################################
-  # fund goele regtest wallet made from well known test_wallet seed - tricky!
-  ################################################################################
-
-  # for i in 1 1 1 2 2 2 3 3 3
-  # do
-  #   tmux send-keys -t $SESSION:2 "./alpha sendtoaddress ${GOELE_WALLET_ADDR} ${i}${DONE}" C-m\; ${WAIT}
-  # done
-
+fi
+################################################################################# <- discard
 
 set +x
 
-# Reenable history
+# Re-enable history
 tmux send-keys -t $SESSION:2 "set -o history" C-m
 
 # Miner
@@ -171,6 +164,8 @@ if [ -z "$NOMINER" ] ; then
   tmux send-keys -t $SESSION:3 "cd ${HARNESS_DIR}" C-m
   tmux send-keys -t $SESSION:3 "watch -n 15 ./mine-alpha 1" C-m
 fi
+
+tmux send-keys -t $SESSION:2 "echo 'Ready DISCARD=${DISCARD}'" C-m
 
 tmux select-window -t $SESSION:2
 tmux attach-session -t $SESSION
