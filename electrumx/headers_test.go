@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/btcsuite/btcd/wire"
@@ -105,9 +106,9 @@ func TestAppendHeaders(t *testing.T) {
 		startPoint:        0, // regtest
 		hdrs:              make(map[int64]*BlockHeader),
 		blkHdrs:           make(map[WireHash]int64),
-		tip:               0,
 		synced:            false,
 	}
+	h.setTip(0)
 
 	numHdrs, err := h.appendHeadersFile(hdrFileReg)
 	if err != nil {
@@ -139,10 +140,10 @@ func TestAppendHeaders(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	h.tip = maybeTip
+	h.setTip(maybeTip)
 
 	// verify chain
-	fmt.Println("verifying back from tip at height", h.tip)
+	fmt.Println("verifying back from tip at height", h.getTip())
 	err = h.verifyAll()
 	if err != nil {
 		log.Fatal(err)
@@ -165,9 +166,9 @@ func TestTruncateHeadersFile(t *testing.T) {
 		startPoint:        0, // regtest
 		hdrs:              make(map[int64]*BlockHeader),
 		blkHdrs:           make(map[WireHash]int64),
-		tip:               0,
 		synced:            false,
 	}
+	h.setTip(0)
 
 	numHdrs, err := h.appendHeadersFile(hdrFileReg)
 	if err != nil {
@@ -277,9 +278,9 @@ func TestStore(t *testing.T) {
 		startPoint:        0, // regtest
 		hdrs:              make(map[int64]*BlockHeader),
 		blkHdrs:           make(map[WireHash]int64),
-		tip:               0,
 		synced:            false,
 	}
+	h.setTip(0)
 
 	err := h.store(hdr, 0)
 	if err != nil {
@@ -328,9 +329,9 @@ func TestStoreHashes(t *testing.T) {
 		startPoint:        0, // regtest
 		hdrs:              make(map[int64]*BlockHeader),
 		blkHdrs:           make(map[WireHash]int64),
-		tip:               0,
 		synced:            false,
 	}
+	h.setTip(0)
 
 	err := h.store(hdrFileReg, 0)
 	if err != nil {
@@ -341,9 +342,10 @@ func TestStoreHashes(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	h.tip = numHeaders - 1
+
+	h.setTip(numHeaders - 1)
 	var i int64
-	for i = 0; i <= h.tip; i++ {
+	for i = 0; i <= h.getTip(); i++ {
 		hdr := h.hdrs[i]
 		if hdr == nil {
 			log.Fatalf("nil header returned from map at %d", i)
@@ -373,16 +375,44 @@ func TestDeserializeHeader(t *testing.T) {
 		startPoint:        0, // regtest
 		hdrs:              make(map[int64]*BlockHeader),
 		blkHdrs:           make(map[WireHash]int64),
-		tip:               0,
 		synced:            false,
 	}
+	h.tip.Store(0)
 
 	r := bytes.NewBuffer(hdrSerialized)
 	blkHdr, err := h.headerDeserialzer.Deserialize(r)
 	if err != nil {
 		log.Fatal(err)
 	}
-	h.tip = -1
+	h.tip.Store(-1)
 	h.storeOneHdr(blkHdr) // {tip++}
 	h.dumpAll()
+}
+
+func TestTip(t *testing.T) {
+	h := headers{}
+	var wg sync.WaitGroup
+	inc := func(delta int64) {
+		defer wg.Done()
+		for n := 0; n < 1000; n++ {
+			h.incTip(delta)
+		}
+	}
+	dec := func(delta int64) {
+		defer wg.Done()
+		for n := 0; n < 1000; n++ {
+			h.decTip(delta)
+		}
+	}
+	for i := 0; i < 10000; i++ {
+		wg.Add(1)
+		go inc(1)
+		wg.Add(1)
+		go dec(1)
+	}
+	wg.Wait()
+	fmt.Printf("tip=%d\n\n", h.getTip())
+	if h.getTip() != 0 {
+		t.Fatal("expected tip=0")
+	}
 }

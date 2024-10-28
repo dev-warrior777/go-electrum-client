@@ -128,10 +128,10 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 	if err != nil {
 		return err
 	}
-	h.tip = maybeTip
+	h.setTip(maybeTip)
 
 	// 5. Verify headers in headers map
-	fmt.Printf("starting verify at height %d\n", h.tip)
+	fmt.Printf("starting verify at height %d\n", h.getTip())
 	err = h.verifyAll()
 	if err != nil {
 		return err
@@ -139,7 +139,7 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 	fmt.Println("header chain verified")
 
 	h.synced = true
-	fmt.Println("headers synced up to tip ", h.tip)
+	fmt.Println("headers synced up to tip ", h.getTip())
 	return nil
 }
 

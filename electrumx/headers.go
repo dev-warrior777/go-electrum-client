@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 )
 
 const (
@@ -55,7 +56,7 @@ type headers struct {
 	hdrs        map[int64]*BlockHeader
 	blkHdrs     map[WireHash]int64
 	hdrsMtx     sync.RWMutex
-	tip         int64
+	tip         atomic.Int64
 	synced      bool
 	recovery    bool
 	recoveryTip int64
@@ -69,19 +70,33 @@ func newHeaders(cfg *ElectrumXConfig) *headers {
 	bhdrsMap := make(map[WireHash]int64, hdrsMapInitSize)
 	headerDeserialzer := cfg.HeaderDeserializer
 	hdrs := headers{
-		headerSize:  cfg.BlockHeaderSize,
-		hdrFilePath: filePath,
-		// p:                 cfg.Params,
+		headerSize:        cfg.BlockHeaderSize,
+		hdrFilePath:       filePath,
 		startPoint:        startPoint,
 		headerDeserialzer: headerDeserialzer,
 		hdrs:              hdrsMap,
 		blkHdrs:           bhdrsMap,
-		tip:               0,
 		synced:            false,
 		recovery:          false,
 		recoveryTip:       0,
 	}
 	return &hdrs
+}
+
+func (h *headers) getTip() int64 {
+	return h.tip.Load()
+}
+
+func (h *headers) setTip(n int64) {
+	h.tip.Store(n)
+}
+
+func (h *headers) incTip(delta int64) {
+	h.tip.Add(delta)
+}
+
+func (h *headers) decTip(delta int64) {
+	h.tip.Add(-delta)
 }
 
 // stored headers start from here
@@ -216,8 +231,8 @@ func (h *headers) store(b []byte, startHeight int64) error {
 func (h *headers) removeOneHdrFromTip() {
 	h.hdrsMtx.Lock()
 	defer h.hdrsMtx.Unlock()
-	delete(h.hdrs, h.tip)
-	h.tip--
+	delete(h.hdrs, h.getTip())
+	h.decTip(1)
 }
 
 // getClientTip returns the stored block headers last tip height or .
@@ -229,17 +244,12 @@ func (h *headers) getClientTip() int64 {
 	if h.recovery {
 		return h.recoveryTip
 	}
-	return h.tip
+	return h.getTip()
 }
 
 // getClientSynced returns the headers synced status - not locked
 func (h *headers) getClientSynced() bool {
 	return h.synced
-}
-
-// getTip returns the stored block headers tip height. Not locked
-func (h *headers) getTip() int64 {
-	return h.tip
 }
 
 // // reverse lookup
@@ -250,7 +260,7 @@ func (h *headers) getTip() int64 {
 // }
 
 func (h *headers) getTipHash() WireHash {
-	hdr := h.hdrs[h.tip]
+	hdr := h.hdrs[h.getTip()]
 	return hdr.Hash
 }
 
@@ -264,11 +274,12 @@ func (h *headers) checkCanConnect(incomingHdr *BlockHeader) bool {
 func (h *headers) storeOneHdr(blkHdr *BlockHeader) {
 	h.hdrsMtx.Lock()
 	defer h.hdrsMtx.Unlock()
-	at := h.tip + 1
+	at := h.getTip() + 1
+	// at := h.tip + 1
 	h.hdrs[at] = blkHdr
 	blkHash := blkHdr.Hash
 	h.blkHdrs[blkHash] = at
-	h.tip = at
+	h.incTip(1)
 }
 
 // Verify headers prev hash back from tip. If 'all' is true 'depth' is ignored
@@ -276,12 +287,12 @@ func (h *headers) storeOneHdr(blkHdr *BlockHeader) {
 func (h *headers) verifyFromTip(depth int64, all bool) error {
 	h.hdrsMtx.RLock()
 	defer h.hdrsMtx.RUnlock()
-	downTo := h.tip - depth
+	downTo := h.getTip() - depth
 	if downTo < 0 || all {
 		downTo = h.startPoint
 	}
 	var height int64
-	for height = h.tip; height > downTo; height-- {
+	for height = h.getTip(); height > downTo; height-- {
 		thisHdr := h.hdrs[height]
 		prevHdr := h.hdrs[height-1]
 		prevHdrBlkHash := prevHdr.Hash
@@ -347,11 +358,11 @@ func (h *headers) getBlockHeaders(startHeight, count int64) ([]*ClientBlockHeade
 		//   making a server call if api users need that.
 		return nil, errors.New("requested start height < start of stored block headers")
 	}
-	if startHeight > h.tip {
+	if startHeight > h.getTip() {
 		return nil, errors.New("requested start height > local tip")
 	}
 	blkEndRange := startHeight + count
-	if blkEndRange > h.tip {
+	if blkEndRange > h.getTip() {
 		return nil, errors.New("requested range is past the local tip")
 	}
 	var hdrs = make([]*ClientBlockHeader, 0, 3)
@@ -405,7 +416,7 @@ func (h *headers) dumpAt(height int64) {
 
 func (h *headers) dumpAll() {
 	var k int64
-	for k = h.startPoint; k < h.tip; k++ {
+	for k = h.startPoint; k < h.getTip(); k++ {
 		h.dumpAt(k)
 	}
 }
