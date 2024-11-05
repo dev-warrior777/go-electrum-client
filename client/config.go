@@ -49,7 +49,7 @@ type ClientConfig struct {
 	// Note: This is tested on Linux and is still considered *Experimental*
 	ProxyPort string
 
-	// Store the seed in encrypted storage
+	// Store the seed in encrypted storage - default false
 	StoreEncSeed bool
 
 	// Database implementation type (bbolt or sqlite)

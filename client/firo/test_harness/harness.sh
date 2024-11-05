@@ -48,7 +48,7 @@ SHELL=$(which bash)
 echo "Loading prepared, encrypted but empty wallet"
 
 mkdir -p "${ALPHA_DIR}/regtest"
-cp "${SOURCE_DIR}/alpha_wallet.dat" "${ALPHA_DIR}/regtest/wallet.dat"
+cp "${SOURCE_DIR}/wallets/alpha_wallet.dat" "${ALPHA_DIR}/regtest/wallet.dat"
 
 ################################################################################
 # Write config files.

@@ -1,6 +1,6 @@
 DEXDATA=$HOME/dextest
-BTCELEX=$DEXDATA/electrum/server
-rm -rf $BTCELEX
+FIROELEX=$DEXDATA/electrum/server
+rm -rf $FIROELEX
 
 $(pwd)/electrumx.sh
 

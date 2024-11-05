@@ -12,11 +12,12 @@
 # - gencerts - go install github.com/decred/dcrd/cmd/gencerts@release-v1.7
 # - git
 #
-# See Also: README_ELECTRUM_HARNESSES.md and README_HARNESS.md
+# See Also: README_ELECTRUM_HARNESSES.md and README_HARNESS.md in dcrdex repo
 
 set -ex
 
-COMMIT=c0cdcc0dfcaa057058fd1ed281557dede924cd27
+COMMIT=937e4bb3d8802317b64231844b698d8758029ca5     # Jul 08, 2024
+# COMMIT=c0cdcc0dfcaa057058fd1ed281557dede924cd27   # May 11, 2023
 
 ELECTRUMX_DIR=~/dextest/electrum/firo/server
 REPO_DIR=${ELECTRUMX_DIR}/electrumx-repo

@@ -16,7 +16,8 @@ import (
 const (
 	// All coins will use this file-name under ../<coin>/<net>/
 	HEADER_FILE_NAME = "blockchain_headers"
-	// Bitcoin ElectrumX chunk size - may vary for other coins' ElectrumX servers.
+	// Bitcoin ElectrumX chunk size - may vary for other coins' ElectrumX servers
+	// in which case this becomes a variable.
 	ELECTRUM_MAGIC_NUMHDR = 2016
 )
 
@@ -31,7 +32,7 @@ func reverseHash(arr [HashSize]byte) [HashSize]byte {
 		left++
 		right--
 	}
-	copy(newArr[:], arr[:])
+	copy(newArr[:], arr[:]) // go1.19
 	return newArr
 }
 
@@ -196,7 +197,7 @@ func (h *headers) readAllBytesFromFile() ([]byte, error) {
 		return nil, err
 	}
 	if n != int(fsize) {
-		return nil, errors.New("read less tha file size")
+		return nil, errors.New("read less than file size")
 	}
 	return b, nil
 }
