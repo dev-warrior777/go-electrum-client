@@ -188,7 +188,8 @@ func (net *Network) startNewPeer(
 	}
 	network := net.config.Coin
 	nettype := net.config.NetType
-	genesis := net.config.Params.GenesisHash.String()
+	genesis := net.config.Genesis
+
 	// node runs in a new child context
 	nodeCtx, nodeCancel := context.WithCancelCause(ctx)
 	err = node.start(nodeCtx, nodeCancel, network, nettype, genesis)

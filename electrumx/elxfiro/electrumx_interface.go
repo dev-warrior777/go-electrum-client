@@ -3,19 +3,23 @@ package elxfiro
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
-// These configure ElectrumX network for: BTC
+// These configure ElectrumX network for: FIRO
 const (
 	FIRO_COIN                     = "firo"
 	FIRO_HEADER_SIZE              = 80 // check this for MTP legacy. Now FiroPoW (ProgPow clone) .. should be 80
 	FIRO_STARTPOINT_REGTEST       = 0
 	FIRO_STARTPOINT_TESTNET       = 170_000
 	FIRO_STARTPOINT_MAINNET       = 987_000
+	FIRO_GENESIS_REGTEST          = "a42b98f04cc2916e8adfb5d9db8a2227c4629bc205748ed2f33180b636ee885b"
+	FIRO_GENESIS_TESTNET          = "aa22adcc12becaf436027ffe62a8fb21b234c58c23865291e5dc52cf53f64fca"
+	FIRO_GENESIS_MAINNET          = "4381deb85b1b2c9843c222944b616d997516dcbd6a964e1eaf0def0830695233"
 	FIRO_MAX_ONLINE_PEERS_REGTEST = 0
 	FIRO_MAX_ONLINE_PEERS_TESTNET = 0 // only one testnet server 95.179.164.13:51002 - v0.14.14.0
 	FIRO_MAX_ONLINE_PEERS_MAINNET = 3 // only 4 servers                              - v0.14.14.0
@@ -47,20 +51,22 @@ type ElectrumXInterface struct {
 func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterface, error) {
 	config.Coin = FIRO_COIN
 	config.BlockHeaderSize = FIRO_HEADER_SIZE
-	config.StartPoints = make(map[string]int64)
-	config.StartPoints[electrumx.REGTEST] = int64(FIRO_STARTPOINT_REGTEST)
-	config.StartPoints[electrumx.TESTNET] = int64(FIRO_STARTPOINT_TESTNET)
-	config.StartPoints[electrumx.MAINNET] = int64(FIRO_STARTPOINT_MAINNET)
 	config.MaxOnion = FIRO_MAX_ONION
 	switch config.NetType {
 	case electrumx.Regtest:
+		config.Genesis = FIRO_GENESIS_REGTEST
+		config.StartPoint = FIRO_STARTPOINT_REGTEST
 		config.MaxOnlinePeers = FIRO_MAX_ONLINE_PEERS_REGTEST
 	case electrumx.Testnet:
+		config.Genesis = FIRO_GENESIS_TESTNET
+		config.StartPoint = FIRO_STARTPOINT_TESTNET
 		config.MaxOnlinePeers = FIRO_MAX_ONLINE_PEERS_TESTNET
 	case electrumx.Mainnet:
+		config.Genesis = FIRO_GENESIS_MAINNET
+		config.StartPoint = FIRO_STARTPOINT_MAINNET
 		config.MaxOnlinePeers = FIRO_MAX_ONLINE_PEERS_MAINNET
 	default:
-		config.MaxOnlinePeers = 2
+		return nil, fmt.Errorf("config error")
 	}
 	deserializer := headerDeserialzer{}
 	config.HeaderDeserializer = &deserializer

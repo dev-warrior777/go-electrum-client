@@ -3,6 +3,7 @@ package elxbtc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/btcsuite/btcd/wire"
@@ -16,6 +17,9 @@ const (
 	BTC_STARTPOINT_REGTEST       = 0
 	BTC_STARTPOINT_TESTNET       = 2560000
 	BTC_STARTPOINT_MAINNET       = 823000
+	BTC_GENESIS_REGTEST          = "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"
+	BTC_GENESIS_TESTNET          = "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"
+	BTC_GENESIS_MAINNET          = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
 	BTC_MAX_ONLINE_PEERS_REGTEST = 0
 	BTC_MAX_ONLINE_PEERS_TESTNET = 3
 	BTC_MAX_ONLINE_PEERS_MAINNET = 10
@@ -47,20 +51,22 @@ type ElectrumXInterface struct {
 func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterface, error) {
 	config.Coin = BTC_COIN
 	config.BlockHeaderSize = BTC_HEADER_SIZE
-	config.StartPoints = make(map[string]int64)
-	config.StartPoints[electrumx.REGTEST] = int64(BTC_STARTPOINT_REGTEST)
-	config.StartPoints[electrumx.TESTNET] = int64(BTC_STARTPOINT_TESTNET)
-	config.StartPoints[electrumx.MAINNET] = int64(BTC_STARTPOINT_MAINNET)
 	config.MaxOnion = BTC_MAX_ONION
 	switch config.NetType {
 	case electrumx.Regtest:
+		config.Genesis = BTC_GENESIS_REGTEST
+		config.StartPoint = BTC_STARTPOINT_REGTEST
 		config.MaxOnlinePeers = BTC_MAX_ONLINE_PEERS_REGTEST
 	case electrumx.Testnet:
+		config.Genesis = BTC_GENESIS_TESTNET
+		config.StartPoint = BTC_STARTPOINT_TESTNET
 		config.MaxOnlinePeers = BTC_MAX_ONLINE_PEERS_TESTNET
 	case electrumx.Mainnet:
+		config.Genesis = BTC_GENESIS_MAINNET
+		config.StartPoint = BTC_STARTPOINT_MAINNET
 		config.MaxOnlinePeers = BTC_MAX_ONLINE_PEERS_MAINNET
 	default:
-		config.MaxOnlinePeers = 2
+		return nil, fmt.Errorf("config error")
 	}
 	deserializer := headerDeserialzer{}
 	config.HeaderDeserializer = &deserializer

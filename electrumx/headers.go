@@ -65,7 +65,6 @@ type headers struct {
 
 func newHeaders(cfg *ElectrumXConfig) *headers {
 	filePath := filepath.Join(cfg.DataDir, HEADER_FILE_NAME)
-	startPoint := getStartPointHeight(cfg)
 	hdrsMapInitSize := 2 * ELECTRUM_MAGIC_NUMHDR //4032
 	hdrsMap := make(map[int64]*BlockHeader, hdrsMapInitSize)
 	bhdrsMap := make(map[WireHash]int64, hdrsMapInitSize)
@@ -73,7 +72,7 @@ func newHeaders(cfg *ElectrumXConfig) *headers {
 	hdrs := headers{
 		headerSize:        cfg.BlockHeaderSize,
 		hdrFilePath:       filePath,
-		startPoint:        startPoint,
+		startPoint:        cfg.StartPoint,
 		headerDeserialzer: headerDeserialzer,
 		hdrs:              hdrsMap,
 		blkHdrs:           bhdrsMap,
@@ -98,20 +97,6 @@ func (h *headers) incTip(delta int64) {
 
 func (h *headers) decTip(delta int64) {
 	h.tip.Add(-delta)
-}
-
-// stored headers start from here
-func getStartPointHeight(cfg *ElectrumXConfig) int64 {
-	var startAtHeight int64 = 0
-	switch cfg.NetType {
-	case MAINNET:
-		startAtHeight = cfg.StartPoints[MAINNET]
-	case TESTNET:
-		startAtHeight = cfg.StartPoints[TESTNET]
-	case REGTEST:
-		startAtHeight = cfg.StartPoints[REGTEST]
-	}
-	return startAtHeight
 }
 
 // ----------------------------------------------------------------------------

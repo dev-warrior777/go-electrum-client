@@ -9,11 +9,11 @@ import (
 
 	"github.com/dev-warrior777/go-electrum-client/client"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
-	"github.com/dev-warrior777/go-electrum-client/electrumx/elxbtc"
+	"github.com/dev-warrior777/go-electrum-client/electrumx/elxfiro"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 	"github.com/dev-warrior777/go-electrum-client/wallet/bdb"
 	"github.com/dev-warrior777/go-electrum-client/wallet/db"
-	// "github.com/dev-warrior777/go-electrum-client/wallet/wltfiro"
+	"github.com/dev-warrior777/go-electrum-client/wallet/wltfiro"
 )
 
 // FiroElectrumClient - implements ElectrumClient interface
@@ -103,7 +103,7 @@ func (ec *FiroElectrumClient) getDatastore() error {
 // createElectrumXInterface creates an ElectrumXInterface
 func (ec *FiroElectrumClient) createElectrumXInterface() error {
 	elxCfg := ec.GetConfig().MakeElectrumXConfig()
-	n, err := elxbtc.NewElectrumXInterface(elxCfg)
+	n, err := elxfiro.NewElectrumXInterface(elxCfg)
 	if err != nil {
 		return err
 	}
@@ -147,12 +147,12 @@ func (ec *FiroElectrumClient) CreateWallet(pw string) error {
 		return err
 	}
 
-	// walletCfg := ec.ClientConfig.MakeWalletConfig()
+	walletCfg := ec.ClientConfig.MakeWalletConfig()
 
-	// ec.Wallet, err = wltfiro.NewFiroElectrumWallet(walletCfg, pw)
-	// if err != nil {
-	// 	return err
-	// }
+	ec.Wallet, err = wltfiro.NewFiroElectrumWallet(walletCfg, pw)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -168,11 +168,11 @@ func (ec *FiroElectrumClient) RecreateWallet(ctx context.Context, pw, mnenomic s
 	if err != nil {
 		return err
 	}
-	// walletCfg := ec.ClientConfig.MakeWalletConfig()
-	// ec.Wallet, err = wltfiro.RecreateElectrumWallet(walletCfg, pw, mnenomic)
-	// if err != nil {
-	// 	return err
-	// }
+	walletCfg := ec.ClientConfig.MakeWalletConfig()
+	ec.Wallet, err = wltfiro.RecreateElectrumWallet(walletCfg, pw, mnenomic)
+	if err != nil {
+		return err
+	}
 	// // Do a rescan because alhough we have a wallet structure with a keychain
 	// // we do not have any transaction history
 	// err = ec.RescanWallet(ctx)
@@ -192,11 +192,11 @@ func (ec *FiroElectrumClient) LoadWallet(pw string) error {
 	if err != nil {
 		return err
 	}
-	// walletCfg := ec.ClientConfig.MakeWalletConfig()
-	// ec.Wallet, err = wltfiro.LoadFiroElectrumWallet(walletCfg, pw)
-	// if err != nil {
-	// 	return err
-	// }
+	walletCfg := ec.ClientConfig.MakeWalletConfig()
+	ec.Wallet, err = wltfiro.LoadFiroElectrumWallet(walletCfg, pw)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

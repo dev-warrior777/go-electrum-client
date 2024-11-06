@@ -20,12 +20,14 @@ const (
 	Litecoin    CoinType = 1
 	Dash        CoinType = 5
 	Zcash       CoinType = 133
+	Firo        CoinType = 136
 	BitcoinCash CoinType = 145
 	Ethereum    CoinType = 60
 
 	TestnetBitcoin     = 1000000
 	TestnetLitecoin    = 1000001
 	TestnetZcash       = 1000133
+	TestnetFiro        = 1000136
 	TestnetBitcoinCash = 1000145
 	TestnetEthereum    = 1000060
 )
@@ -38,6 +40,8 @@ func (c *CoinType) String() string {
 		return "Bitcoin Cash"
 	case Zcash:
 		return "Zcash"
+	case Firo:
+		return "Firo"
 	case Litecoin:
 		return "Litecoin"
 	case Ethereum:
@@ -65,6 +69,8 @@ func (c *CoinType) CurrencyCode() string {
 		return "BCH"
 	case Zcash:
 		return "ZEC"
+	case Firo:
+		return "FIRO"
 	case Litecoin:
 		return "LTC"
 	case Ethereum:
@@ -75,6 +81,8 @@ func (c *CoinType) CurrencyCode() string {
 		return "TBCH"
 	case TestnetZcash:
 		return "TZEC"
+	case TestnetFiro:
+		return "TFIRO"
 	case TestnetLitecoin:
 		return "TLTC"
 	case TestnetEthereum:

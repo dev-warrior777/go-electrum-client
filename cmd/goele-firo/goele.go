@@ -14,13 +14,13 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/dev-warrior777/go-electrum-client/client"
-	"github.com/dev-warrior777/go-electrum-client/client/btc"
+	"github.com/dev-warrior777/go-electrum-client/client/firo"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 	"github.com/dev-warrior777/go-electrum-client/wallet"
 )
 
 var (
-	coins = []string{"btc"} // add as implemented
+	coins = []string{"firo"} // add as implemented
 	nets  = []string{"mainnet", "testnet", "testnet3", "testnet4", "regtest", "simnet"}
 )
 
@@ -43,39 +43,40 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 	}
 
 	switch coin {
-	case "btc":
+	case "firo":
 		cfg.CoinType = wallet.Bitcoin
 		cfg.Coin = coin
 		switch net {
 		case "simnet", "regtest":
+			cfg.CoinType = 136
 			cfg.NetType = electrumx.Regtest
 			cfg.RPCTestPort = 28887
 			cfg.Params = &chaincfg.RegressionNetParams
 			cfg.TrustedPeer = &electrumx.NodeServerAddr{
-				// Net: "ssl", Addr: "127.0.0.1:57002", // debug server
-				Net: "ssl", Addr: "127.0.0.1:53002",
+				Net: "ssl", Addr: "127.0.0.1:50002",
 			}
 			cfg.StoreEncSeed = true
 			cfg.Testing = true
 		case "testnet", "testnet3", "testnet4":
+			cfg.CoinType = 136
 			cfg.NetType = electrumx.Testnet
 			cfg.RPCTestPort = 18887
 			cfg.Params = &chaincfg.TestNet3Params
 			cfg.TrustedPeer = &electrumx.NodeServerAddr{
-				// Net: "ssl", Addr: "testnet.aranguren.org:51002",
-				// Net: "tcp", Addr: "testnet.aranguren.org:51001",
-				// Net: "ssl", Addr: "testnet.hsmiths.com:53012",
-				Net: "ssl", Addr: "testnet.qtornado.com:51002",
-				// Net: "ssl", Addr: "tn.not.fyi:55002",
+				Net: "ssl", Addr: "95.179.164.13:51002",
 			}
 			cfg.StoreEncSeed = true
 			cfg.Testing = true
 		case "mainnet":
+			cfg.CoinType = 136
 			cfg.Params = &chaincfg.MainNetParams
 			cfg.NetType = electrumx.Mainnet
 			cfg.RPCTestPort = 8887
 			cfg.TrustedPeer = &electrumx.NodeServerAddr{
-				Net: "ssl", Addr: "elx.bitske.com:50002",
+				// Net: "ssl", Addr: "electrumx.firo.org:50002",
+				// Net: "ssl", Addr: "electrumx01.firo.org:50002",
+				Net: "ssl", Addr: "electrumx02.firo.org:50002",
+				// Net: "ssl", Addr: "electrumx03.firo.org:50002",
 			}
 			cfg.StoreEncSeed = false
 			cfg.Testing = false
@@ -102,7 +103,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 }
 
 func configure() (string, *client.ClientConfig, error) {
-	coin := flag.String("coin", "btc", "coin name")
+	coin := flag.String("coin", "firo", "coin name")
 	net := flag.String("net", "regtest", "network type; testnet, mainnet, regtest")
 	pass := flag.String("pass", "", "wallet password")
 	flag.Parse()
@@ -158,7 +159,7 @@ func main() {
 	fmt.Printf("electrumX server address: %s\n", cfg.TrustedPeer)
 
 	// make basic client
-	ec := btc.NewBtcElectrumClient(cfg)
+	ec := firo.NewFiroElectrumClient(cfg)
 
 	// start client, create ElectrumXInterface & sync headers
 	clientCtx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -221,7 +222,7 @@ func main() {
 	fmt.Println("")
 
 	// for testing only
-	err = btc.RPCServe(ec)
+	err = firo.RPCServe(ec)
 	if err != nil {
 		fmt.Println(err, " - exiting")
 		os.Exit(1)

@@ -100,8 +100,12 @@ type ElectrumXConfig struct {
 	HeaderDeserializer HeaderDeserializer
 
 	// Checkpoints for each network: mainnet, testnet, regtest
-	// Filled in by a concrete fn. for each coin in ElectrumXInterface
-	StartPoints map[string]int64
+	// Filled in by each coin in ElectrumXInterface
+	StartPoint int64
+
+	// Genesis for each network: mainnet, testnet, regtest
+	// Filled in by each coin in ElectrumXInterface
+	Genesis string
 
 	// Maximum online peers for each network
 	// Filled in by each coin in ElectrumXInterface
