@@ -14,11 +14,11 @@ const (
 	FIRO_COIN                     = "firo"
 	FIRO_HEADER_SIZE              = 80 // check this for MTP legacy. Now FiroPoW (ProgPow clone) .. should be 80
 	FIRO_STARTPOINT_REGTEST       = 0
-	FIRO_STARTPOINT_TESTNET       = 2560000 // TODO:
-	FIRO_STARTPOINT_MAINNET       = 823000  // TODO:
+	FIRO_STARTPOINT_TESTNET       = 170_000
+	FIRO_STARTPOINT_MAINNET       = 987_000
 	FIRO_MAX_ONLINE_PEERS_REGTEST = 0
-	FIRO_MAX_ONLINE_PEERS_TESTNET = 0 // only one testnet server currently with outdated firod version last I looked
-	FIRO_MAX_ONLINE_PEERS_MAINNET = 3 // only 4 servers last I looked
+	FIRO_MAX_ONLINE_PEERS_TESTNET = 0 // only one testnet server 95.179.164.13:51002 - v0.14.14.0
+	FIRO_MAX_ONLINE_PEERS_MAINNET = 3 // only 4 servers                              - v0.14.14.0
 	FIRO_MAX_ONION                = 0
 )
 
