@@ -56,7 +56,7 @@ type ElectrumClient interface {
 	RescanWallet(ctx context.Context) error
 	ImportAndSweep(ctx context.Context, keyPairs []string) error
 	//
-	// Small subset of electrum-like methods
+	// Subset of electrum-like methods
 	Tip() int64
 	Synced() bool
 	GetBlockHeader(height int64) (*electrumx.ClientBlockHeader, error)

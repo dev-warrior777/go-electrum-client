@@ -47,3 +47,9 @@ __debug_bin*
 
 #kept orig related versions of files being changed
 *.orig
+
+#scratchpads
+_client_notes.txt
+_wallet_notes.txt
+_electrumx_notes.txt
+

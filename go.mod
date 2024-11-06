@@ -14,7 +14,7 @@ require (
 	github.com/spf13/cast v1.6.0
 	github.com/tyler-smith/go-bip39 v1.1.0
 	go.etcd.io/bbolt v1.3.9
-	golang.org/x/net v0.22.0
+	golang.org/x/net v0.25.0
 )
 
 replace go.etcd.io/bbolt => github.com/etcd-io/bbolt v1.3.9
@@ -22,7 +22,9 @@ replace go.etcd.io/bbolt => github.com/etcd-io/bbolt v1.3.9
 require (
 	github.com/aead/siphash v1.0.1 // indirect
 	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.4 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/kkdai/bstream v1.0.0 // indirect
+	golang.org/x/sync v0.7.0 // indirect
 )
 
 require (

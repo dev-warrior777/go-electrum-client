@@ -3,26 +3,9 @@
 # Devs should install gencerts
 # go install github.com/decred/dcrd/cmd/gencerts@release-v1.7
 
-# ./electrumx.sh (Bitcoin/Litecoin) (20556/20566) (54002/55002)
+set -evx
 
-set -ex
-
-export COIN="${1:-Bitcoin}"
-
-case $COIN in
-  Bitcoin)
-    SYMBOL=btc
-    ;;
-
-  Litecoin)
-    SYMBOL=ltc
-    ;;
-
-  *)
-    echo -n "unknown coin"
-    ;;
-esac
-
+SYMBOL=btc
 
 ELECTRUMX_DIR=~/dextest/electrum/${SYMBOL}/server
 REPO_DIR=${ELECTRUMX_DIR}/electrumx-repo
@@ -49,7 +32,7 @@ pip install .
 
 gencerts -L ${DATA_DIR}/ssl.cert ${DATA_DIR}/ssl.key
 
-set +x
+set +evx
 
 # Server Config
 export NET="regtest"
