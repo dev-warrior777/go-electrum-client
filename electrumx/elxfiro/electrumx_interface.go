@@ -17,9 +17,9 @@ const (
 	FIRO_STARTPOINT_TESTNET       = 170_000
 	FIRO_STARTPOINT_MAINNET       = 987_000
 	FIRO_MAX_ONLINE_PEERS_REGTEST = 0
-	FIRO_MAX_ONLINE_PEERS_TESTNET = 0 // only one testnet server - node:  0.14.14.0
-	FIRO_MAX_ONLINE_PEERS_MAINNET = 3 // only 4 servers -          nodes: 0.14.14.0
-	FIRO_MAX_ONION                = 0 // for now ...
+	FIRO_MAX_ONLINE_PEERS_TESTNET = 0 // only one testnet server 95.179.164.13:51002 - v0.14.14.0
+	FIRO_MAX_ONLINE_PEERS_MAINNET = 3 // only 4 servers                              - v0.14.14.0
+	FIRO_MAX_ONION                = 0
 )
 
 type headerDeserialzer struct{}

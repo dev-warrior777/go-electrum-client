@@ -1,0 +1,17 @@
+
+mainnet:
+electrumx.firo.org:50002
+electrumx01.firo.org:50002
+electrumx02.firo.org:50002
+electrumx03.firo.org:50002
+
+987_000
+
+
+testnet:
+95.179.164.13:51002
+
+170_000
+
+regtest:
+127.0.0.1:50002

@@ -85,4 +85,7 @@ type ElectrumClient interface {
 	GetRawTransaction(ctx context.Context, txid string) ([]byte, error)
 	GetAddressHistory(ctx context.Context, addr string) (electrumx.HistoryResult, error)
 	GetAddressUnspent(ctx context.Context, addr string) (electrumx.ListUnspentResult, error)
+
+	//coin specific extra for server protocol - use dummy method for non-implmenting coins.
+	// firo EXX addresses
 }
