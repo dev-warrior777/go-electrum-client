@@ -1,0 +1,27 @@
+Scratchpad for Firo electrumX changes from Bitcoin
+
+- 2016 btc headers --	ELECTRUM_MAGIC_NUMHDR = 2016 `headers.go` <-- check `firo-electrumx` code
+
+Servers:
+    mainnet:
+        electrumx.firo.org:50002
+        electrumx01.firo.org:50002
+        electrumx02.firo.org:50002
+        electrumx03.firo.org:50002
+    testnet:
+        95.179.164.13:51002
+    regtest:
+        localhost:50002
+
+Checkpoints/startpoints:
+    mainnet:
+        checkpoint: (341100, uint256S("0x1ca6cbd9f6e13db8e0e1db0b77f8b1a037b01c69558214bc1ae2ce1f81da4890"))
+        startpoint: 987_000
+    testnet:
+        checkpoint: 0
+        startpoint: 170_000
+    regtest:
+        0
+
+
+
