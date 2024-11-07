@@ -1,19 +1,29 @@
 package elxfiro
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dev-warrior777/go-electrum-client/electrumx"
 )
 
+const (
+	FIRO_HEADER_SIZE         = 80
+	FIRO_FIROPOW_EXTRA       = 40
+	FIRO_FIROPOW_HEADER_SIZE = FIRO_HEADER_SIZE + FIRO_FIROPOW_EXTRA
+)
+
 // These configure ElectrumX network for: FIRO
 const (
-	FIRO_COIN                     = "firo"
-	FIRO_HEADER_SIZE              = 80 // check this for MTP legacy. Now FiroPoW (ProgPow clone) .. should be 80
+	FIRO_COIN                = "firo"
+	FIRO_HEADER_SIZE_REGTEST = 80
+	FIRO_HEADER_SIZE_FIROPOW = 120
+	// FIRO_HEADER_SIZE              = 80 // check this for MTP legacy. Now FiroPoW (ProgPow clone) .. should be 80
 	FIRO_STARTPOINT_REGTEST       = 0
 	FIRO_STARTPOINT_TESTNET       = 170_000
 	FIRO_STARTPOINT_MAINNET       = 987_000
@@ -26,9 +36,39 @@ const (
 	FIRO_MAX_ONION                = 0
 )
 
-type headerDeserialzer struct{}
+type headerDeserializer struct{}
 
-func (d headerDeserialzer) Deserialize(r io.Reader) (*electrumx.BlockHeader, error) {
+func (d headerDeserializer) Deserialize(r io.Reader) (*electrumx.BlockHeader, error) {
+	blockHeader := &electrumx.BlockHeader{}
+	sz := int64(FIRO_FIROPOW_HEADER_SIZE)
+	fullHeader := make([]byte, sz)
+	_, err := io.ReadFull(r, fullHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	// hash full header
+	hash := chainhash.DoubleHashH(fullHeader)
+	blockHeader.Hash = electrumx.WireHash(hash)
+
+	// deserialize the block header without the extra progpow bytes
+	blockHeaderRdr := bytes.NewReader(fullHeader[:FIRO_HEADER_SIZE])
+	wireHdr := &wire.BlockHeader{}
+	err = wireHdr.Deserialize(blockHeaderRdr)
+	if err != nil {
+		return nil, err
+	}
+	blockHeader.Version = wireHdr.Version
+	// chainHash := wireHdr.BlockHash()
+	// blockHeader.Hash = electrumx.WireHash(chainHash)
+	blockHeader.Prev = electrumx.WireHash(wireHdr.PrevBlock)
+	blockHeader.Merkle = electrumx.WireHash(wireHdr.MerkleRoot)
+	return blockHeader, nil
+}
+
+type regtestHeaderDeserializer struct{}
+
+func (d regtestHeaderDeserializer) Deserialize(r io.Reader) (*electrumx.BlockHeader, error) {
 	wireHdr := &wire.BlockHeader{}
 	err := wireHdr.Deserialize(r)
 	if err != nil {
@@ -50,26 +90,34 @@ type ElectrumXInterface struct {
 
 func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterface, error) {
 	config.Coin = FIRO_COIN
-	config.BlockHeaderSize = FIRO_HEADER_SIZE
 	config.MaxOnion = FIRO_MAX_ONION
+
 	switch config.NetType {
 	case electrumx.Regtest:
+		config.BlockHeaderSize = FIRO_HEADER_SIZE
+		config.HeaderDeserializer = regtestHeaderDeserializer{}
+		config.BlockHeaderSize = FIRO_HEADER_SIZE_REGTEST
 		config.Genesis = FIRO_GENESIS_REGTEST
 		config.StartPoint = FIRO_STARTPOINT_REGTEST
 		config.MaxOnlinePeers = FIRO_MAX_ONLINE_PEERS_REGTEST
 	case electrumx.Testnet:
+		config.BlockHeaderSize = FIRO_FIROPOW_HEADER_SIZE
+		config.HeaderDeserializer = headerDeserializer{}
+		config.BlockHeaderSize = FIRO_HEADER_SIZE_FIROPOW
 		config.Genesis = FIRO_GENESIS_TESTNET
 		config.StartPoint = FIRO_STARTPOINT_TESTNET
 		config.MaxOnlinePeers = FIRO_MAX_ONLINE_PEERS_TESTNET
 	case electrumx.Mainnet:
+		config.BlockHeaderSize = FIRO_FIROPOW_HEADER_SIZE
+		config.HeaderDeserializer = headerDeserializer{}
+		config.BlockHeaderSize = FIRO_HEADER_SIZE_FIROPOW
 		config.Genesis = FIRO_GENESIS_MAINNET
 		config.StartPoint = FIRO_STARTPOINT_MAINNET
 		config.MaxOnlinePeers = FIRO_MAX_ONLINE_PEERS_MAINNET
 	default:
 		return nil, fmt.Errorf("config error")
 	}
-	deserializer := headerDeserialzer{}
-	config.HeaderDeserializer = &deserializer
+
 	x := ElectrumXInterface{
 		config:  config,
 		network: nil,

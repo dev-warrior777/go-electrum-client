@@ -52,6 +52,7 @@ func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterfa
 	config.Coin = BTC_COIN
 	config.BlockHeaderSize = BTC_HEADER_SIZE
 	config.MaxOnion = BTC_MAX_ONION
+
 	switch config.NetType {
 	case electrumx.Regtest:
 		config.Genesis = BTC_GENESIS_REGTEST
@@ -68,8 +69,8 @@ func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterfa
 	default:
 		return nil, fmt.Errorf("config error")
 	}
-	deserializer := headerDeserialzer{}
-	config.HeaderDeserializer = &deserializer
+
+	config.HeaderDeserializer = &headerDeserialzer{}
 	x := ElectrumXInterface{
 		config:  config,
 		network: nil,

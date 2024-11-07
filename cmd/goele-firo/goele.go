@@ -50,7 +50,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		case "simnet", "regtest":
 			cfg.CoinType = 136
 			cfg.NetType = electrumx.Regtest
-			cfg.RPCTestPort = 28887
+			cfg.RPCTestPort = 28886
 			cfg.Params = &chaincfg.RegressionNetParams
 			cfg.TrustedPeer = &electrumx.NodeServerAddr{
 				Net: "ssl", Addr: "127.0.0.1:50002",
@@ -60,7 +60,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 		case "testnet", "testnet3", "testnet4":
 			cfg.CoinType = 136
 			cfg.NetType = electrumx.Testnet
-			cfg.RPCTestPort = 18887
+			cfg.RPCTestPort = 18886
 			cfg.Params = &chaincfg.TestNet3Params
 			cfg.TrustedPeer = &electrumx.NodeServerAddr{
 				Net: "ssl", Addr: "95.179.164.13:51002",
@@ -71,7 +71,7 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 			cfg.CoinType = 136
 			cfg.Params = &chaincfg.MainNetParams
 			cfg.NetType = electrumx.Mainnet
-			cfg.RPCTestPort = 8887
+			cfg.RPCTestPort = 8886
 			cfg.TrustedPeer = &electrumx.NodeServerAddr{
 				// Net: "ssl", Addr: "electrumx.firo.org:50002",
 				// Net: "ssl", Addr: "electrumx01.firo.org:50002",

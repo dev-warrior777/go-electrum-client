@@ -194,11 +194,11 @@ func main() {
 	if len(args) > 2 {
 		switch args[1] {
 		case "-regtest", "--regtest":
-			port = "28887"
+			port = "28886"
 		case "-testnet", "--testnet":
-			port = "18887"
+			port = "18886"
 		case "-mainnet", "--mainnet":
-			port = "8887"
+			port = "8886"
 		default:
 			fmt.Println("please set a network: -mainnet, -testnet, -regtest")
 			os.Exit(1)

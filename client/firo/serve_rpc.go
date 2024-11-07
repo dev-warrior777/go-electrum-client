@@ -168,7 +168,7 @@ func (e *Ec) RPCBroadcast(request map[string]string, response *map[string]string
 // ///////////
 const (
 	RpcDefaultIP   = "127.0.0.1"
-	RpcDefaultPort = 28887 // regtest
+	RpcDefaultPort = 28886 // regtest
 )
 
 func RPCServe(electrumClient client.ElectrumClient) error {
