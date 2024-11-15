@@ -24,6 +24,9 @@ const (
 	BTC_MAX_ONLINE_PEERS_TESTNET = 3
 	BTC_MAX_ONLINE_PEERS_MAINNET = 10
 	BTC_MAX_ONION                = 2
+	BTC_STRATEGY_FLAGS_REGTEST   = electrumx.NoDeleteKnownPeers
+	BTC_STRATEGY_FLAGS_TESTNET   = electrumx.Default
+	BTC_STRATEGY_FLAGS_MAINNET   = electrumx.Default
 )
 
 type headerDeserialzer struct{}
@@ -55,14 +58,17 @@ func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterfa
 
 	switch config.NetType {
 	case electrumx.Regtest:
+		config.Flags = BTC_STRATEGY_FLAGS_REGTEST
 		config.Genesis = BTC_GENESIS_REGTEST
 		config.StartPoint = BTC_STARTPOINT_REGTEST
 		config.MaxOnlinePeers = BTC_MAX_ONLINE_PEERS_REGTEST
 	case electrumx.Testnet:
+		config.Flags = BTC_STRATEGY_FLAGS_TESTNET
 		config.Genesis = BTC_GENESIS_TESTNET
 		config.StartPoint = BTC_STARTPOINT_TESTNET
 		config.MaxOnlinePeers = BTC_MAX_ONLINE_PEERS_TESTNET
 	case electrumx.Mainnet:
+		config.Flags = BTC_STRATEGY_FLAGS_MAINNET
 		config.Genesis = BTC_GENESIS_MAINNET
 		config.StartPoint = BTC_STARTPOINT_MAINNET
 		config.MaxOnlinePeers = BTC_MAX_ONLINE_PEERS_MAINNET

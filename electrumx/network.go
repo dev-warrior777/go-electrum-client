@@ -46,7 +46,7 @@ var errNodeMisbehavingCanceled = errors.New("Server Misbehaving Canceled")
 var errNoNetwork = errors.New("network not started")
 var errNoLeader = errors.New("no leader node is assigned - try again in 10 seconds")
 
-var peerId uint32 // stomic
+var peerId uint32 // atomic
 
 type peerNode struct {
 	id         uint32
@@ -296,7 +296,7 @@ func (net *Network) checkLeader(ctx context.Context) {
 				continue
 			}
 			net.leader = peer
-			fmt.Printf("promoted and started new (untrusted) leader %s\n", peer.netAddr)
+			fmt.Printf("promoted and started new leader %s\n", peer.netAddr)
 			return
 		}
 	}
@@ -400,7 +400,7 @@ func (net *Network) startNewLeader(ctx context.Context) {
 	if err != nil {
 		net.removeServer(available[0])
 	}
-	fmt.Printf("started new (untrusted) leader %s\n", addr.String())
+	fmt.Printf("started new leader %s\n", addr.String())
 }
 
 func (net *Network) shufflePeers() {

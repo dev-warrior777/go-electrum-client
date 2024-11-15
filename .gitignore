@@ -21,22 +21,23 @@
 go.work
 go.work.sum
 
-#test data
-testdata/
-
 #test bin
-electrumx/elxbtc/cmd/main
-cmd/goele/goele
-cmd/mkwallet/mkwallet
-cmd/rmwallet/rmwallet
+cmd/goele-btc/goele-btc
+cmd/mkwallet-btc/mkwallet-btc
+cmd/rmwallet-btc/rmwallet-btc
+cmd/goele-firo/goele-firo
+cmd/mkwallet-firo/mkwallet-firo
+cmd/rmwallet-firo/rmwallet-firo
 wallet/cmd/boltdmp/bd
 wallet/cmd/boltdmp/boltdmp
 client/btc/rpc_test/client
-client/btc/rpc_test/rpc_test
+client/firo/rpc_test/client
 
 #profiling
-cmd/goele/goele.prof
-cmd/goele/tmp/
+cmd/goele-btc/goele-btc.prof
+cmd/goele-btc/tmp/
+cmd/goele-firo/goele-firo.prof
+cmd/goele-firo/tmp/
 
 #vscode
 .vscode/

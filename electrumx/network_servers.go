@@ -213,6 +213,11 @@ func (net *Network) updateStoredServers(servers []*serverAddr) error {
 }
 
 func (net *Network) removeServer(server *serverAddr) error {
+	if net.config.Flags&NoDeleteKnownPeers == NoDeleteKnownPeers {
+		fmt.Printf("removeServer: not removing %s - Strategy: NoDeleteStoredPeers\n", server.Address)
+		return nil
+	}
+
 	net.knownServersMtx.Lock()
 	defer net.knownServersMtx.Unlock()
 
@@ -225,6 +230,7 @@ func (net *Network) removeServer(server *serverAddr) error {
 		lessKnown = append(lessKnown, known)
 	}
 	net.knownServers = lessKnown
+
 	// remove from file
 	stored, _, err := net.readServerAddrFile()
 	if err != nil {

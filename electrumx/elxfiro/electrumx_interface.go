@@ -34,6 +34,9 @@ const (
 	FIRO_MAX_ONLINE_PEERS_TESTNET = 0 // only one testnet server 95.179.164.13:51002 - v0.14.14.0
 	FIRO_MAX_ONLINE_PEERS_MAINNET = 3 // only 4 servers                              - v0.14.14.0
 	FIRO_MAX_ONION                = 0
+	FIRO_STRATEGY_FLAGS_REGTEST   = electrumx.NoDeleteKnownPeers // only one server
+	FIRO_STRATEGY_FLAGS_TESTNET   = electrumx.NoDeleteKnownPeers // only one server
+	FIRO_STRATEGY_FLAGS_MAINNET   = electrumx.NoDeleteKnownPeers // 4 servers
 )
 
 type headerDeserializer struct{}
@@ -94,21 +97,21 @@ func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterfa
 
 	switch config.NetType {
 	case electrumx.Regtest:
-		config.BlockHeaderSize = FIRO_HEADER_SIZE
+		config.Flags = FIRO_STRATEGY_FLAGS_REGTEST
 		config.HeaderDeserializer = regtestHeaderDeserializer{}
 		config.BlockHeaderSize = FIRO_HEADER_SIZE_REGTEST
 		config.Genesis = FIRO_GENESIS_REGTEST
 		config.StartPoint = FIRO_STARTPOINT_REGTEST
 		config.MaxOnlinePeers = FIRO_MAX_ONLINE_PEERS_REGTEST
 	case electrumx.Testnet:
-		config.BlockHeaderSize = FIRO_FIROPOW_HEADER_SIZE
+		config.Flags = FIRO_STRATEGY_FLAGS_TESTNET
 		config.HeaderDeserializer = headerDeserializer{}
 		config.BlockHeaderSize = FIRO_HEADER_SIZE_FIROPOW
 		config.Genesis = FIRO_GENESIS_TESTNET
 		config.StartPoint = FIRO_STARTPOINT_TESTNET
 		config.MaxOnlinePeers = FIRO_MAX_ONLINE_PEERS_TESTNET
 	case electrumx.Mainnet:
-		config.BlockHeaderSize = FIRO_FIROPOW_HEADER_SIZE
+		config.Flags = FIRO_STRATEGY_FLAGS_TESTNET
 		config.HeaderDeserializer = headerDeserializer{}
 		config.BlockHeaderSize = FIRO_HEADER_SIZE_FIROPOW
 		config.Genesis = FIRO_GENESIS_MAINNET

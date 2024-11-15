@@ -126,7 +126,7 @@ func checkSimnetHelp(cfg *client.ClientConfig) string {
 
 func main() {
 	// // Start profiling
-	// f, e := os.Create("goele.prof")
+	// f, e := os.Create("goele-btc.prof")
 	// if e != nil {
 	// 	fmt.Println(e)
 	// 	return
@@ -136,7 +136,7 @@ func main() {
 	// //--------------------------
 
 	// Run your program here
-	fmt.Println("Goele", client.GoeleVersion)
+	fmt.Println("Goele-BTC", client.GoeleVersion)
 	pass, cfg, err := configure()
 	if err != nil {
 		fmt.Println(err, " - exiting")

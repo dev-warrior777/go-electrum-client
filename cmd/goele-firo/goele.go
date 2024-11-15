@@ -73,9 +73,9 @@ func makeBasicConfig(coin, net string) (*client.ClientConfig, error) {
 			cfg.NetType = electrumx.Mainnet
 			cfg.RPCTestPort = 8886
 			cfg.TrustedPeer = &electrumx.NodeServerAddr{
-				// Net: "ssl", Addr: "electrumx.firo.org:50002",
+				Net: "ssl", Addr: "electrumx.firo.org:50002",
 				// Net: "ssl", Addr: "electrumx01.firo.org:50002",
-				Net: "ssl", Addr: "electrumx02.firo.org:50002",
+				// Net: "ssl", Addr: "electrumx02.firo.org:50002",
 				// Net: "ssl", Addr: "electrumx03.firo.org:50002",
 			}
 			cfg.StoreEncSeed = false
@@ -127,7 +127,7 @@ func checkSimnetHelp(cfg *client.ClientConfig) string {
 
 func main() {
 	// // Start profiling
-	// f, e := os.Create("goele.prof")
+	// f, e := os.Create("goele-firo.prof")
 	// if e != nil {
 	// 	fmt.Println(e)
 	// 	return
@@ -137,7 +137,7 @@ func main() {
 	// //--------------------------
 
 	// Run your program here
-	fmt.Println("Goele", client.GoeleVersion)
+	fmt.Println("Goele-Firo", client.GoeleVersion)
 	pass, cfg, err := configure()
 	if err != nil {
 		fmt.Println(err, " - exiting")
