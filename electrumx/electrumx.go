@@ -53,10 +53,11 @@ const (
 	// The Default strategy is for a more dynamic electrumx network such as BTC
 	// where we remove servers from the knownServers slice and also from the
 	// 'network_servers.json' file when they disconnect or misbehave. If a new
-	// server is found (server.peers.subscribe RPC), which only works if the
+	// server is found (server.peers.subscribe RPC), which only works iff the
 	// leader's server has PEER_DISCOVERY environment variable configured, then
 	// it is added to both network.go's knownServers slice & 'network_servers.json'.
 	Default = uint8(0x00)
+
 	// For static sized electrumx networks like Firo we know and maybe trust all
 	// or most of the servers and we pre-populate 'network_servers.json' with the
 	// servers in the network. These are never deleted or removed from the knownServers
