@@ -1,0 +1,5 @@
+Scratchpad for Firo wallet changes from Bitcoin
+
+- Transparent addresses for now, later Spark addresses
+- Exx Addresses to implement - probably can use firo-electrumX server
+- NO Segwit

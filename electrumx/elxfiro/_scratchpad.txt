@@ -118,7 +118,7 @@ class FiroRegtest(Firo):
                    'c4629bc205748ed2f33180b636ee885b'
     REORG_LIMIT = 8000
     RPC_PORT = 18444
-    # INT_MAX from chainparams 2147483647 0xefffffff
+    # INT_MAX from chainparams 2147483647 0x7fffffff
     PROGPOW_START_TIME = 2147483647
 
 
