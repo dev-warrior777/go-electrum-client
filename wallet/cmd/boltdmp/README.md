@@ -6,6 +6,6 @@ Dumps Goele specific structures stored in `wallet.bdb` bolt database
 
 usage: `bd` _<folder/directory where wallet.bdb is stored>_
 
-Example: `./bd /home/dev/.config/goele/btc/regtest`
+Example: `./bd /home/<user>/.config/goele/btc/regtest`
 
 special case: `bd wallet.bdb` assuming the wallet.bdb file in the same directory as `bd`

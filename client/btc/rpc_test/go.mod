@@ -1,5 +1,7 @@
 module github.com/bisoncraft/go-electrum-client/client/btc/rpc_test
 
-go 1.19
+go 1.23.0
 
-require github.com/spf13/cast v1.7.1
+toolchain go1.24.4
+
+require github.com/spf13/cast v1.10.0

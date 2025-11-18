@@ -25,9 +25,9 @@ cmd/rmwallet-btc/rmwallet-btc
 cmd/goele-firo/goele-firo
 cmd/mkwallet-firo/mkwallet-firo
 cmd/rmwallet-firo/rmwallet-firo
-cmd/goele-dash/goele-btc
-cmd/mkwallet-dash/mkwallet-btc
-cmd/rmwallet-dash/rmwallet-btc
+cmd/goele-dash/goele-dash
+cmd/mkwallet-dash/mkwallet-dash
+cmd/rmwallet-dash/rmwallet-dash
 wallet/cmd/boltdmp/bd
 wallet/cmd/boltdmp/boltdmp
 client/btc/rpc_test/client

@@ -2,7 +2,7 @@ module github.com/bisoncraft/go-electrum-client
 
 go 1.23.0
 
-toolchain go1.23.2
+toolchain go1.24.4
 
 require (
 	github.com/btcsuite/btcd v0.24.2
