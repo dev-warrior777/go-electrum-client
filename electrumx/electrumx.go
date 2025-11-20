@@ -13,6 +13,7 @@ import (
 	"io"
 	"net"
 
+	"decred.org/dcrdex/dex"
 	"github.com/btcsuite/btcd/chaincfg"
 )
 
@@ -73,11 +74,6 @@ const (
 	TESTNET = "testnet"
 	REGTEST = "regtest"
 )
-
-// TODO: remove
-// const (
-// 	COIN_BTC = "btc"
-// )
 
 // Assumption: all hashes are 32 bytes long
 const HashSize = 32
@@ -169,7 +165,7 @@ var Mainnet string = "mainnet"
 var DebugMode bool
 
 type ElectrumX interface {
-	Start(ctx context.Context) error
+	Start(ctx context.Context, logger dex.Logger) error
 
 	GetTip() int64
 	GetSyncStatus() bool

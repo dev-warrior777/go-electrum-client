@@ -4,8 +4,6 @@
 package elxdash
 
 import (
-	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/bisoncraft/go-electrum-client/electrumx"
@@ -13,7 +11,8 @@ import (
 
 // TODO DASH SPECIFIC AFTER MAKING DASH HARNESS
 
-// Data taken from btc regtest which has a block size 0f 80 and nonce 0
+// Data taken from btc regtest which has a block size 0f 80 and nonce 0 .. so retarded for dash
+// Test commented out
 
 var hdr = []byte{
 	0x00, 0x00, 0x00, 0x20,
@@ -50,44 +49,48 @@ var hdrBadLenMore = []byte{
 	0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
 }
 
-func mkCfg() *electrumx.ElectrumXConfig {
+func mkCfg(dataDir string) *electrumx.ElectrumXConfig {
 	return &electrumx.ElectrumXConfig{
 		Coin:    "dash",
 		NetType: "regtest",
-		DataDir: "/tmp",
+		DataDir: dataDir,
 	}
 }
 
 func TestHeaderDeserializer(t *testing.T) {
-	cfg := mkCfg()
+	t.Log("test needs dash regtest header data")
+	// dataDir := t.TempDir()
+	// cfg := mkCfg(dataDir)
 
-	iface, _ := NewElectrumXInterface(cfg)
-	d := iface.config.HeaderDeserializer
+	// iface, _ := NewElectrumXInterface(cfg)
+	// d := iface.config.HeaderDeserializer
 
-	rdr := bytes.NewBuffer(hdr)
-	blkHdr, err := d.Deserialize(rdr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmt.Printf("%x\n", blkHdr.Hash.String())
-	if !bytes.Equal([]byte(blkHdr.Hash[:]), []byte{0x73, 0x07, 0x97, 0x74, 0x17, 0xea, 0x9f, 0x17, 0x90, 0xc8, 0x03, 0x88, 0x64, 0x8e, 0xd8, 0x16, 0x26, 0x50, 0xbe, 0x04, 0x45, 0x2b, 0x6b, 0x1d, 0xe8, 0xff, 0x9a, 0xd4, 0x2b, 0x36, 0x45, 0x23}) {
-		t.Fatal("sha256 doublehash error")
-	}
+	// rdr := bytes.NewBuffer(hdr)
+	// blkHdr, err := d.Deserialize(rdr)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+	// fmt.Printf("%x\n", blkHdr.Hash)
+	// if !bytes.Equal([]byte(blkHdr.Hash[:]), []byte{0x73, 0x07, 0x97, 0x74, 0x17, 0xea, 0x9f, 0x17, 0x90, 0xc8, 0x03, 0x88, 0x64, 0x8e, 0xd8, 0x16, 0x26, 0x50, 0xbe, 0x04, 0x45, 0x2b, 0x6b, 0x1d, 0xe8, 0xff, 0x9a, 0xd4, 0x2b, 0x36, 0x45, 0x23}) {
+	// 	t.Fatal("sha256 doublehash error")
+	// }
 
-	// not a full header
-	rdrLess := bytes.NewBuffer(hdrBadLenLess)
-	_, err = d.Deserialize(rdrLess)
-	if err == nil {
-		t.Fatal(err)
-	}
-	// wire.BlockHash reader only reads 80 bytes so no fail on the deserialization
+	// // not a full header
+	// rdrLess := bytes.NewBuffer(hdrBadLenLess)
+	// _, err = d.Deserialize(rdrLess)
+	// if err == nil {
+	// 	t.Fatal(err)
+	// }
+	// // wire.BlockHash reader only reads 80 bytes so no fail on the deserialization
 
-	rdrMore := bytes.NewBuffer(hdrBadLenMore)
-	_, err = d.Deserialize(rdrMore)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// rdrMore := bytes.NewBuffer(hdrBadLenMore)
+	// _, err = d.Deserialize(rdrMore)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
 }
+
+// Most of these tests are out of date TODO(goele) make coin deserializer specific
 
 // func TestReadStoreHeaderFile(t *testing.T) {
 // 	f, n, err := mkHdrFile()

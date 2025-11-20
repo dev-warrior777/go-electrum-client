@@ -9,27 +9,28 @@ import (
 	"fmt"
 	"io"
 
+	"decred.org/dcrdex/dex"
 	"github.com/bisoncraft/go-electrum-client/electrumx"
 	"github.com/btcsuite/btcd/wire"
 )
 
 // These configure ElectrumX network for: BTC
 const (
-	BTC_COIN                     = "btc"
-	BTC_HEADER_SIZE              = 80
-	BTC_STARTPOINT_REGTEST       = 0
-	BTC_STARTPOINT_TESTNET       = 2560000
-	BTC_STARTPOINT_MAINNET       = 823000
-	BTC_GENESIS_REGTEST          = "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"
-	BTC_GENESIS_TESTNET          = "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"
-	BTC_GENESIS_MAINNET          = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
-	BTC_MAX_ONLINE_PEERS_REGTEST = 0
-	BTC_MAX_ONLINE_PEERS_TESTNET = 3
-	BTC_MAX_ONLINE_PEERS_MAINNET = 10
-	BTC_MAX_ONION                = 2
-	BTC_STRATEGY_FLAGS_REGTEST   = electrumx.NoDeleteKnownPeers
-	BTC_STRATEGY_FLAGS_TESTNET   = electrumx.Default
-	BTC_STRATEGY_FLAGS_MAINNET   = electrumx.Default
+	BtcCoin                  = "btc"
+	BtcHeaderSize            = 80
+	BtcStartpointRegtest     = 0
+	BtcStartpointTestnet     = 2560000
+	BtcstartpointMainnet     = 823000
+	BtcGenesisRegtest        = "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"
+	BtcGenesisTestnet        = "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"
+	BtcGenesisMainnet        = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
+	BtcMaxOnlinePeersRegtest = 0
+	BtcMaxOnlinePeersTestnet = 3
+	BtcMaxOnlinePeersMainnet = 10
+	BtcMaxOnion              = 2
+	BtcStrategyFlagsRegtest  = electrumx.NoDeleteKnownPeers
+	BtcStrategyFlagsTestnet  = electrumx.Default
+	BtcStrategyFlagsMainnet  = electrumx.Default
 )
 
 type headerDeserialzer struct{}
@@ -55,26 +56,26 @@ type ElectrumXInterface struct {
 }
 
 func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterface, error) {
-	config.Coin = BTC_COIN
-	config.BlockHeaderSize = BTC_HEADER_SIZE
-	config.MaxOnion = BTC_MAX_ONION
+	config.Coin = BtcCoin
+	config.BlockHeaderSize = BtcHeaderSize
+	config.MaxOnion = BtcMaxOnion
 
 	switch config.NetType {
 	case electrumx.Regtest:
-		config.Flags = BTC_STRATEGY_FLAGS_REGTEST
-		config.Genesis = BTC_GENESIS_REGTEST
-		config.StartPoint = BTC_STARTPOINT_REGTEST
-		config.MaxOnlinePeers = BTC_MAX_ONLINE_PEERS_REGTEST
+		config.Flags = BtcStrategyFlagsRegtest
+		config.Genesis = BtcGenesisRegtest
+		config.StartPoint = BtcStartpointRegtest
+		config.MaxOnlinePeers = BtcMaxOnlinePeersRegtest
 	case electrumx.Testnet:
-		config.Flags = BTC_STRATEGY_FLAGS_TESTNET
-		config.Genesis = BTC_GENESIS_TESTNET
-		config.StartPoint = BTC_STARTPOINT_TESTNET
-		config.MaxOnlinePeers = BTC_MAX_ONLINE_PEERS_TESTNET
+		config.Flags = BtcStrategyFlagsTestnet
+		config.Genesis = BtcGenesisTestnet
+		config.StartPoint = BtcStartpointTestnet
+		config.MaxOnlinePeers = BtcMaxOnlinePeersTestnet
 	case electrumx.Mainnet:
-		config.Flags = BTC_STRATEGY_FLAGS_MAINNET
-		config.Genesis = BTC_GENESIS_MAINNET
-		config.StartPoint = BTC_STARTPOINT_MAINNET
-		config.MaxOnlinePeers = BTC_MAX_ONLINE_PEERS_MAINNET
+		config.Flags = BtcStrategyFlagsMainnet
+		config.Genesis = BtcGenesisMainnet
+		config.StartPoint = BtcstartpointMainnet
+		config.MaxOnlinePeers = BtcMaxOnlinePeersMainnet
 	default:
 		return nil, fmt.Errorf("config error")
 	}
@@ -87,8 +88,8 @@ func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterfa
 	return &x, nil
 }
 
-func (x *ElectrumXInterface) Start(ctx context.Context) error {
-	network := electrumx.NewNetwork(x.config)
+func (x *ElectrumXInterface) Start(ctx context.Context, logger dex.Logger) error {
+	network := electrumx.NewNetwork(x.config, logger)
 	err := network.Start(ctx)
 	if err != nil {
 		return err

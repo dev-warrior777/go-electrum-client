@@ -50,16 +50,17 @@ var hdrBadLenMore = []byte{
 	0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
 }
 
-func mkCfg() *electrumx.ElectrumXConfig {
+func mkCfg(dataDir string) *electrumx.ElectrumXConfig {
 	return &electrumx.ElectrumXConfig{
 		Coin:    "firo",
 		NetType: "regtest",
-		DataDir: "/tmp",
+		DataDir: dataDir,
 	}
 }
 
 func TestHeaderDeserializer(t *testing.T) {
-	cfg := mkCfg()
+	dataDir := t.TempDir()
+	cfg := mkCfg(dataDir)
 
 	iface, _ := NewElectrumXInterface(cfg)
 	d := iface.config.HeaderDeserializer

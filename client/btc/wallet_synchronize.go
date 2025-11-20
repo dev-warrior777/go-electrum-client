@@ -7,8 +7,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
-	"os"
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -154,34 +152,34 @@ func (ec *BtcElectrumClient) addressStatusNotify(ctx context.Context) error {
 
 	go func() {
 
-		fmt.Println("=== Waiting for address change notifications ===")
+		ec.Log.Debug("waiting for address change notifications")
 
 		for {
 			select {
 
 			case <-ctx.Done():
-				fmt.Println("ctx.Done - in client scripthash notify - exiting thread")
+				ec.Log.Debug("ctx.Done - in client scripthash notify - exiting thread")
 				return
 
 			case status, ok := <-scripthashNotifyCh:
 				if !ok {
-					fmt.Println("scripthash notify channel closed - exiting thread")
+					ec.Log.Debug("scripthash notify channel closed - exiting thread")
 					return
 				}
 
 				if status.Status == "" {
-					// fmt.Println("status.Status is null no history yet; ignoring...")
+					// ec.Log.Trace("status.Status is null no history yet; ignoring...")
 					continue
 				}
 
 				// get wallet db subscription details
 				sub, err := ec.getSubscriptionForScripthash(status.Scripthash)
 				if err != nil { // db assert  'no rows in result set'
-					fmt.Fprintf(os.Stderr, "getSubscriptionForScripthash - %v", err)
+					ec.Log.Errorf("getSubscriptionForScripthash - %v", err)
 					return
 				}
 				if sub == nil { // db assert
-					fmt.Fprintf(os.Stderr, "no subscription for subscribed scripthash")
+					ec.Log.Trace("no subscription for subscribed scripthash")
 					return
 				}
 
@@ -240,7 +238,7 @@ func (ec *BtcElectrumClient) UnsubscribeAddressNotify(ctx context.Context, pkScr
 	}
 	subscription, err := ec.getSubscription(pkScript)
 	if err != nil || subscription == nil {
-		fmt.Println("not subscribed or db error")
+		ec.Log.Errorf("not subscribed or db error %v", err)
 		return
 	}
 
@@ -248,7 +246,7 @@ func (ec *BtcElectrumClient) UnsubscribeAddressNotify(ctx context.Context, pkScr
 	node.UnsubscribeScripthashNotify(ctx, subscription.ElectrumScripthash)
 	err = ec.removeSubscription(pkScript)
 	if err != nil {
-		fmt.Println("removeSubscription", err)
+		ec.Log.Errorf("removeSubscription %v", err)
 		return
 	}
 }
@@ -266,7 +264,7 @@ func (ec *BtcElectrumClient) GetAddressHistoryFromNode(ctx context.Context, subs
 	}
 
 	if len(res) == 0 {
-		fmt.Println("empty history result for: ", subscription.PkScript)
+		ec.Log.Debug("empty history result for: ", subscription.PkScript)
 		return nil, nil
 	}
 
@@ -303,7 +301,7 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(ctx context.Context, history e
 		// does wallet already has a confirmed transaction?
 		walletHasTx, txn := ec.GetWallet().HasTransaction(h.TxHash)
 		if walletHasTx && txn.Height > 0 {
-			// fmt.Println("** already got confirmed tx", h.TxHash)
+			ec.Log.Tracef("already got confirmed tx %s", h.TxHash)
 			continue
 		}
 		// add or update the wallet transaction
@@ -311,10 +309,10 @@ func (ec *BtcElectrumClient) addTxHistoryToWallet(ctx context.Context, history e
 		if err != nil {
 			continue
 		}
-		// fmt.Printf("adding/updating transaction txid: %s, height: %d, fee %d\n", h.TxHash, h.Height, h.Fee)
+		// ec.Log.Tracef("adding/updating transaction txid: %s, height: %d, fee %d\n", h.TxHash, h.Height, h.Fee)
 		err = ec.GetWallet().AddTransaction(msgTx, h.Height, txtime)
 		if err != nil {
-			fmt.Println(err)
+			ec.Log.Errorf("add transaction error %v", err)
 			continue
 		}
 	}

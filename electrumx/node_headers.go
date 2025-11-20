@@ -36,7 +36,7 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 		return err
 	}
 	lenb := int64(len(b))
-	fmt.Println("read:", lenb, " bytes from header file")
+	// n.log.Tra ("read:", lenb, " bytes from header file")
 	numHeaders, err := h.bytesToNumHdrs(lenb)
 	if err != nil {
 		return err
@@ -59,7 +59,7 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 	}
 	count := hdrsRes.Count
 
-	fmt.Printf("read: %d from server at height %d max chunk size %d\n", count, startHeight, hdrsRes.Max)
+	n.log.Debugf("read: %d from server at height %d max chunk size %d", count, startHeight, hdrsRes.Max)
 
 	if count > 0 {
 		b, err := hex.DecodeString(hdrsRes.HexConcat)
@@ -72,7 +72,7 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 		}
 		maybeTip += int64(count)
 
-		fmt.Println(" appended: ", nh, " headers at ", startHeight, " maybeTip ", maybeTip)
+		n.log.Debugf("appended: %d headers at %d - maybeTip: %d", nh, startHeight, maybeTip)
 	}
 
 	if count < blockCount {
@@ -107,7 +107,7 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 				}
 				maybeTip += int64(count)
 
-				fmt.Println(" Appended: ", nh, " headers at ", startHeight, " maybeTip ", maybeTip)
+				n.log.Debugf("appended: %d  headers at %d - maybeTip: %d", nh, startHeight, maybeTip)
 			}
 
 			if count < blockCount {
@@ -130,15 +130,15 @@ func (n *Node) syncNetworkHeaders(nodeCtx context.Context) error {
 	h.setTip(maybeTip)
 
 	// 5. Verify headers in headers map
-	fmt.Printf("starting verify at height %d\n", h.getTip())
+	n.log.Debugf("starting verify at height %d", h.getTip())
 	err = h.verifyAll()
 	if err != nil {
 		return err
 	}
-	fmt.Println("header chain verified")
+	n.log.Debug("header chain verified")
 
 	h.synced = true
-	fmt.Println("headers synced up to tip ", h.getTip())
+	n.log.Debugf("headers synced up to tip %d", h.getTip())
 	return nil
 }
 
@@ -179,7 +179,7 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 	qchan <- hdrRes
 
 	go func() {
-		fmt.Println("=== Waiting for Header Notifications")
+		n.log.Debug("waiting for Header Notifications")
 		defer close(qchan)
 		for {
 			if nodeCtx.Err() != nil {
@@ -196,7 +196,7 @@ func (n *Node) headersNotify(nodeCtx context.Context) error {
 }
 
 // headerQueue receives incoming headers notify results from qchan
-// - run as a goroutine.
+// Should be run as a goroutine.
 // The client local 'blockhain_headers' file is appended and the headers map updated and verified.
 func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyResult) {
 	h := n.networkHeaders
@@ -214,7 +214,7 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyR
 
 			ourTip := h.getTip()
 
-			fmt.Printf("incoming header notification height: %d\n", hdrRes.Height)
+			n.log.Debugf("incoming header notification height: %d", hdrRes.Height)
 
 			if hdrRes.Height < h.startPoint {
 				// earlier than our starting checkpoint
@@ -225,7 +225,7 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyR
 
 			if hdrRes.Height <= ourTip {
 				// we already have it
-				fmt.Printf(" - we already have a header for height %d\n\n", hdrRes.Height)
+				n.log.Debugf("we already have a header for height %d", hdrRes.Height)
 				continue
 			}
 
@@ -236,7 +236,7 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyR
 				}
 				n.session.bumpCostString(hdrRes.Hex)
 				// connected the block & updated our headers tip
-				fmt.Printf(" - updated 1 header - our new tip is %d\n\n", h.getTip())
+				n.log.Debugf("updated 1 header - our new tip is %d", h.getTip())
 				// notify client
 				n.clientTipChangeNotify <- h.getTip()
 				continue
@@ -244,7 +244,7 @@ func (n *Node) headerQueue(nodeCtx context.Context, qchan <-chan *headersNotifyR
 			// two or more headers that we do not have yet
 			numHdrs := n.syncHeadersOntoOurTip(nodeCtx, hdrRes.Height)
 			// updating less hdrs than requested is not an error - we hope to get them next time
-			fmt.Printf(" - updated %d headers - our new tip is %d\n\n", numHdrs, h.getTip())
+			n.log.Debugf("updated %d headers - our new tip is %d", numHdrs, h.getTip())
 			if numHdrs > 0 {
 				n.clientTipChangeNotify <- h.getTip()
 			}
@@ -258,7 +258,7 @@ func (n *Node) syncHeadersOntoOurTip(nodeCtx context.Context, serverHeight int64
 	missing := serverHeight - ourTip
 	from := ourTip + 1
 	to := serverHeight
-	// fmt.Printf("syncHeadersFromTip: ourTip %d server height %d num missing %d\n", ourTip, serverHeight, missing)
+	// n.log.Debugf("syncHeadersFromTip: ourTip %d server height %d num missing %d", ourTip, serverHeight, missing)
 	// per electrum, but I don't think it matters and we could always use BlockHeaders once
 	if missing > REWIND {
 		return n.updateFromChunk(nodeCtx, from, to)
@@ -328,15 +328,15 @@ func (n *Node) connectTip(serverHeader string) bool {
 	}
 	// check connect block
 	if !h.checkCanConnect(incomingHdr) {
-		fmt.Printf("connectTip - cannot connect\n"+
-			" -- incoming hash:           %s\n"+
-			" -- incoming prev hash:      %s\n"+
-			" -- our current tip hash:    %s\n",
+		n.log.Debugf("connectTip - cannot connect"+
+			" incoming hash: %s"+
+			" incoming prev hash: %s"+
+			" our current tip hash: %s",
 			incomingHdr.Hash.StringRev(), incomingHdr.Prev.StringRev(), h.getTipHash().StringRev())
 		h.dbgDumpTipHashes(3)
 		// fork maybe?
 		n.reorgRecovery()
-		fmt.Printf("*** removed %d stored headers from tip -  new tip is %d ***\n",
+		n.log.Debugf("removed %d stored headers from tip - new tip is %d",
 			REWIND, n.networkHeaders.getTip())
 		n.session.bumpCostError()
 		return false
@@ -375,7 +375,7 @@ func (n *Node) reorgRecovery() {
 		errMsg := fmt.Sprintf("reorgRecovery: truncateHeadersFile returned: %v", err)
 		panic(errMsg)
 	}
-	fmt.Printf("truncateHeadersFile: new num headers is %d\n", newNumHeaders)
+	n.log.Debugf("truncateHeadersFile: new num headers is %d", newNumHeaders)
 	for i := 0; i < REWIND; i++ {
 		h.removeOneHdrFromTip() // (sets tip--)
 	}

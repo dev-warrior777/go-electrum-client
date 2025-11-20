@@ -170,6 +170,7 @@ func (net *Network) updateNetworkServers(servers []*serverAddr) error {
 	return nil
 }
 
+// updateStoredServers used only for btc
 func (net *Network) updateStoredServers(servers []*serverAddr) error {
 	net.knownServersMtx.Lock()
 	defer net.knownServersMtx.Unlock()
@@ -201,7 +202,7 @@ func (net *Network) updateStoredServers(servers []*serverAddr) error {
 
 func (net *Network) removeServer(server *serverAddr) error {
 	if net.config.Flags&NoDeleteKnownPeers == NoDeleteKnownPeers {
-		fmt.Printf("removeServer: not removing %s - Strategy: NoDeleteStoredPeers\n", server.Address)
+		net.log.Debugf("removeServer: not removing %s - Strategy: NoDeleteStoredPeers", server.Address)
 		return nil
 	}
 

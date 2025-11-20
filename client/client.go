@@ -23,6 +23,7 @@ package client
 import (
 	"context"
 
+	"decred.org/dcrdex/dex"
 	"github.com/bisoncraft/go-electrum-client/electrumx"
 	"github.com/bisoncraft/go-electrum-client/wallet"
 )
@@ -41,7 +42,7 @@ const (
 )
 
 type ElectrumClient interface {
-	Start(ctx context.Context) error
+	Start(ctx context.Context, log dex.Logger) error
 	Stop()
 	//
 	GetConfig() *ClientConfig

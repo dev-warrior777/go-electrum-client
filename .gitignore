@@ -18,6 +18,9 @@
 go.work
 go.work.sum
 
+# go mod tidy all
+gmt.sh
+
 #test bin
 cmd/goele-btc/goele-btc
 cmd/mkwallet-btc/mkwallet-btc

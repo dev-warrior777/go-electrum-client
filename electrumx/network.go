@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"decred.org/dcrdex/dex"
 	"github.com/decred/dcrd/crypto/rand"
 )
 
@@ -85,6 +86,7 @@ func newPeerNodeWithId(
 
 type Network struct {
 	config          *ElectrumXConfig
+	log             dex.Logger
 	started         bool
 	startMtx        sync.Mutex
 	leader          *peerNode
@@ -100,7 +102,7 @@ type Network struct {
 	clientScripthashNotify chan *ScripthashStatusResult
 }
 
-func NewNetwork(config *ElectrumXConfig) *Network {
+func NewNetwork(config *ElectrumXConfig, logger dex.Logger) *Network {
 	var proxyAddr = ""
 	if config.ProxyPort != "" {
 		proxyAddr = fmt.Sprintf("%s:%s", LOCALHOST, config.ProxyPort)
@@ -108,6 +110,7 @@ func NewNetwork(config *ElectrumXConfig) *Network {
 	h := newHeaders(config)
 	network := &Network{
 		config:                 config,
+		log:                    logger,
 		started:                false,
 		leader:                 nil,
 		peers:                  make([]*peerNode, 0, 10),
@@ -185,7 +188,8 @@ func (net *Network) startNewPeer(
 		isLeader,
 		net.headers,
 		net.clientTipChangeNotify,
-		net.clientScripthashNotify)
+		net.clientScripthashNotify,
+		net.log)
 	if err != nil {
 		return err
 	}
@@ -215,7 +219,7 @@ func (net *Network) startNewPeer(
 func (net *Network) getServerPeers(ctx context.Context) {
 	err := net.getServers(ctx)
 	if err != nil {
-		fmt.Printf("getServerPeers: ignoring error - %v\n", err)
+		net.log.Debugf("getServerPeers: ignoring error - %v", err)
 	}
 }
 
@@ -230,7 +234,7 @@ func (net *Network) removePeer(oldPeer *peerNode) {
 	newPeers := make([]*peerNode, 0, nodesLen-1)
 	for _, peer := range net.peers {
 		if oldPeer.id == peer.id {
-			fmt.Printf("removing peer %d\n", oldPeer.id)
+			net.log.Debugf("removing peer %d", oldPeer.id)
 		} else {
 			newPeers = append(newPeers, peer)
 		}
@@ -299,7 +303,7 @@ func (net *Network) checkLeader(ctx context.Context) {
 				continue
 			}
 			net.leader = peer
-			fmt.Printf("promoted and started new leader %s\n", peer.netAddr)
+			net.log.Debugf("promoted and started new leader %s", peer.netAddr)
 			return
 		}
 	}
@@ -344,7 +348,7 @@ func (net *Network) startNewPeerMaybe(ctx context.Context) {
 		net.removeServer(available[0])
 	}
 	net.shufflePeers()
-	fmt.Printf("online peers: %d\n\n", net.getNumPeers())
+	net.log.Debugf("online peers: %d", net.getNumPeers())
 }
 
 func toNetAddr(saddr *serverAddr) *NodeServerAddr {
@@ -403,7 +407,7 @@ func (net *Network) startNewLeader(ctx context.Context) {
 	if err != nil {
 		net.removeServer(available[0])
 	}
-	fmt.Printf("started new leader %s\n", addr.String())
+	net.log.Debugf("started new leader %s", addr.String())
 }
 
 func (net *Network) shufflePeers() {

@@ -6,10 +6,12 @@ package btc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path"
 	"sync"
 
+	"decred.org/dcrdex/dex"
 	"github.com/bisoncraft/go-electrum-client/client"
 	"github.com/bisoncraft/go-electrum-client/electrumx"
 	"github.com/bisoncraft/go-electrum-client/electrumx/elxbtc"
@@ -23,6 +25,8 @@ import (
 type BtcElectrumClient struct {
 	// Cancel is the cancel func for the goele context
 	Cancel context.CancelFunc
+	// Log is a dex logger
+	Log dex.Logger
 	// The Goele configuration
 	ClientConfig *client.ClientConfig
 	// Goele wallet
@@ -39,6 +43,7 @@ type BtcElectrumClient struct {
 func NewBtcElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 	ec := BtcElectrumClient{
 		Cancel:              nil,
+		Log:                 nil,
 		ClientConfig:        cfg,
 		Wallet:              nil,
 		X:                   nil,
@@ -118,14 +123,23 @@ func (ec *BtcElectrumClient) createElectrumXInterface() error {
 
 // client interface implementation
 
-func (ec *BtcElectrumClient) Start(parentCtx context.Context) error {
+func (ec *BtcElectrumClient) Start(parentCtx context.Context, logger dex.Logger) error {
+	if parentCtx == nil {
+		return fmt.Errorf("context from caller is nil")
+	}
+	if logger == nil {
+		return fmt.Errorf("dex logger from caller is nil")
+	}
 	goeleCtx, goeleCancel := context.WithCancel(parentCtx)
 	ec.Cancel = goeleCancel
+	ec.Log = logger.SubLogger("GOEL").SubLogger("btc")
+	ec.Log.Infof("starting electrum client")
 	err := ec.createElectrumXInterface()
 	if err != nil {
 		return err
 	}
-	err = ec.X.Start(goeleCtx)
+	ec.Log.Debug("starting electrumX interface")
+	err = ec.X.Start(goeleCtx, ec.Log)
 	if err != nil {
 		return err
 	}
@@ -134,6 +148,7 @@ func (ec *BtcElectrumClient) Start(parentCtx context.Context) error {
 		return err
 	}
 	go ec.tipChange(goeleCtx)
+	ec.Log.Info("electrum client started")
 	return nil
 }
 

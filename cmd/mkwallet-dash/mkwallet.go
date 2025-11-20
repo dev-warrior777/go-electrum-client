@@ -3,7 +3,7 @@
 
 package main
 
-// Run create or recreate a wallet for testing
+// Run create or recreate a wallet for testing dash
 
 import (
 	"context"
@@ -14,11 +14,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"decred.org/dcrdex/dex"
 	"github.com/bisoncraft/go-electrum-client/client"
 	"github.com/bisoncraft/go-electrum-client/client/dash"
 	"github.com/bisoncraft/go-electrum-client/electrumx"
 	"github.com/bisoncraft/go-electrum-client/wallet"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/decred/slog"
 )
 
 var (
@@ -203,7 +205,8 @@ func main() {
 	}
 
 	// start client, create node & sync headers
-	err = ec.Start(context.Background())
+	logger := dex.StdOutLogger(cfg.Coin, slog.LevelTrace)
+	err = ec.Start(context.Background(), logger)
 	if err != nil {
 		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
 		os.Exit(1)

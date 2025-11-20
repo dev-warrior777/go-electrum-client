@@ -11,24 +11,15 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"decred.org/dcrdex/dex"
 	"github.com/decred/go-socks/socks"
 )
 
 // Thanks to Chappjc for the original source code.
-
-// printer is a function with the signature of a logger method.
-type printer func(format string, params ...any)
-
-var (
-	stderrPrinter = printer(func(format string, params ...any) {
-		fmt.Fprintf(os.Stderr, format+"\n", params...)
-	})
-)
 
 // from electrum code - a ping should be about 50% default server timeout for
 // ping which is ~10m .. so should be around 300s with a margin for error.
@@ -42,8 +33,8 @@ type serverConn struct {
 	conn       net.Conn
 	nodeCancel context.CancelCauseFunc
 	done       chan struct{}
-	addr       string // kept for debug
-	debug      printer
+	addr       string     // kept for debug
+	log        dex.Logger // TODO(goele) hack this in
 
 	reqID uint64
 
@@ -93,7 +84,7 @@ func (sc *serverConn) listen(nodeCtx context.Context) {
 		msg, err := reader.ReadBytes(newline)
 		if err != nil {
 			if nodeCtx.Err() == nil { // unexpected
-				sc.debug("ReadBytes: %v - conn closed\n", err)
+				sc.log.Debugf("ReadBytes: %v - conn closed", err)
 			}
 			sc.nodeCancel(errServerCanceled)
 			return
@@ -105,14 +96,14 @@ func (sc *serverConn) listen(nodeCtx context.Context) {
 			continue
 		}
 
-		// sc.debug("[Debug] ", string(msg), "\n[<-Debug]\n\n")
+		// sc.log.Tracef("listen debugging %s", string(msg)) // TODO(goele) keep for debugging
 
 		// Notifications
 		if jsonResp.Method != "" {
 			var ntfnParams ntfnData // the ntfn payload
 			err = json.Unmarshal(msg, &ntfnParams)
 			if err != nil {
-				sc.debug("notification Unmarshal error: %v", err)
+				sc.log.Debugf("notification Unmarshal error: %v", err)
 				continue
 			}
 
@@ -125,14 +116,14 @@ func (sc *serverConn) listen(nodeCtx context.Context) {
 				sc.scripthashStatusNotify(ntfnParams.Params)
 				continue
 			}
-			sc.debug("Received notification for unknown method %s", jsonResp.Method)
+			sc.log.Debugf("Received notification for unknown method %s", jsonResp.Method)
 			continue
 		}
 
 		// Responses
 		c := sc.responseChan(jsonResp.ID)
 		if c == nil {
-			sc.debug("Received response for unknown request ID %d", jsonResp.ID)
+			sc.log.Debugf("Received response for unknown request ID %d", jsonResp.ID)
 			continue
 		}
 		c <- &jsonResp // buffered and single use => cannot block
@@ -179,7 +170,8 @@ func connectServer(
 	nodeCtx context.Context,
 	nodeCancel context.CancelCauseFunc,
 	addr string,
-	opts *connectOpts) (*serverConn, error) {
+	opts *connectOpts,
+	logger dex.Logger) (*serverConn, error) {
 
 	var dial func(nodeCtx context.Context, network, addr string) (net.Conn, error)
 	var dialCtx context.Context
@@ -218,7 +210,7 @@ func connectServer(
 		nodeCancel:   nodeCancel,
 		done:         make(chan struct{}),
 		addr:         addr,
-		debug:        stderrPrinter,
+		log:          logger,
 		respHandlers: make(map[uint64]chan *response),
 		// 128 bytes - unbuffered because we have a queue downstream
 		scripthashNotify: make(chan *ScripthashStatusResult),
@@ -231,7 +223,7 @@ func connectServer(
 	go func() {
 		<-nodeCtx.Done()
 		cause := context.Cause(nodeCtx)
-		sc.debug("nodeCtx.Done in connectServer for %s - cause %v\n", sc.addr, cause)
+		sc.log.Tracef("nodeCtx.Done in connectServer for %s - cause %v", sc.addr, cause)
 		conn.Close()
 		close(sc.done)
 	}()
@@ -300,7 +292,7 @@ func (sc *serverConn) scripthashStatusNotify(raw json.RawMessage) {
 		defer sc.scripthashNotifyMtx.Unlock()
 		sc.scripthashNotify <- &statusResult
 	} else {
-		sc.debug("Scripthash Status Notify\nError: %v\nRaw: %s\n", err, string(raw))
+		sc.log.Debugf("scripthash status notify: error: %v, raw json: %s", err, string(raw))
 	}
 }
 
@@ -328,7 +320,7 @@ func (sc *serverConn) headersTipChangeNotify(raw json.RawMessage) {
 			sc.headersNotify <- r
 		}
 	} else {
-		sc.debug("Headers Notify\nError: %v\nRaw: %s\n", err, string(raw))
+		sc.log.Debugf("headers notify\nError: %v\nRaw: %s\n", err, string(raw))
 	}
 }
 
@@ -455,29 +447,29 @@ func (sc *serverConn) serverPeers(nodeCtx context.Context) ([]*peersResult, erro
 	peers := make([]*peersResult, 0, len(resp))
 	for _, peer := range resp {
 		if len(peer) != 3 {
-			sc.debug("bad peer data: %v (%T)", peer, peer)
+			sc.log.Debugf("bad peer data: %v (%T)", peer, peer)
 			continue
 		}
 		addr, ok := peer[0].(string)
 		if !ok {
-			sc.debug("bad peer IP data: %v (%T)", peer[0], peer[0])
+			sc.log.Debugf("bad peer IP data: %v (%T)", peer[0], peer[0])
 			continue
 		}
 		host, ok := peer[1].(string)
 		if !ok {
-			sc.debug("bad peer hostname: %v (%T)", peer[1], peer[1])
+			sc.log.Debugf("bad peer hostname: %v (%T)", peer[1], peer[1])
 			continue
 		}
 		featsI, ok := peer[2].([]any)
 		if !ok {
-			sc.debug("bad peer feature data: %v (%T)", peer[2], peer[2])
+			sc.log.Debugf("bad peer feature data: %v (%T)", peer[2], peer[2])
 			continue
 		}
 		feats := make([]string, len(featsI))
 		for i, featI := range featsI {
 			feat, ok := featI.(string)
 			if !ok {
-				sc.debug("bad peer feature data: %v (%T)", featI, featI)
+				sc.log.Debugf("bad peer feature data: %v (%T)", featI, featI)
 				continue
 			}
 			feats[i] = feat
@@ -676,7 +668,7 @@ func (sc *serverConn) UnsubscribeScripthash(nodeCtx context.Context, scripthash 
 	var resp string
 	err := sc.request(nodeCtx, method, positional{scripthash}, &resp)
 	if err != nil {
-		sc.debug("UnsubscribeScripthash: %v\n", err)
+		sc.log.Debugf("UnsubscribeScripthash: %v", err)
 	}
 }
 

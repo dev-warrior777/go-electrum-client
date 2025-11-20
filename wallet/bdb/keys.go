@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -120,7 +119,7 @@ func (k *KeysDB) GetDbg() string {
 			krec.ScriptAddress, &chaincfg.RegressionNetParams)
 		if swerr != nil {
 			segwitAddrStr = ""
-			fmt.Println(swerr)
+			// fmt.Println(swerr)
 		} else {
 			segwitAddrStr = segwitAddress.String()
 		}

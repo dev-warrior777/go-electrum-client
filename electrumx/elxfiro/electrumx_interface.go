@@ -10,43 +10,43 @@ import (
 	"fmt"
 	"io"
 
+	"decred.org/dcrdex/dex"
 	"github.com/bisoncraft/go-electrum-client/electrumx"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
 const (
-	FIRO_HEADER_SIZE         = 80
-	FIRO_FIROPOW_EXTRA       = 40
-	FIRO_FIROPOW_HEADER_SIZE = FIRO_HEADER_SIZE + FIRO_FIROPOW_EXTRA
+	FiroHeaderSize        = 80
+	FiroProgpowExtra      = 40
+	FiroProgpowHeaderSize = FiroHeaderSize + FiroProgpowExtra
 )
 
 // These configure ElectrumX network for: FIRO
 const (
-	FIRO_COIN                = "firo"
-	FIRO_HEADER_SIZE_REGTEST = 80
-	FIRO_HEADER_SIZE_FIROPOW = 120
-	// FIRO_HEADER_SIZE              = 80 // check this for MTP legacy. Now FiroPoW (ProgPow clone) .. should be 80
-	FIRO_STARTPOINT_REGTEST       = 0
-	FIRO_STARTPOINT_TESTNET       = 170_000
-	FIRO_STARTPOINT_MAINNET       = 987_000
-	FIRO_GENESIS_REGTEST          = "a42b98f04cc2916e8adfb5d9db8a2227c4629bc205748ed2f33180b636ee885b"
-	FIRO_GENESIS_TESTNET          = "aa22adcc12becaf436027ffe62a8fb21b234c58c23865291e5dc52cf53f64fca"
-	FIRO_GENESIS_MAINNET          = "4381deb85b1b2c9843c222944b616d997516dcbd6a964e1eaf0def0830695233"
-	FIRO_MAX_ONLINE_PEERS_REGTEST = 0
-	FIRO_MAX_ONLINE_PEERS_TESTNET = 0 // only one testnet server 95.179.164.13:51002 - v0.14.14.0
-	FIRO_MAX_ONLINE_PEERS_MAINNET = 3 // only 4 servers                              - v0.14.14.0
-	FIRO_MAX_ONION                = 0
-	FIRO_STRATEGY_FLAGS_REGTEST   = electrumx.NoDeleteKnownPeers // only one server
-	FIRO_STRATEGY_FLAGS_TESTNET   = electrumx.NoDeleteKnownPeers // only one server
-	FIRO_STRATEGY_FLAGS_MAINNET   = electrumx.NoDeleteKnownPeers // 4 servers
+	FiroCoin                  = "firo"
+	FiroHeaderSizeRegtest     = 80
+	FiroHeaderSizeFiropow     = 120
+	FiroStartpointRegtest     = 0
+	FiroStartpointTestnet     = 170_000
+	FiroStartpointMainnet     = 987_000
+	FiroGenesisRegtest        = "a42b98f04cc2916e8adfb5d9db8a2227c4629bc205748ed2f33180b636ee885b"
+	FiroGenesisTestnet        = "aa22adcc12becaf436027ffe62a8fb21b234c58c23865291e5dc52cf53f64fca"
+	FiroGenesisMainnet        = "4381deb85b1b2c9843c222944b616d997516dcbd6a964e1eaf0def0830695233"
+	FiroMaxOnlinePeersRegtest = 0
+	FiroMaxOnlinePeersTestnet = 0 // only one testnet server 95.179.164.13:51002 - Firo  Core 0.14.15.0
+	FiroMaxOnlinePeersMainnet = 3 // only 4 servers                              - Firo  Core 0.14.15.0
+	FiroMaxOnion              = 0
+	FiroStrategyFlagsRegtest  = electrumx.NoDeleteKnownPeers // only one server
+	FiroStrategyFlagsTestnet  = electrumx.NoDeleteKnownPeers // only one server
+	FiroStrategyFlagsMainnet  = electrumx.NoDeleteKnownPeers // 4 servers
 )
 
 type headerDeserializer struct{}
 
 func (d headerDeserializer) Deserialize(r io.Reader) (*electrumx.BlockHeader, error) {
 	blockHeader := &electrumx.BlockHeader{}
-	sz := int64(FIRO_FIROPOW_HEADER_SIZE)
+	sz := int64(FiroProgpowHeaderSize)
 	fullHeader := make([]byte, sz)
 	_, err := io.ReadFull(r, fullHeader)
 	if err != nil {
@@ -58,7 +58,7 @@ func (d headerDeserializer) Deserialize(r io.Reader) (*electrumx.BlockHeader, er
 	blockHeader.Hash = electrumx.WireHash(hash)
 
 	// deserialize the block header without the extra progpow bytes
-	blockHeaderRdr := bytes.NewReader(fullHeader[:FIRO_HEADER_SIZE])
+	blockHeaderRdr := bytes.NewReader(fullHeader[:FiroHeaderSize])
 	wireHdr := &wire.BlockHeader{}
 	err = wireHdr.Deserialize(blockHeaderRdr)
 	if err != nil {
@@ -93,31 +93,31 @@ type ElectrumXInterface struct {
 }
 
 func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterface, error) {
-	config.Coin = FIRO_COIN
-	config.MaxOnion = FIRO_MAX_ONION
+	config.Coin = FiroCoin
+	config.MaxOnion = FiroMaxOnion
 
 	switch config.NetType {
 	case electrumx.Regtest:
-		config.Flags = FIRO_STRATEGY_FLAGS_REGTEST
+		config.Flags = FiroStrategyFlagsRegtest
 		config.HeaderDeserializer = regtestHeaderDeserializer{}
-		config.BlockHeaderSize = FIRO_HEADER_SIZE_REGTEST
-		config.Genesis = FIRO_GENESIS_REGTEST
-		config.StartPoint = FIRO_STARTPOINT_REGTEST
-		config.MaxOnlinePeers = FIRO_MAX_ONLINE_PEERS_REGTEST
+		config.BlockHeaderSize = FiroHeaderSizeRegtest
+		config.Genesis = FiroGenesisRegtest
+		config.StartPoint = FiroStartpointRegtest
+		config.MaxOnlinePeers = FiroMaxOnlinePeersRegtest
 	case electrumx.Testnet:
-		config.Flags = FIRO_STRATEGY_FLAGS_TESTNET
+		config.Flags = FiroStrategyFlagsTestnet
 		config.HeaderDeserializer = headerDeserializer{}
-		config.BlockHeaderSize = FIRO_HEADER_SIZE_FIROPOW
-		config.Genesis = FIRO_GENESIS_TESTNET
-		config.StartPoint = FIRO_STARTPOINT_TESTNET
-		config.MaxOnlinePeers = FIRO_MAX_ONLINE_PEERS_TESTNET
+		config.BlockHeaderSize = FiroHeaderSizeFiropow
+		config.Genesis = FiroGenesisTestnet
+		config.StartPoint = FiroStartpointTestnet
+		config.MaxOnlinePeers = FiroMaxOnlinePeersTestnet
 	case electrumx.Mainnet:
-		config.Flags = FIRO_STRATEGY_FLAGS_TESTNET
+		config.Flags = FiroStrategyFlagsTestnet
 		config.HeaderDeserializer = headerDeserializer{}
-		config.BlockHeaderSize = FIRO_HEADER_SIZE_FIROPOW
-		config.Genesis = FIRO_GENESIS_MAINNET
-		config.StartPoint = FIRO_STARTPOINT_MAINNET
-		config.MaxOnlinePeers = FIRO_MAX_ONLINE_PEERS_MAINNET
+		config.BlockHeaderSize = FiroHeaderSizeFiropow
+		config.Genesis = FiroGenesisMainnet
+		config.StartPoint = FiroStartpointMainnet
+		config.MaxOnlinePeers = FiroMaxOnlinePeersMainnet
 	default:
 		return nil, fmt.Errorf("config error")
 	}
@@ -129,8 +129,8 @@ func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterfa
 	return &x, nil
 }
 
-func (x *ElectrumXInterface) Start(ctx context.Context) error {
-	network := electrumx.NewNetwork(x.config)
+func (x *ElectrumXInterface) Start(ctx context.Context, logger dex.Logger) error {
+	network := electrumx.NewNetwork(x.config, logger)
 	err := network.Start(ctx)
 	if err != nil {
 		return err

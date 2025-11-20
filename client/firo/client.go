@@ -6,10 +6,12 @@ package firo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path"
 	"sync"
 
+	"decred.org/dcrdex/dex"
 	"github.com/bisoncraft/go-electrum-client/client"
 	"github.com/bisoncraft/go-electrum-client/electrumx"
 	"github.com/bisoncraft/go-electrum-client/electrumx/elxfiro"
@@ -23,11 +25,13 @@ import (
 type FiroElectrumClient struct {
 	// Cancel is the cancel func for the goele context
 	Cancel context.CancelFunc
+	// Log is a dex Logger
+	Log dex.Logger
 	// The Goele configuration
 	ClientConfig *client.ClientConfig
 	// Goele wallet
 	Wallet wallet.ElectrumWallet
-	// Interface tp ElectrumX servers for a coin network
+	// Interface to ElectrumX servers for a coin network
 	X electrumx.ElectrumX
 	// Receive tip change notify channel from electrumx
 	rcvTipChangeNotify <-chan int64
@@ -39,6 +43,7 @@ type FiroElectrumClient struct {
 func NewFiroElectrumClient(cfg *client.ClientConfig) client.ElectrumClient {
 	ec := FiroElectrumClient{
 		Cancel:              nil,
+		Log:                 nil,
 		ClientConfig:        cfg,
 		Wallet:              nil,
 		X:                   nil,
@@ -118,14 +123,23 @@ func (ec *FiroElectrumClient) createElectrumXInterface() error {
 
 // client interface implementation
 
-func (ec *FiroElectrumClient) Start(parentCtx context.Context) error {
+func (ec *FiroElectrumClient) Start(parentCtx context.Context, logger dex.Logger) error {
+	if parentCtx == nil {
+		return fmt.Errorf("context from caller is nil")
+	}
+	if logger == nil {
+		return fmt.Errorf("dex logger from caller is nil")
+	}
 	goeleCtx, goeleCancel := context.WithCancel(parentCtx)
 	ec.Cancel = goeleCancel
+	ec.Log = logger.SubLogger("GOEL").SubLogger("firo")
+	ec.Log.Info("starting electrum client")
 	err := ec.createElectrumXInterface()
 	if err != nil {
 		return err
 	}
-	err = ec.X.Start(goeleCtx)
+	ec.Log.Debug("starting electrumX interface")
+	err = ec.X.Start(goeleCtx, ec.Log)
 	if err != nil {
 		return err
 	}
@@ -134,6 +148,7 @@ func (ec *FiroElectrumClient) Start(parentCtx context.Context) error {
 		return err
 	}
 	go ec.tipChange(goeleCtx)
+	ec.Log.Info("electrum client started")
 	return nil
 }
 
@@ -179,13 +194,9 @@ func (ec *FiroElectrumClient) RecreateWallet(ctx context.Context, pw, mnenomic s
 	if err != nil {
 		return err
 	}
-	// // Do a rescan because alhough we have a wallet structure with a keychain
-	// // we do not have any transaction history
-	// err = ec.RescanWallet(ctx)
-	// if err != nil {
-	// 	return err
-	// }
-	return nil
+	// Do a rescan because alhough we have a wallet structure with a keychain
+	// we do not have any transaction history
+	return ec.RescanWallet(ctx)
 }
 
 // LoadWallet loads an existing wallet. The password is required to decrypt

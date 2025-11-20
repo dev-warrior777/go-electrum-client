@@ -17,17 +17,17 @@ import (
 	"golang.org/x/crypto/nacl/secretbox"
 )
 
-const STORAGE = "storage"
+const Storage = "storage"
 
 var (
 	ErrBadPw = errors.New("bad password")
 	// Argon2 params
-	SALT    = []byte("2977958431d29f2d") // TODO: a good random for dev
-	TIME    = uint32(1)
-	MEM     = uint32(64 * 1024)
-	THREADS = uint8(runtime.NumCPU())
-	THRDMAX = uint8(255)
-	KEYLEN  = uint32(32)
+	Salt    = []byte("2977958431d29f2d") // TODO: a good random for dev
+	Time    = uint32(1)
+	Mem     = uint32(64 * 1024)
+	Threads = uint8(runtime.NumCPU())
+	ThrdMax = uint8(255)
+	KeyLen  = uint32(32)
 )
 
 type EncDB struct {
@@ -53,7 +53,7 @@ func (e *EncDB) PutEncrypted(b []byte, pw string) error {
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(STORAGE, eb)
+	_, err = stmt.Exec(Storage, eb)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -72,7 +72,7 @@ func (e *EncDB) GetDecrypted(pw string) ([]byte, error) {
 	}
 	defer stmt.Close()
 	var b []byte
-	err = stmt.QueryRow(STORAGE).Scan(&b)
+	err = stmt.QueryRow(Storage).Scan(&b)
 	if err != nil {
 		return nil, err
 	}
@@ -107,11 +107,11 @@ func decryptBytes(encrypted []byte, password string) ([]byte, error) {
 }
 
 func getEncryptionKey32(password string) [32]byte {
-	threads := THREADS
-	if threads > THRDMAX {
-		threads = THRDMAX
+	threads := Threads
+	if threads > ThrdMax {
+		threads = ThrdMax
 	}
-	b := argon2.IDKey([]byte(password), SALT, TIME, MEM, threads, KEYLEN)
+	b := argon2.IDKey([]byte(password), Salt, Time, Mem, threads, KeyLen)
 	// revert to go19
 	// return ([32]byte)(b[:])
 	var arr32 [32]byte

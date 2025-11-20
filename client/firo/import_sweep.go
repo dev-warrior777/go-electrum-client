@@ -156,13 +156,13 @@ func (ec *FiroElectrumClient) ImportAndSweep(ctx context.Context, importedKeyPai
 	for _, k := range importedKeyPairs {
 		wif, err := btcutil.DecodeWIF(k)
 		if err != nil {
-			fmt.Printf("warning cannot decode WIF from string: %s\n", k)
+			ec.Log.Warnf("warning cannot decode WIF from string: %s", k)
 			continue
 		}
 
 		inputsForKey, err := ec.getUtxos(ctx, wif)
 		if err != nil {
-			fmt.Printf("warning cannot get utxos for pubkey: %s\n",
+			ec.Log.Warnf("warning cannot get utxos for pubkey: %s",
 				hex.EncodeToString(wif.SerializePubKey()))
 			continue
 		}

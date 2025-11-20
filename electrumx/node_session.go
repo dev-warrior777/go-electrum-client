@@ -6,10 +6,11 @@ package electrumx
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"decred.org/dcrdex/dex"
 )
 
 ///////////////////////////////////////////////////
@@ -57,10 +58,10 @@ import (
 // This is just a naive PoC that will have to be better implemented.
 
 const (
-	COST_SOFT_LIMIT    = 2000.00
-	COST_HARD_LIMIT    = 10000.00
-	BW_COST_PER_BYTE   = 1.0 / 100000
-	COST_DECAY_PER_SEC = (COST_HARD_LIMIT / 3600.00)
+	CostSoftLimit      = 2000.00
+	CostHardLimit      = 10000.00
+	BwCostPerByte      = 1.0 / 100000
+	CostDecayPerSecond = (CostHardLimit / 3600.00)
 	// Adjust frequency of cost reductions
 	TuningFactor = 10
 )
@@ -68,10 +69,15 @@ const (
 type session struct {
 	cost    float32
 	costMtx sync.Mutex
+	log     dex.Logger
 }
 
-func newSession() *session {
-	return &session{cost: float32(0)}
+func newSession(logger dex.Logger) *session {
+	s := &session{
+		cost: float32(0),
+		log:  logger,
+	}
+	return s
 }
 
 func (s *session) start(nodeCtx context.Context) {
@@ -85,7 +91,7 @@ func (s *session) runCostDecayLoop(nodeCtx context.Context) {
 	for {
 		select {
 		case <-nodeCtx.Done():
-			fmt.Printf("final session cost %f\n", s.cost)
+			s.log.Tracef("final session cost %f", s.cost)
 			return
 		case <-t.C:
 			// TuningFactor times slower to give back credits for less frequent
@@ -102,18 +108,18 @@ func (s *session) runCostDecayLoop(nodeCtx context.Context) {
 func (s *session) reduceCost() {
 	s.costMtx.Lock()
 	defer s.costMtx.Unlock()
-	s.cost -= COST_DECAY_PER_SEC
+	s.cost -= CostDecayPerSecond
 }
 
 func (s *session) bumpCost(incurred float32) {
 	s.costMtx.Lock()
 	defer s.costMtx.Unlock()
 	s.cost += incurred
-	// fmt.Printf(" - incurred: %f, total-cost: %f\n", incurred, s.cost)
+	// fmt.Printf(" - incurred: %f, total-cost: %f\n", incurred, s.cost) // TODO(goele) remove
 }
 
 func (s *session) bumpCostBytes(numBytes int) {
-	incurred := float32(numBytes) * BW_COST_PER_BYTE
+	incurred := float32(numBytes) * BwCostPerByte
 	s.bumpCost(incurred)
 }
 

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 
+	"decred.org/dcrdex/dex"
 	"github.com/bisoncraft/go-electrum-client/electrumx"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/phoreproject/go-x11"
@@ -17,21 +18,21 @@ import (
 
 // These configure ElectrumX network for: DASH
 const (
-	DASH_COIN                     = "dash"
-	DASH_HEADER_SIZE              = 80 // https://docs.dash.org/en/stable/docs/core/reference/block-chain-block-headers.html
-	DASH_STARTPOINT_REGTEST       = 0
-	DASH_STARTPOINT_TESTNET       = 1225000 // March/April 2025
-	DASH_STARTPOINT_MAINNET       = 2248000 // March/April 2025
-	DASH_GENESIS_REGTEST          = "000008ca1832a4baf228eb1553c03d3a2c8e02399550dd6ea8d65cec3ef23d2e"
-	DASH_GENESIS_TESTNET          = "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c"
-	DASH_GENESIS_MAINNET          = "00000ffd590b1485b3caadc19b22e6379c733355108f107a430458cdf3407ab6"
-	DASH_MAX_ONLINE_PEERS_REGTEST = 0
-	DASH_MAX_ONLINE_PEERS_TESTNET = 1
-	DASH_MAX_ONLINE_PEERS_MAINNET = 3
-	DASH_MAX_ONION                = 1
-	DASH_STRATEGY_FLAGS_REGTEST   = electrumx.NoDeleteKnownPeers
-	DASH_STRATEGY_FLAGS_TESTNET   = electrumx.NoDeleteKnownPeers
-	DASH_STRATEGY_FLAGS_MAINNET   = electrumx.NoDeleteKnownPeers // 1..5 servers per kool_guy
+	DashCoin                  = "dash"
+	DashHeaderSize            = 80 // https://docs.dash.org/en/stable/docs/core/reference/block-chain-block-headers.html
+	DashStartpointRegtest     = 0
+	DashStartpointTestnet     = 1225000 // March/April 2025
+	DashStartpointMainnet     = 2248000 // March/April 2025
+	DashGenesisRegtest        = "000008ca1832a4baf228eb1553c03d3a2c8e02399550dd6ea8d65cec3ef23d2e"
+	DashGenesisTestnet        = "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c"
+	DashGenesisMainnet        = "00000ffd590b1485b3caadc19b22e6379c733355108f107a430458cdf3407ab6"
+	DashMaxOnlinePeersRegtest = 0
+	DashMaxOnlinePeersTestnet = 1
+	DashMaxOnlinePeersMainnet = 3
+	DashMaxOnion              = 1
+	DashStrategyFlagsRegtest  = electrumx.NoDeleteKnownPeers
+	DashStrategyFlagsTestnet  = electrumx.NoDeleteKnownPeers
+	DashStrategyFlagsMainnet  = electrumx.NoDeleteKnownPeers // 1..5 servers per kool_guy @ novosibirsk
 )
 
 type headerDeserialzer struct{}
@@ -41,7 +42,7 @@ type headerDeserialzer struct{}
 // See also: https://github.com/phoreproject/go-x11/blob/master/readme.md
 func (d headerDeserialzer) Deserialize(r io.Reader) (*electrumx.BlockHeader, error) {
 	blockHeader := &electrumx.BlockHeader{}
-	sz := int64(DASH_HEADER_SIZE)
+	sz := int64(DashHeaderSize)
 	header := make([]byte, sz)
 	_, err := io.ReadFull(r, header)
 	if err != nil {
@@ -51,7 +52,6 @@ func (d headerDeserialzer) Deserialize(r io.Reader) (*electrumx.BlockHeader, err
 	// hash the header
 	hs, hash := x11.New(), [32]byte{}
 	hs.Hash(header, hash[:])
-	// fmt.Printf("hash: %x\n", hash[:])
 	blockHeader.Hash = electrumx.WireHash(hash)
 
 	// deserialize the block header
@@ -73,26 +73,26 @@ type ElectrumXInterface struct {
 }
 
 func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterface, error) {
-	config.Coin = DASH_COIN
-	config.BlockHeaderSize = DASH_HEADER_SIZE
-	config.MaxOnion = DASH_MAX_ONION
+	config.Coin = DashCoin
+	config.BlockHeaderSize = DashHeaderSize
+	config.MaxOnion = DashMaxOnion
 
 	switch config.NetType {
 	case electrumx.Regtest:
-		config.Flags = DASH_STRATEGY_FLAGS_REGTEST
-		config.Genesis = DASH_GENESIS_REGTEST
-		config.StartPoint = DASH_STARTPOINT_REGTEST
-		config.MaxOnlinePeers = DASH_MAX_ONLINE_PEERS_REGTEST
+		config.Flags = DashStrategyFlagsRegtest
+		config.Genesis = DashGenesisRegtest
+		config.StartPoint = DashStartpointRegtest
+		config.MaxOnlinePeers = DashMaxOnlinePeersRegtest
 	case electrumx.Testnet:
-		config.Flags = DASH_STRATEGY_FLAGS_TESTNET
-		config.Genesis = DASH_GENESIS_TESTNET
-		config.StartPoint = DASH_STARTPOINT_TESTNET
-		config.MaxOnlinePeers = DASH_MAX_ONLINE_PEERS_TESTNET
+		config.Flags = DashStrategyFlagsTestnet
+		config.Genesis = DashGenesisTestnet
+		config.StartPoint = DashStartpointTestnet
+		config.MaxOnlinePeers = DashMaxOnlinePeersTestnet
 	case electrumx.Mainnet:
-		config.Flags = DASH_STRATEGY_FLAGS_MAINNET
-		config.Genesis = DASH_GENESIS_MAINNET
-		config.StartPoint = DASH_STARTPOINT_MAINNET
-		config.MaxOnlinePeers = DASH_MAX_ONLINE_PEERS_MAINNET
+		config.Flags = DashStrategyFlagsMainnet
+		config.Genesis = DashGenesisMainnet
+		config.StartPoint = DashStartpointMainnet
+		config.MaxOnlinePeers = DashMaxOnlinePeersMainnet
 	default:
 		return nil, fmt.Errorf("config error")
 	}
@@ -105,8 +105,8 @@ func NewElectrumXInterface(config *electrumx.ElectrumXConfig) (*ElectrumXInterfa
 	return &x, nil
 }
 
-func (x *ElectrumXInterface) Start(ctx context.Context) error {
-	network := electrumx.NewNetwork(x.config)
+func (x *ElectrumXInterface) Start(ctx context.Context, logger dex.Logger) error {
+	network := electrumx.NewNetwork(x.config, logger)
 	err := network.Start(ctx)
 	if err != nil {
 		return err

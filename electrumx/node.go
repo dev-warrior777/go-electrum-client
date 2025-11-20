@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+
+	"decred.org/dcrdex/dex"
 )
 
 var ErrNotConnected = errors.New("node not connected")
@@ -24,6 +26,7 @@ type Node struct {
 	clientTipChangeNotify  chan int64
 	clientScriptHashNotify chan *ScripthashStatusResult
 	session                *session
+	log                    dex.Logger
 }
 
 func newNode(
@@ -32,7 +35,8 @@ func newNode(
 	isLeader bool,
 	networkHeaders *headers,
 	clientTipChangeNotify chan int64,
-	clientScriptHashNotify chan *ScripthashStatusResult) (*Node, error) {
+	clientScriptHashNotify chan *ScripthashStatusResult,
+	log dex.Logger) (*Node, error) {
 
 	netProto := netAddr.Network()
 	addr := netAddr.String()
@@ -71,13 +75,14 @@ func newNode(
 		clientTipChangeNotify:  clientTipChangeNotify,
 		clientScriptHashNotify: clientScriptHashNotify,
 		session:                nil,
+		log:                    log,
 	}
 	return n, nil
 }
 
 func (n *Node) start(nodeCtx context.Context, nodeCancel context.CancelCauseFunc, network, nettype, genesis string) error {
 	// connect to electrumX
-	sc, err := connectServer(nodeCtx, nodeCancel, n.serverAddr, n.connectOpts)
+	sc, err := connectServer(nodeCtx, nodeCancel, n.serverAddr, n.connectOpts, n.log)
 	if err != nil {
 		return err
 	}
@@ -95,8 +100,8 @@ func (n *Node) start(nodeCtx context.Context, nodeCancel context.CancelCauseFunc
 		return fmt.Errorf("wrong genesis hash for %s %s", network, nettype)
 	}
 
-	fmt.Printf(
-		"** Connected to %s over %s on %s ***\n   Using server software version %s protocol version %s\n   Genesis %s\n",
+	n.log.Debugf(
+		"connected to %s over %s on %s - using server software version: %s protocol version: %s  genesis %s",
 		n.serverAddr, n.netProto, nettype, version[0], version[1], genesis)
 
 	n.server.conn = sc
@@ -106,7 +111,7 @@ func (n *Node) start(nodeCtx context.Context, nodeCancel context.CancelCauseFunc
 	n.server.protocolVersion = version[1]
 
 	// start a new session for this node to monitor resource use
-	n.session = newSession()
+	n.session = newSession(n.log)
 	n.session.start(nodeCtx)
 
 	// Node is up and ready - if not leader then we exit here

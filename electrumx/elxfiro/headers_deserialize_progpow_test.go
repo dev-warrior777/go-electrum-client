@@ -31,16 +31,17 @@ var hdr1 = []byte{
 	0xca, 0xb0, 0x6e, 0x08, 0xbe, 0x5b, 0xd4, 0x43, 0x4c, 0xa6, 0xf6, 0x91, 0xf4, 0x38, 0x1f, 0x6c,
 	0x1b, 0x1e, 0x61, 0xe3, 0xd5, 0xb2, 0x83, 0x5b}
 
-func mkProgPowCfg() *electrumx.ElectrumXConfig {
+func mkProgPowCfg(dataDir string) *electrumx.ElectrumXConfig {
 	return &electrumx.ElectrumXConfig{
 		Coin:    "firo",
 		NetType: "mainnet",
-		DataDir: "/tmp",
+		DataDir: dataDir,
 	}
 }
 
 func TestHeaderProgPowDeserializer(t *testing.T) {
-	cfg := mkProgPowCfg()
+	dataDir := t.TempDir()
+	cfg := mkProgPowCfg(dataDir)
 
 	iface, _ := NewElectrumXInterface(cfg)
 	d := iface.config.HeaderDeserializer

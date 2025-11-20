@@ -49,7 +49,7 @@ func (ec *DashElectrumClient) SyncWallet(ctx context.Context) error {
 			return err
 		}
 		if status == "" {
-			// fmt.Println("no history for this script address .. yet")
+			ec.Log.Trace("no history for this script address .. yet")
 			continue
 		}
 		// get address history to date for this address from ElectrumX
@@ -243,7 +243,7 @@ func (ec *DashElectrumClient) Broadcast(ctx context.Context, rawTx []byte) (stri
 			backToWallet[idx] = pkScript
 		}
 	}
-	// fmt.Printf("found %d address(es) back to our wallet\n", len(backToWallet))
+	ec.Log.Tracef("found %d address(es) back to our wallet\n", len(backToWallet))
 
 	// Send tx to ElectrumX for broadcasting to the bitcoin network
 	rawTxStr := hex.EncodeToString(rawTx)

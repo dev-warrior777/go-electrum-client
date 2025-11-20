@@ -6,7 +6,6 @@ package firo
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
 
 	"github.com/bisoncraft/go-electrum-client/client"
 	"github.com/bisoncraft/go-electrum-client/wallet"
@@ -38,23 +37,23 @@ func (ec *FiroElectrumClient) RescanWallet(ctx context.Context) error {
 			}
 			address, err := w.GetAddress(keyPath)
 			if err != nil {
-				fmt.Printf("bad address for: %d:%d\n", keyIndex, change)
+				ec.Log.Errorf("bad address for: %d:%d - %v", keyIndex, change, err)
 				continue
 			}
 			scripthash, err := addressToElectrumScripthash(address)
 			if err != nil {
-				fmt.Printf("cannot make script hash for address: %s\n", address.String())
+				ec.Log.Errorf("cannot make script hash for address: %s - %v", address.String(), err)
 				continue
 			}
-			// fmt.Printf("%s %s  Index:change %d:%d\n", address.String(), scripthash, keyIndex, change)
+			ec.Log.Tracef("%s %s  Index:change %d:%d", address.String(), scripthash, keyIndex, change)
 
 			history, err := node.GetHistory(ctx, scripthash)
 			if err != nil {
-				fmt.Printf("error: %v - for scripthash %s\n", scripthash, err)
+				ec.Log.Errorf("error: %v - for scripthash %s", scripthash, err)
 				continue
 			}
 			if len(history) == 0 {
-				// fmt.Printf("No history for script hash from node: %s\n", scripthash)
+				ec.Log.Tracef("No history for script hash from node: %s", scripthash)
 				continue
 			}
 			// got history - update the highest hit index
@@ -66,7 +65,7 @@ func (ec *FiroElectrumClient) RescanWallet(ctx context.Context) error {
 			// }
 			pkScriptBytes, err := w.AddressToScript(address)
 			if err != nil {
-				fmt.Printf("cannot make pkScript for address: %s\n", address.String())
+				ec.Log.Errorf("cannot make pkScript for address: %s - %v", address.String(), err)
 				continue
 			}
 			subscription := &wallet.Subscription{
@@ -76,17 +75,17 @@ func (ec *FiroElectrumClient) RescanWallet(ctx context.Context) error {
 			}
 			err = w.AddSubscription(subscription)
 			if err != nil {
-				fmt.Printf("cannot add subscritpion for address: %s\n", address.String())
+				ec.Log.Errorf("cannot add subscritpion for address: %s - %v", address.String(), err)
 				// ec.dumpSubscription("failed to add", subscription)
 				continue
 			}
-			// fmt.Printf("Added subscritpion for address: %s to wallet subscriptions\n", address.String())
+			ec.Log.Tracef("Added subscription for address: %s to wallet subscriptions", address.String())
 		}
 
 		// if no more history hits for another GAP_LIMIT tries consider the job done.
 		if keyIndex > historyHitIndex+client.GAP_LIMIT {
-			// fmt.Printf("keyIndex: %d greater than highest history found index %d by GAP_LIMIT %d\n\n",
-			// 	keyIndex, historyHitIndex, client.GAP_LIMIT)
+			ec.Log.Debugf("keyIndex: %d greater than highest history found index %d by GAP_LIMIT %d",
+				keyIndex, historyHitIndex, client.GAP_LIMIT)
 			break
 		}
 	}

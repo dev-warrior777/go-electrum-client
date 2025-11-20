@@ -3,7 +3,7 @@
 
 package main
 
-// Run goele as an app for testing
+// Run goele as an app for testing btc
 
 import (
 	"context"
@@ -15,11 +15,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"decred.org/dcrdex/dex"
 	"github.com/bisoncraft/go-electrum-client/client"
 	"github.com/bisoncraft/go-electrum-client/client/btc"
 	"github.com/bisoncraft/go-electrum-client/electrumx"
 	"github.com/bisoncraft/go-electrum-client/wallet"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/decred/slog"
 )
 
 var (
@@ -165,12 +167,12 @@ func main() {
 
 	// start client, create ElectrumXInterface & sync headers
 	clientCtx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
-	err = ec.Start(clientCtx)
+	logger := dex.StdOutLogger("[Test]", slog.LevelTrace)
+	err = ec.Start(clientCtx, logger)
 	if err != nil {
 		fmt.Printf("%v - exiting.\n%s\n", err, checkSimnetHelp(cfg))
 		os.Exit(1)
 	}
-	fmt.Println("synced", ec.Synced())
 
 	// to make the client's wallet:
 	// - for regtest/testnet testing recreate a wallet with a known set of keys.

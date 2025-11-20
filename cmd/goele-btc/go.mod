@@ -5,8 +5,10 @@ go 1.23.2
 toolchain go1.24.4
 
 require (
+	decred.org/dcrdex v1.0.4
 	github.com/bisoncraft/go-electrum-client v0.0.0-20250415021946-c57d95f10ae9
 	github.com/btcsuite/btcd v0.25.0
+	github.com/decred/slog v1.2.0
 )
 
 require (
@@ -17,13 +19,14 @@ require (
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f // indirect
 	github.com/btcsuite/btcwallet/wallet/txauthor v1.3.5 // indirect
 	github.com/btcsuite/btcwallet/wallet/txrules v1.2.2 // indirect
-	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.3 // indirect
+	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
 	github.com/decred/dcrd/crypto/rand v1.0.1 // indirect
 	github.com/decred/dcrd/crypto/ripemd160 v1.0.2 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/decred/go-socks v1.1.0 // indirect
+	github.com/jrick/logrotate v1.0.0 // indirect
 	github.com/kkdai/bstream v1.0.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.27 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

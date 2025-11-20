@@ -6,7 +6,6 @@ package electrumx
 import (
 	"context"
 	"errors"
-	"fmt"
 )
 
 func (n *Node) scriptHashNotify(nodeCtx context.Context) error {
@@ -22,7 +21,7 @@ func (n *Node) scriptHashNotify(nodeCtx context.Context) error {
 
 	go func() {
 		defer close(qchan)
-		fmt.Println("=== Waiting for Scripthash Notifications")
+		n.log.Debug("waiting for scripthash notifications")
 		for {
 			if nodeCtx.Err() != nil {
 				<-n.server.conn.done
