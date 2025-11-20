@@ -112,7 +112,7 @@ func (k *KeysDB) GetUnused(purpose wallet.KeyChange) ([]int, error) {
 	var ret []int
 	stm := "select keyIndex from keys where purpose=" + strconv.Itoa(int(purpose)) + " and used=0 order by rowid asc"
 	rows, err := k.db.Query(stm)
-	if err != nil {
+	if err != nil || rows.Err() != nil {
 		return ret, err
 	}
 	defer rows.Close()
@@ -133,8 +133,8 @@ func (k *KeysDB) GetAll() ([]wallet.KeyPath, error) {
 	var ret []wallet.KeyPath
 	stm := "select purpose, keyIndex from keys"
 	rows, err := k.db.Query(stm)
-	if err != nil {
-		fmt.Println(err)
+	if err != nil || rows.Err() != nil {
+		fmt.Println(err, rows.Err())
 		return ret, err
 	}
 	defer rows.Close()
@@ -165,12 +165,13 @@ func (k *KeysDB) GetLookaheadWindows() map[wallet.KeyChange]int {
 	k.lock.RLock()
 	defer k.lock.RUnlock()
 	windows := make(map[wallet.KeyChange]int)
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		stm := "select used from keys where purpose=" + strconv.Itoa(i) + " order by rowid desc"
 		rows, err := k.db.Query(stm)
-		if err != nil {
+		if err != nil || rows.Err() != nil {
 			continue
 		}
+		defer rows.Close()
 		var unusedCount int
 		for rows.Next() {
 			var used int
@@ -180,7 +181,7 @@ func (k *KeysDB) GetLookaheadWindows() map[wallet.KeyChange]int {
 			if used == 0 {
 				unusedCount++
 			} else {
-				break
+				break // rows.Close
 			}
 		}
 		purpose := wallet.KeyChange(i)

@@ -109,7 +109,7 @@ func (km *KeyManager) GetFreshKey(purpose wallet.KeyChange) (*hd.ExtendedKey, er
 		return nil, err
 	}
 	p := wallet.KeyPath{
-		Change: wallet.KeyChange(purpose),
+		Change: purpose,
 		Index:  index,
 	}
 	err = km.datastore.Put(addr.ScriptAddress(), p)

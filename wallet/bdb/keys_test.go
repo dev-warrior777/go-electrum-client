@@ -295,15 +295,13 @@ func TestGetLookaheadWindows(t *testing.T) {
 	defer teardownKdb()
 
 	// test zero keys
-	var winZero = make(map[wallet.KeyChange]int)
-	winZero = kdb.GetLookaheadWindows()
+	winZero := kdb.GetLookaheadWindows()
 	if winZero[wallet.EXTERNAL] != 0 || winZero[wallet.INTERNAL] != 0 {
 		t.Fatal("no records failed - should return an un-empty map")
 	}
 
 	// test some keys - internal & external
-	var windows = make(map[wallet.KeyChange]int)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		b := make([]byte, 20)
 		rand.Read(b)
 		err := kdb.Put(b, wallet.KeyPath{
@@ -329,7 +327,7 @@ func TestGetLookaheadWindows(t *testing.T) {
 			kdb.MarkKeyAsUsed(b)
 		}
 	}
-	windows = kdb.GetLookaheadWindows()
+	windows := kdb.GetLookaheadWindows()
 	if windows[wallet.EXTERNAL] != 100-33 || windows[wallet.INTERNAL] != 100-81 {
 		t.Error("Fetched incorrect lookahead windows")
 	}

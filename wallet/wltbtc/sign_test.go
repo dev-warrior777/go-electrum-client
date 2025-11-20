@@ -35,8 +35,7 @@ func getUtxos() []*wallet.Utxo {
 	script7, _ := hex.DecodeString("0014df0683535861d41af232009259b5d3811d4471a8")
 	script8, _ := hex.DecodeString("0014a30a0cf1da8c0c36ae8d637b674663ccf2b31e45")
 
-	var utxos = make([]*wallet.Utxo, 0, 10)
-	utxos = []*wallet.Utxo{
+	utxos := []*wallet.Utxo{
 		{
 			Op:           *op1,
 			Value:        300000000,

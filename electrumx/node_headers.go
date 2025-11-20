@@ -296,7 +296,7 @@ func (n *Node) updateFromChunk(nodeCtx context.Context, from, to int64) int64 {
 		// corrupted or electrumx server code different from that expected
 		return 0
 	}
-	oneHdrLen := int(h.headerSize) * 2
+	oneHdrLen := h.headerSize * 2
 	allHdrs := hdrsRes.HexConcat
 	strLenAll := len(allHdrs)
 	// check size of returned concatenated blocks

@@ -171,7 +171,7 @@ func (w *DashElectrumWallet) buildTx(
 	}
 
 	// Get the fee per kilobyte
-	feePerKB := int64(w.GetFeePerByte(feeLevel)) * 1000
+	feePerKB := w.GetFeePerByte(feeLevel) * 1000
 
 	// outputs
 	out := wire.NewTxOut(amount, script)

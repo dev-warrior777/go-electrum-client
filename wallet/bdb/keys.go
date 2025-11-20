@@ -217,7 +217,7 @@ func (k *KeysDB) get(scriptAddress []byte) (*keyRec, error) {
 	k.lock.RLock()
 	defer k.lock.RUnlock()
 
-	key := []byte(scriptAddress)
+	key := scriptAddress
 	if len(key) != 20 {
 		return nil, errors.New("bad key length")
 	}

@@ -86,7 +86,7 @@ func (s *SubscriptionsDB) GetAll() ([]*wallet.Subscription, error) {
 	var subs []*wallet.Subscription
 	stm := "select scriptPubKey, electrumScripthash, address from subscriptions"
 	rows, err := s.db.Query(stm)
-	if err != nil {
+	if err != nil || rows.Err() != nil {
 		return subs, err
 	}
 	defer rows.Close()

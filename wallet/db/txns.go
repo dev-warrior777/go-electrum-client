@@ -81,7 +81,7 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 	var ret []wallet.Txn
 	stm := "select txid, tx, value, height, timestamp, watchOnly from txns"
 	rows, err := t.db.Query(stm)
-	if err != nil {
+	if err != nil || rows.Err() != nil {
 		return ret, err
 	}
 	defer rows.Close()

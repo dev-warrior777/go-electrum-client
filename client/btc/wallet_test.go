@@ -28,7 +28,6 @@ func makeBitcoinRegtestTestConfig(dataDir string) (*client.ClientConfig, error) 
 	return cfg, nil
 }
 
-
 // Create a new standard wallet
 func TestWalletCreation(t *testing.T) {
 	dataDir := t.TempDir()

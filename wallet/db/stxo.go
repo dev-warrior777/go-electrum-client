@@ -59,7 +59,7 @@ func (s *StxoDB) GetAll() ([]wallet.Stxo, error) {
 	var ret []wallet.Stxo
 	stm := "select outpoint, value, height, scriptPubKey, watchOnly, spendHeight, spendTxid from stxos"
 	rows, err := s.db.Query(stm)
-	if err != nil {
+	if err != nil || rows.Err() != nil {
 		return ret, err
 	}
 	defer rows.Close()

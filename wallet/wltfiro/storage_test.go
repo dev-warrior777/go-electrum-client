@@ -44,8 +44,8 @@ func TestStoreRetreiveBlob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(string(req))
-	fmt.Println(string(ret))
+	fmt.Println(req)
+	fmt.Println(ret)
 }
 
 func TestStoreRetrieveEncryptedStore(t *testing.T) {
