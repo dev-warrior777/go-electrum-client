@@ -31,7 +31,7 @@ jobs:
 
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v9  # Latest stable (v9.0.0)
-         with:
+        with:
           args: --timeout=10m      # optional
 
       - name: Build
